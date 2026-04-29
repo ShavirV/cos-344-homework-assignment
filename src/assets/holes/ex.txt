@@ -1,0 +1,2 @@
+load assets from a .txt file
+each hole or component will have its own txt file, to allow us to test and model in isolation
