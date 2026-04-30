@@ -2,7 +2,8 @@ files =
 main: main.cpp glad.c
 	g++ -g shader.cpp $(files) main.cpp glad.c -lglfw -pthread -lGLEW -ldl -lGL -o main
 clean:
-	rm -f *.o main
+	rm -rf *.o main outline
+	
 run:
 	./main
 all:
@@ -11,5 +12,5 @@ all:
 	make run
 
 outline: 
-	g++ -g src/core/shader.cpp src/objects/Triangle.cpp src/objects/Rectangle.cpp src/objects/Circle.cpp src/scene/Outline.cpp -Iinclude -lglfw -pthread -lGLEW -ldl -lGL -o outline
+	g++ -g supplementary/outline/shader.cpp supplementary/outline/Outline.cpp supplementary/outline/Triangle.cpp supplementary/outline/Square.cpp supplementary/outline/Shape.cpp supplementary/outline/Matrix.cpp supplementary/outline/Vector.cpp -Iinclude -lglfw -pthread -lGLEW -ldl -lGL -o outline
 	./outline
