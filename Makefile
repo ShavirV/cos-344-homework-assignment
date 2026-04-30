@@ -12,5 +12,6 @@ all:
 	make run
 
 outline: 
-	g++ -g supplementary/outline/shader.cpp supplementary/outline/Outline.cpp supplementary/outline/Triangle.cpp supplementary/outline/Square.cpp supplementary/outline/Shape.cpp supplementary/outline/Matrix.cpp supplementary/outline/Vector.cpp -Iinclude -lglfw -pthread -lGLEW -ldl -lGL -o outline
+	make clean
+	g++ -g supplementary/outline/shader.cpp supplementary/outline/Outline.cpp supplementary/outline/Triangle.cpp supplementary/outline/Circle.cpp supplementary/outline/Rectangle.cpp -Iinclude -lglfw -pthread -lGLEW -ldl -lGL -o outline
 	./outline
