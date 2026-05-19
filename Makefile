@@ -1,25 +1,37 @@
+# ─── Detect OS ───────────────────────────────────────────────────────────────
+UNAME_S := $(shell uname -s)
+
 # ─── Compiler & Flags ────────────────────────────────────────────────────────
 CXX      := g++
 CXXFLAGS := -std=c++11 -g -Wall \
             -I./include \
             -I./src
 
-LDFLAGS  := -lglfw -pthread -lGLEW -ldl -lGL
+# ─── Platform-specific flags ─────────────────────────────────────────────────
+ifeq ($(UNAME_S), Darwin)
+    BREW_PREFIX := $(shell brew --prefix)
+    CXXFLAGS    += -I$(BREW_PREFIX)/include
+    LDFLAGS     := -L$(BREW_PREFIX)/lib \
+                   -lglfw -lGLEW \
+                   -framework OpenGL \
+                   -framework Cocoa \
+                   -framework IOKit \
+                   -framework CoreVideo
+else ifeq ($(UNAME_S), Linux)
+    LDFLAGS := -lglfw -pthread -lGLEW -ldl -lGL
+else
+    # Windows (MinGW)
+    LDFLAGS := -lglfw3 -lglew32 -lopengl32 -lgdi32
+endif
 
 # ─── Sources ──────────────────────────────────────────────────────────────────
-# Recursively find all .cpp files under src/
 SRCS     := $(shell find src/ -name "*.cpp")
-
-# Entry point
 MAIN     := src/scene/main.cpp
-
-# All other .cpp files (exclude main.cpp to avoid duplicate main)
 LIB_SRCS := $(filter-out $(MAIN), $(SRCS))
 
 # ─── Objects ─────────────────────────────────────────────────────────────────
 LIB_OBJS := $(LIB_SRCS:.cpp=.o)
 MAIN_OBJ := $(MAIN:.cpp=.o)
-
 ALL_OBJS := $(LIB_OBJS) $(MAIN_OBJ)
 
 # ─── Target ───────────────────────────────────────────────────────────────────
@@ -31,7 +43,6 @@ all: clean $(TARGET)
 $(TARGET): $(ALL_OBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
-# Compile all .cpp files to .o
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
