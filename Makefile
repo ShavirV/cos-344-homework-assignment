@@ -1,17 +1,47 @@
-files = 
-main: main.cpp glad.c
-	g++ -g shader.cpp $(files) main.cpp glad.c -lglfw -pthread -lGLEW -ldl -lGL -o main
-clean:
-	rm -rf *.o main outline
-	
-run:
-	./main
-all:
-	make clean
-	make
-	make run
+# ─── Compiler & Flags ────────────────────────────────────────────────────────
+CXX      := g++
+CXXFLAGS := -std=c++11 -g -Wall \
+            -I./include \
+            -I./src
 
-outline: 
-	make clean
-	g++ -g supplementary/outline/shader.cpp supplementary/outline/Outline.cpp supplementary/outline/Triangle.cpp supplementary/outline/Circle.cpp supplementary/outline/Rectangle.cpp -Iinclude -lglfw -pthread -lGLEW -ldl -lGL -o outline
-	./outline
+LDFLAGS  := -lglfw -pthread -lGLEW -ldl -lGL
+
+# ─── Sources ──────────────────────────────────────────────────────────────────
+# Recursively find all .cpp files under src/
+SRCS     := $(shell find src/ -name "*.cpp")
+
+# Entry point
+MAIN     := src/scene/main.cpp
+
+# All other .cpp files (exclude main.cpp to avoid duplicate main)
+LIB_SRCS := $(filter-out $(MAIN), $(SRCS))
+
+# ─── Objects ─────────────────────────────────────────────────────────────────
+LIB_OBJS := $(LIB_SRCS:.cpp=.o)
+MAIN_OBJ := $(MAIN:.cpp=.o)
+
+ALL_OBJS := $(LIB_OBJS) $(MAIN_OBJ)
+
+# ─── Target ───────────────────────────────────────────────────────────────────
+TARGET   := main
+
+# ─── Rules ────────────────────────────────────────────────────────────────────
+all: clean $(TARGET)
+
+$(TARGET): $(ALL_OBJS)
+	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
+
+# Compile all .cpp files to .o
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+clean:
+	find src/ -name "*.o" -delete
+	rm -f $(TARGET)
+
+run:
+	./$(TARGET)
+
+rebuild: clean $(TARGET) run
+
+.PHONY: all clean run rebuild

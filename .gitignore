@@ -1,42 +1,63 @@
-# Prerequisites
-*.d
+# ─── Build outputs
+main
+outline
 
-# Compiled Object files
-*.slo
-*.lo
+# ─── Executables 
+*.exe
+*.out
+*.app
+
+# ─── Compiled Object files
 *.o
 *.obj
+*.slo
+*.lo
 
-# Precompiled Headers
+# ─── Precompiled Headers 
 *.gch
 *.pch
 
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
+# ─── Compiled Dynamic libraries 
 *.so
 *.dylib
 *.dll
 
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
+# ─── Compiled Static libraries 
 *.lai
 *.la
 *.a
 *.lib
 
-# Executables
-*.exe
-*.out
-*.app
-outline
-
-# debug information files
+# ─── Linker / Debugger files 
+*.ilk
+*.pdb
 *.dwo
+
+# ─── Fortran module files 
+*.mod
+*.smod
+
+# ─── Prerequisites 
+*.d
+
+# ─── Local include headers (glew, glfw, glad, glm — installed locally) ───────
+include/
+glad.c
+
+# ─── IDE / editor files 
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS files 
+.DS_Store
+Thumbs.db
+
+# ─── Supplementary / reference code (not part of submission) 
+supplementary/
+
+# ─── Compiled test binaries 
+tests/*.o
+tests/main
