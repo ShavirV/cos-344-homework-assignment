@@ -1,18 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
-
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
-#include "../../include/shader.hpp"
-#include "../../include/Mesh.h"
+#include "../core/shader.hpp"
+#include "../core/Mesh.h"
 
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
+
+// ── Camera state ─────────────────────────────────────────────────────────────
+glm::vec3 cameraPos   = glm::vec3(0.0f, 20.0f, 50.0f);
+glm::vec3 cameraFront = glm::normalize(glm::vec3(0.0f, -20.0f, -50.0f));
+glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
+const float SPEED     = 0.5f;
 
 const char* getError()
 {
@@ -37,7 +41,6 @@ inline void startUpGLEW()
 inline GLFWwindow* setUp()
 {
     startUpGLFW();
-
     glfwWindowHint(GLFW_SAMPLES, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -51,11 +54,25 @@ inline GLFWwindow* setUp()
         glfwTerminate();
         throw "Failed to open GLFW window.";
     }
-
     glfwMakeContextCurrent(window);
     startUpGLEW();
-
     return window;
+}
+
+void processInput(GLFWwindow* window)
+{
+    // Forward/back along the ground (ignore y component so we don't fly)
+    glm::vec3 flat = glm::normalize(glm::vec3(cameraFront.x, 0.0f, cameraFront.z));
+    glm::vec3 right = glm::normalize(glm::cross(flat, cameraUp));
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        cameraPos += SPEED * flat;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cameraPos -= SPEED * flat;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        cameraPos -= SPEED * right;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        cameraPos += SPEED * right;
 }
 
 int main()
@@ -77,47 +94,73 @@ int main()
     GLuint shader = LoadShaders("src/shaders/vertex.glsl", "src/shaders/fragment.glsl");
 
     // ── Ground plane ─────────────────────────────────────────────────────────
-    Mesh ground = Mesh::makeCuboid(20.0f, 0.1f, 20.0f,
+    Mesh ground = Mesh::makeCuboid(80.0f, 0.1f, 50.0f,
                                    0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
-    // Debug: confirm vertices were added
-    std::cout << "Ground vertex count: " << ground.getVertexCount() << std::endl;
-    std::cout << "Ground index count:  " << ground.getIndexCount()  << std::endl;
+    Mesh hole1 = Mesh::makeCuboid(15.0f, 0.1f, 7.5f,
+                                  1.0f, 0.0f, 0.0f, 1.0f);
+    hole1.rotate(90, 0.0f, 1.0f, 0.0f);
+    hole1.translate(0.0f, 0.1f, -32.0f);
+    hole1.setup();
 
-    // Debug: confirm uniforms exist in shader
+    Mesh hole2 = Mesh::makeCuboid(15.0f, 0.1f, 7.5f,
+                                  1.0f, 0.0f, 0.0f, 1.0f);
+    hole2.translate(-25.0f, 0.1f, -15.0f);
+    hole2.setup();
+
+    Mesh hole3 = Mesh::makeCuboid(15.0f, 0.1f, 7.5f,
+                                  1.0f, 0.0f, 0.0f, 1.0f);
+    hole3.rotate(90, 0.0f, 1.0f, 0.0f);
+    hole3.translate(0.0f, 0.1f, -20.0f);
+    hole3.setup();
+
+    Mesh hole4 = Mesh::makeCuboid(15.0f, 0.1f, 7.5f,
+                                  1.0f, 0.0f, 0.0f, 1.0f);
+    hole4.translate(-15.0f, 0.1f, 15.0f);
+    hole4.setup();
+
+   Mesh volcano = Mesh::makeCone(10.0f, 10.0f, 64,
+                               0.39f, 0.26f, 0.13f, 0.5f);
+    volcano.translate(0.0f, 5.0f, 0.0f);
+    volcano.setup();
+
     glUseProgram(shader);
     GLint locModel = glGetUniformLocation(shader, "model");
     GLint locView  = glGetUniformLocation(shader, "view");
     GLint locProj  = glGetUniformLocation(shader, "projection");
     GLint locCol   = glGetUniformLocation(shader, "colour");
-    std::cout << "model="      << locModel
-              << " view="      << locView
-              << " projection="<< locProj
-              << " colour="    << locCol << std::endl;
+    std::cout << "model=" << locModel << " view=" << locView
+              << " projection=" << locProj << " colour=" << locCol << std::endl;
 
-    // ── Camera ───────────────────────────────────────────────────────────────
     glm::mat4 projection = glm::perspective(
         glm::radians(45.0f),
         (float)WIDTH / (float)HEIGHT,
-        0.1f, 100.0f
-    );
-
-    glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 15.0f, 15.0f),
-        glm::vec3(0.0f,  0.0f,  0.0f),
-        glm::vec3(0.0f,  1.0f,  0.0f)
+        0.1f, 200.0f
     );
 
     while (!glfwWindowShouldClose(window))
     {
+        processInput(window);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glm::mat4 view = glm::lookAt(
+            cameraPos,
+            cameraPos + cameraFront,
+            cameraUp
+        );
 
         glUseProgram(shader);
         glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
 
         ground.draw(shader, false);
+        hole1.draw(shader, false);
+        hole2.draw(shader, false);
+        hole3.draw(shader,false);
+        hole4.draw(shader,false);
+        volcano.draw(shader, false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

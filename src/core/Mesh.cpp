@@ -10,14 +10,94 @@ Mesh::Mesh(float r, float g, float b, float a)
       buffersInitialized(false),
       vertexCount(0),
       indexCount(0),
-      wireVertexCount(0)
+      wireVertexCount(0),
+      vertices    (new Vertex      [MAX_VERTICES]),
+      indices     (new unsigned int[MAX_INDICES ]),
+      wireVertices(new float       [MAX_WIRE    ])
 {
 }
 
+
 Mesh::~Mesh()
 {
-    cleanup();
+    cleanup();              
+    delete[] vertices;
+    delete[] indices;
+    delete[] wireVertices;
 }
+
+
+Mesh::Mesh(Mesh&& other) noexcept
+    : r(other.r), g(other.g), b(other.b), a(other.a),
+      modelMatrix        (other.modelMatrix),
+      select             (other.select),
+      VAO                (other.VAO),
+      VBO                (other.VBO),
+      EBO                (other.EBO),
+      wireVAO            (other.wireVAO),
+      wireVBO            (other.wireVBO),
+      buffersInitialized (other.buffersInitialized),
+      vertexCount        (other.vertexCount),
+      indexCount         (other.indexCount),
+      wireVertexCount    (other.wireVertexCount),
+      vertices           (other.vertices),
+      indices            (other.indices),
+      wireVertices       (other.wireVertices)
+{
+    other.vertices      = nullptr;
+    other.indices       = nullptr;
+    other.wireVertices  = nullptr;
+    other.vertexCount   = 0;
+    other.indexCount    = 0;
+    other.wireVertexCount = 0;
+    other.VAO = other.VBO = other.EBO = 0;
+    other.wireVAO = other.wireVBO = 0;
+    other.buffersInitialized = false;
+}
+
+
+Mesh& Mesh::operator=(Mesh&& other) noexcept
+{
+    if (this == &other)
+        return *this;
+
+    // Release what we currently own.
+    cleanup();
+    delete[] vertices;
+    delete[] indices;
+    delete[] wireVertices;
+
+    // Steal from other.
+    r = other.r;  g = other.g;  b = other.b;  a = other.a;
+    modelMatrix        = other.modelMatrix;
+    select             = other.select;
+    VAO                = other.VAO;
+    VBO                = other.VBO;
+    EBO                = other.EBO;
+    wireVAO            = other.wireVAO;
+    wireVBO            = other.wireVBO;
+    buffersInitialized = other.buffersInitialized;
+    vertexCount        = other.vertexCount;
+    indexCount         = other.indexCount;
+    wireVertexCount    = other.wireVertexCount;
+    vertices           = other.vertices;
+    indices            = other.indices;
+    wireVertices       = other.wireVertices;
+
+    // Null out source.
+    other.vertices      = nullptr;
+    other.indices       = nullptr;
+    other.wireVertices  = nullptr;
+    other.vertexCount   = 0;
+    other.indexCount    = 0;
+    other.wireVertexCount = 0;
+    other.VAO = other.VBO = other.EBO = 0;
+    other.wireVAO = other.wireVBO = 0;
+    other.buffersInitialized = false;
+
+    return *this;
+}
+
 
 void Mesh::addVertex(const Vertex& v)
 {
@@ -38,6 +118,7 @@ void Mesh::addTriangle(unsigned int i0, unsigned int i1, unsigned int i2)
     addIndex(i2);
 }
 
+
 void Mesh::cleanup()
 {
     if (buffersInitialized)
@@ -52,6 +133,7 @@ void Mesh::cleanup()
         buffersInitialized = false;
     }
 }
+
 
 void Mesh::setup()
 {
@@ -76,16 +158,17 @@ void Mesh::setup()
         indexCount * sizeof(unsigned int),
         indices, GL_STATIC_DRAW);
 
+    // position  — attribute 0
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
         (void*)0);
     glEnableVertexAttribArray(0);
 
-    // normal
+    // normal    — attribute 1
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
         (void*)(sizeof(glm::vec3)));
     glEnableVertexAttribArray(1);
 
-    // texCoord
+    // texCoord  — attribute 2
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
         (void*)(sizeof(glm::vec3) * 2));
     glEnableVertexAttribArray(2);
@@ -97,6 +180,7 @@ void Mesh::setup()
     buildWireVBO();
 }
 
+
 void Mesh::buildWireVBO()
 {
     wireVertexCount = 0;
@@ -107,6 +191,7 @@ void Mesh::buildWireVBO()
         unsigned int i1 = indices[i + 1];
         unsigned int i2 = indices[i + 2];
 
+        // Edge i0→i1
         wireVertices[wireVertexCount++] = vertices[i0].position.x;
         wireVertices[wireVertexCount++] = vertices[i0].position.y;
         wireVertices[wireVertexCount++] = vertices[i0].position.z;
@@ -114,6 +199,7 @@ void Mesh::buildWireVBO()
         wireVertices[wireVertexCount++] = vertices[i1].position.y;
         wireVertices[wireVertexCount++] = vertices[i1].position.z;
 
+        // Edge i1→i2
         wireVertices[wireVertexCount++] = vertices[i1].position.x;
         wireVertices[wireVertexCount++] = vertices[i1].position.y;
         wireVertices[wireVertexCount++] = vertices[i1].position.z;
@@ -121,6 +207,7 @@ void Mesh::buildWireVBO()
         wireVertices[wireVertexCount++] = vertices[i2].position.y;
         wireVertices[wireVertexCount++] = vertices[i2].position.z;
 
+        // Edge i2→i0
         wireVertices[wireVertexCount++] = vertices[i2].position.x;
         wireVertices[wireVertexCount++] = vertices[i2].position.y;
         wireVertices[wireVertexCount++] = vertices[i2].position.z;
@@ -150,6 +237,7 @@ void Mesh::buildWireVBO()
     glBindVertexArray(0);
 }
 
+
 void Mesh::draw(GLuint shaderProgram, bool wireframe)
 {
     if (!buffersInitialized && vertexCount > 0)
@@ -164,18 +252,11 @@ void Mesh::draw(GLuint shaderProgram, bool wireframe)
     glUseProgram(shaderProgram);
 
     if (select)
-    {
-        glUniform4f(colourLocation,
-            r * 0.7f + 0.3f,
-            g * 0.7f + 0.3f,
-            b * 0.7f + 0.3f, a);
-    }
+        glUniform4f(colourLocation, r * 0.7f + 0.3f, g * 0.7f + 0.3f,
+                                    b * 0.7f + 0.3f, a);
     else
-    {
         glUniform4f(colourLocation, r, g, b, a);
-    }
 
-    // glm::value_ptr gives a column-major float* — use GL_FALSE for transpose
     glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(modelMatrix));
 
     if (wireframe)
@@ -221,6 +302,7 @@ void Mesh::applyMatrix(const glm::mat4& m)
     modelMatrix = m * modelMatrix;
 }
 
+
 void Mesh::setRGBA(float r, float g, float b, float a)
 {
     this->r = r;
@@ -229,15 +311,8 @@ void Mesh::setRGBA(float r, float g, float b, float a)
     this->a = a;
 }
 
-void Mesh::selected(bool s)
-{
-    select = s;
-}
-
-bool Mesh::isSelected()
-{
-    return select;
-}
+void Mesh::selected(bool s)  { select = s; }
+bool Mesh::isSelected()      { return select; }
 
 
 Mesh Mesh::makeCuboid(float width, float height, float depth,
@@ -250,22 +325,22 @@ Mesh Mesh::makeCuboid(float width, float height, float depth,
     Mesh mesh(r, g, b, a);
 
     Vertex verts[] = {
-        // Front
+        // Front  (+Z)
         {{-w,-h, d},{0,0,1},{0,0}}, {{ w,-h, d},{0,0,1},{1,0}},
         {{ w, h, d},{0,0,1},{1,1}}, {{-w, h, d},{0,0,1},{0,1}},
-        // Back
+        // Back   (-Z)
         {{ w,-h,-d},{0,0,-1},{0,0}}, {{-w,-h,-d},{0,0,-1},{1,0}},
         {{-w, h,-d},{0,0,-1},{1,1}}, {{ w, h,-d},{0,0,-1},{0,1}},
-        // Left
+        // Left   (-X)
         {{-w,-h,-d},{-1,0,0},{0,0}}, {{-w,-h, d},{-1,0,0},{1,0}},
         {{-w, h, d},{-1,0,0},{1,1}}, {{-w, h,-d},{-1,0,0},{0,1}},
-        // Right
+        // Right  (+X)
         {{ w,-h, d},{1,0,0},{0,0}}, {{ w,-h,-d},{1,0,0},{1,0}},
         {{ w, h,-d},{1,0,0},{1,1}}, {{ w, h, d},{1,0,0},{0,1}},
-        // Top
+        // Top    (+Y)
         {{-w, h, d},{0,1,0},{0,0}}, {{ w, h, d},{0,1,0},{1,0}},
         {{ w, h,-d},{0,1,0},{1,1}}, {{-w, h,-d},{0,1,0},{0,1}},
-        // Bottom
+        // Bottom (-Y)
         {{-w,-h,-d},{0,-1,0},{0,0}}, {{ w,-h,-d},{0,-1,0},{1,0}},
         {{ w,-h, d},{0,-1,0},{1,1}}, {{-w,-h, d},{0,-1,0},{0,1}},
     };
@@ -280,8 +355,9 @@ Mesh Mesh::makeCuboid(float width, float height, float depth,
         mesh.addTriangle(base+2, base+3, base+0);
     }
 
-    return mesh;
+    return mesh;    // move constructor fires here — no copy, no stack blowout
 }
+
 
 Mesh Mesh::makeTriangularPrism(float width, float height, float depth,
                                 float r, float g, float b, float a)
@@ -320,12 +396,13 @@ Mesh Mesh::makeTriangularPrism(float width, float height, float depth,
 
     mesh.addTriangle(0, 1, 2);
     mesh.addTriangle(3, 4, 5);
-    mesh.addTriangle(6, 7, 8);  mesh.addTriangle(8, 9, 6);
-    mesh.addTriangle(10,11,12); mesh.addTriangle(12,13,10);
-    mesh.addTriangle(14,15,16); mesh.addTriangle(16,17,14);
+    mesh.addTriangle(6, 7, 8);  mesh.addTriangle(8,  9,  6);
+    mesh.addTriangle(10,11,12); mesh.addTriangle(12, 13, 10);
+    mesh.addTriangle(14,15,16); mesh.addTriangle(16, 17, 14);
 
     return mesh;
 }
+
 
 Mesh Mesh::makeCone(float radius, float height, int sectors,
                     float r, float g, float b, float a)
@@ -333,7 +410,7 @@ Mesh Mesh::makeCone(float radius, float height, int sectors,
     Mesh mesh(r, g, b, a);
 
     float h = height / 2.0f;
-    glm::vec3 apex      = { 0,  h, 0};
+    glm::vec3 apex       = { 0,  h, 0};
     glm::vec3 baseCentre = { 0, -h, 0};
 
     float slopeLen = sqrtf(height*height + radius*radius);
@@ -370,6 +447,7 @@ Mesh Mesh::makeCone(float radius, float height, int sectors,
     return mesh;
 }
 
+
 Mesh Mesh::makeCylinder(float radius, float height, int sectors,
                         float r, float g, float b, float a)
 {
@@ -401,16 +479,16 @@ Mesh Mesh::makeCylinder(float radius, float height, int sectors,
 
         glm::vec3 nUp = {0,1,0};
         int tBaseIdx = mesh.vertexCount;
-        mesh.addVertex({topC,        nUp, {0.5f, 0.5f}});
-        mesh.addVertex({{x1,h,z1},   nUp, {0.5f+0.5f*cosf(a1), 0.5f+0.5f*sinf(a1)}});
-        mesh.addVertex({{x2,h,z2},   nUp, {0.5f+0.5f*cosf(a2), 0.5f+0.5f*sinf(a2)}});
+        mesh.addVertex({topC,         nUp, {0.5f, 0.5f}});
+        mesh.addVertex({{x1, h, z1},  nUp, {0.5f+0.5f*cosf(a1), 0.5f+0.5f*sinf(a1)}});
+        mesh.addVertex({{x2, h, z2},  nUp, {0.5f+0.5f*cosf(a2), 0.5f+0.5f*sinf(a2)}});
         mesh.addTriangle(tBaseIdx, tBaseIdx+1, tBaseIdx+2);
 
         glm::vec3 nDn = {0,-1,0};
         int bBaseIdx = mesh.vertexCount;
-        mesh.addVertex({botC,        nDn, {0.5f, 0.5f}});
-        mesh.addVertex({{x2,-h,z2},  nDn, {0.5f+0.5f*cosf(a2), 0.5f+0.5f*sinf(a2)}});
-        mesh.addVertex({{x1,-h,z1},  nDn, {0.5f+0.5f*cosf(a1), 0.5f+0.5f*sinf(a1)}});
+        mesh.addVertex({botC,         nDn, {0.5f, 0.5f}});
+        mesh.addVertex({{x2,-h, z2},  nDn, {0.5f+0.5f*cosf(a2), 0.5f+0.5f*sinf(a2)}});
+        mesh.addVertex({{x1,-h, z1},  nDn, {0.5f+0.5f*cosf(a1), 0.5f+0.5f*sinf(a1)}});
         mesh.addTriangle(bBaseIdx, bBaseIdx+1, bBaseIdx+2);
     }
 

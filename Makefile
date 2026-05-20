@@ -42,6 +42,7 @@ all: clean $(TARGET)
 
 $(TARGET): $(ALL_OBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
+	./$(TARGET)
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
