@@ -17,6 +17,10 @@ glm::vec3 cameraPos   = glm::vec3(0.0f, 20.0f, 50.0f);
 glm::vec3 cameraFront = glm::normalize(glm::vec3(0.0f, -20.0f, -50.0f));
 glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
 const float SPEED     = 0.5f;
+const float LOOK_SPEED = 1.0f;   // degrees per frame
+
+float yaw   = -90.0f;   // start facing -Z
+float pitch = -21.8f;   // start angled slightly down (matches original front vector)
 
 const char* getError()
 {
@@ -61,18 +65,31 @@ inline GLFWwindow* setUp()
 
 void processInput(GLFWwindow* window)
 {
-    // Forward/back along the ground (ignore y component so we don't fly)
-    glm::vec3 flat = glm::normalize(glm::vec3(cameraFront.x, 0.0f, cameraFront.z));
+    // ── Look (arrow keys) ────────────────────────────────────────────────────
+    if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) yaw   -= LOOK_SPEED;
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) yaw   += LOOK_SPEED;
+    if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS) pitch += LOOK_SPEED;
+    if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) pitch -= LOOK_SPEED;
+
+    // Clamp pitch so the camera doesn't flip over
+    if (pitch >  89.0f) pitch =  89.0f;
+    if (pitch < -89.0f) pitch = -89.0f;
+
+    // Rebuild cameraFront from yaw/pitch
+    cameraFront = glm::normalize(glm::vec3(
+        cosf(glm::radians(yaw)) * cosf(glm::radians(pitch)),
+        sinf(glm::radians(pitch)),
+        sinf(glm::radians(yaw)) * cosf(glm::radians(pitch))
+    ));
+
+    // ── Move (WASD) ──────────────────────────────────────────────────────────
+    glm::vec3 flat  = glm::normalize(glm::vec3(cameraFront.x, 0.0f, cameraFront.z));
     glm::vec3 right = glm::normalize(glm::cross(flat, cameraUp));
 
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        cameraPos += SPEED * flat;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        cameraPos -= SPEED * flat;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        cameraPos -= SPEED * right;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        cameraPos += SPEED * right;
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) cameraPos += SPEED * flat;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) cameraPos -= SPEED * flat;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) cameraPos -= SPEED * right;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) cameraPos += SPEED * right;
 }
 
 int main()
@@ -94,35 +111,62 @@ int main()
     GLuint shader = LoadShaders("src/shaders/vertex.glsl", "src/shaders/fragment.glsl");
 
     // ── Ground plane ─────────────────────────────────────────────────────────
-    Mesh ground = Mesh::makeCuboid(80.0f, 0.1f, 50.0f,
+    Mesh ground = Mesh::makeCuboid(160.0f, 0.1f, 100.0f,
                                    0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
-    Mesh hole1 = Mesh::makeCuboid(15.0f, 0.1f, 7.5f,
+    Mesh hole1 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
                                   1.0f, 0.0f, 0.0f, 1.0f);
     hole1.rotate(90, 0.0f, 1.0f, 0.0f);
-    hole1.translate(0.0f, 0.1f, -32.0f);
+    hole1.translate(-30.0f, 0.1f, -70.0f);
     hole1.setup();
 
-    Mesh hole2 = Mesh::makeCuboid(15.0f, 0.1f, 7.5f,
+    Mesh hole2 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
                                   1.0f, 0.0f, 0.0f, 1.0f);
-    hole2.translate(-25.0f, 0.1f, -15.0f);
+    hole2.rotate(45, 0.0f, 1.0f, 0.0f);
+    hole2.translate(-40.0f, 0.1f, -50.0f);
     hole2.setup();
 
-    Mesh hole3 = Mesh::makeCuboid(15.0f, 0.1f, 7.5f,
+ 
+    Mesh hole3 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
                                   1.0f, 0.0f, 0.0f, 1.0f);
-    hole3.rotate(90, 0.0f, 1.0f, 0.0f);
-    hole3.translate(0.0f, 0.1f, -20.0f);
+     hole3.translate(-60.0f, 0.1f, -35.0f);
     hole3.setup();
 
-    Mesh hole4 = Mesh::makeCuboid(15.0f, 0.1f, 7.5f,
+    Mesh hole4 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
                                   1.0f, 0.0f, 0.0f, 1.0f);
-    hole4.translate(-15.0f, 0.1f, 15.0f);
+    hole4.rotate(90, 0.0f, 1.0f, 0.0f);
+    hole4.translate(13.0f, 2.0f, -39.0f);
     hole4.setup();
 
-   Mesh volcano = Mesh::makeCone(10.0f, 10.0f, 64,
-                               0.39f, 0.26f, 0.13f, 0.5f);
-    volcano.translate(0.0f, 5.0f, 0.0f);
+    Mesh hole5 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
+                                  1.0f, 0.0f, 0.0f, 1.0f);
+    hole5.rotate(-20, 0.0f, 1.0f, 0.0f);
+    hole5.translate(-15.0f, 5.0f, 27.0f);
+    hole5.setup();
+
+    Mesh hole6 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
+                                  1.0f, 0.0f, 0.0f, 1.0f);
+    hole6.rotate(20, 0.0f, 1.0f, 0.0f);
+    hole6.translate(5.0f, 7.0f, 23.0f);
+
+    Mesh hole7 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
+                                  1.0f, 0.0f, 0.0f, 1.0f);
+    hole7.rotate(90, 0.0f, 1.0f, 0.0f);
+    hole7.translate(10.0f, 9.0f, 20.0f);
+
+    Mesh hole8 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
+                                  1.0f, 0.0f, 0.0f, 1.0f);
+    hole8.translate(30.0f, 10.0f, -40.0f);
+
+    Mesh hole9 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
+                                  1.0f, 0.0f, 0.0f, 1.0f);
+    hole9.rotate(-30, 0.0f, 1.0f, 0.0f);
+    hole9.translate(40.0f, 10.0f, -60.0f);
+
+    Mesh volcano = Mesh::makeCone(30.0f, 30.0f, 64,
+                                  0.39f, 0.26f, 0.13f, 0.5f);
+    volcano.translate(-5.0f, 10.0f, -15.0f);
     volcano.setup();
 
     glUseProgram(shader);
@@ -158,8 +202,13 @@ int main()
         ground.draw(shader, false);
         hole1.draw(shader, false);
         hole2.draw(shader, false);
-        hole3.draw(shader,false);
-        hole4.draw(shader,false);
+        hole3.draw(shader, false);
+        hole4.draw(shader, false);
+        hole5.draw(shader, false);
+        hole6.draw(shader, false);
+        hole7.draw(shader, false);
+        hole8.draw(shader, false);
+        hole9.draw(shader, false);
         volcano.draw(shader, false);
 
         glfwSwapBuffers(window);
