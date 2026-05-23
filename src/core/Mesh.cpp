@@ -609,7 +609,7 @@ Mesh Mesh::makeHill(float topWidth,    float topDepth,
 Mesh Mesh::makeHole(float cx, float cy, float cz, float rotY)
 {
     // Fairway colour: bright red so it reads clearly from above.
-    Mesh h = Mesh::makeCuboid(28.0f, 0.2f, 10.0f, 1.0f, 0.05f, 0.05f, 1.0f);
+    Mesh h = Mesh::makeCuboid(28.0f, 0.2f, 15.0f, 1.0f, 0.05f, 0.05f, 1.0f);
     if (rotY != 0.0f)
         h.rotate(rotY, 0.0f, 1.0f, 0.0f);
     h.translate(cx, cy, cz);

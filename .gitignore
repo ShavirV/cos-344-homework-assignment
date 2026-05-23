@@ -1,6 +1,7 @@
 # ─── Build outputs
 main
 outline
+bin_dev
 
 # ─── Executables 
 *.exe

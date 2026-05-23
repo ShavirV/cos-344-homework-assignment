@@ -1,9 +1,7 @@
 // main.cpp  —  COS344 Miniature Golf Course
 //
-// Holes are flat red cuboids 28 (length) × 0.2 (height) × 20 (width).
+// Holes are flat red cuboids 28 (length) × 0.2 (height) × 15 (width).
 // Rotation: 0° = runs along X,  90° = runs along Z.
-// Half-extents: 0° → hx=14, hz=10   |   90° → hx=10, hz=14
-// All positions verified with >= 3 world-unit gap between every pair.
 //
 // Directed play order:
 //   1→2→3→4→5→6→7→8→9(tunnel)→10→11→12→13→14→15→16→17→18
@@ -30,7 +28,7 @@
 //  H17   | +16   | +40   |  0°
 //  H18   | +16   | +15   |  0°   FINISH
 //
-//  Volcano centre: (0, y=20, -10)   base radius 20, height 40
+//  Volcano centre: (0, 20, -10)   base radius 20, height 40
 //  Tunnel mouths:  x = ±20,  y = 4, z = -8  (cylinders rotated 90° around Z)
 
 #include <stdio.h>
@@ -47,7 +45,7 @@
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
 
-// ── Camera ─────────────────────────────────────────────────────────────────
+// ── Camera ──────────────────────────────────────────────────────────────────
 glm::vec3 cameraPos   = glm::vec3(0.0f, 90.0f, 160.0f);
 glm::vec3 cameraFront = glm::normalize(glm::vec3(0.0f, -90.0f, -160.0f));
 glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -100,19 +98,6 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) cameraPos -= SPEED * cameraUp;
 }
 
-// ── makeHole ───────────────────────────────────────────────────────────────
-// Fairway: 28 long × 0.2 tall × 20 wide, red.
-// rot90 = false → length along X;  rot90 = true → length along Z.
-static Mesh makeHole(float cx, float cz, bool rot90 = false)
-{
-    const float FY = 0.35f;
-    Mesh h = Mesh::makeCuboid(28.0f, 0.2f, 15.0f, 1.0f, 0.05f, 0.05f, 1.0f);
-    if (rot90) h.rotate(90.0f, 0.0f, 1.0f, 0.0f);
-    h.translate(cx, FY, cz);
-    h.setup();
-    return h;
-}
-
 int main()
 {
     GLFWwindow* window;
@@ -123,7 +108,7 @@ int main()
     glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
     GLuint shader = LoadShaders("src/shaders/vertex.glsl", "src/shaders/fragment.glsl");
 
-    // ── Ground ──────────────────────────────────────────────────────────────
+    // ── Ground ───────────────────────────────────────────────────────────────
     Mesh ground = Mesh::makeCuboid(210.0f, 0.5f, 125.0f, 0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
@@ -143,26 +128,29 @@ int main()
     tunnelE.translate( 20.0f, 4.0f, -8.0f);
     tunnelE.setup();
 
-    // ── Holes ────────────────────────────────────────────────────────────────
-    Mesh hole1  = makeHole(-80.0f, +40.0f);          // START
-    Mesh hole2  = makeHole(-80.0f, +15.0f);
-    Mesh hole3  = makeHole(-48.0f, +40.0f);
-    Mesh hole4  = makeHole(-48.0f, +15.0f);
-    Mesh hole5  = makeHole(-80.0f,  -8.0f);
-    Mesh hole6  = makeHole(-20.0f, +28.0f, true);    // 90°
-    Mesh hole7  = makeHole(-22.0f, -35.0f);
-    Mesh hole8  = makeHole(-19.0f,  -8.0f, true);    // 90°
-    Mesh hole9w = makeHole(-48.0f,  -8.0f);          // tunnel west approach
-    Mesh hole9e = makeHole(+48.0f,  -8.0f);          // tunnel east exit
-    Mesh hole10 = makeHole(+22.0f, -35.0f);
-    Mesh hole11 = makeHole(+55.0f, -35.0f);
-    Mesh hole12 = makeHole(+80.0f,  -8.0f);
-    Mesh hole13 = makeHole(+80.0f, +15.0f);
-    Mesh hole14 = makeHole(+80.0f, +40.0f);
-    Mesh hole15 = makeHole(+48.0f, +40.0f);
-    Mesh hole16 = makeHole(+48.0f, +15.0f);
-    Mesh hole17 = makeHole(+16.0f, +40.0f);
-    Mesh hole18 = makeHole(+16.0f, +15.0f);          // FINISH
+    // ── Holes — using Mesh::makeHole(cx, cy, cz, rotY) ──────────────────────
+    // cy = 0.35 places the fairway flush on top of the ground slab (0.5 tall).
+    const float FY = 0.35f;
+
+    Mesh hole1  = Mesh::makeHole(-80.0f, FY, +40.0f,  0.0f);   // START
+    Mesh hole2  = Mesh::makeHole(-80.0f, FY, +15.0f,  0.0f);
+    Mesh hole3  = Mesh::makeHole(-48.0f, FY, +40.0f,  0.0f);
+    Mesh hole4  = Mesh::makeHole(-48.0f, FY, +15.0f,  0.0f);
+    Mesh hole5  = Mesh::makeHole(-80.0f, FY,  -8.0f,  0.0f);
+    Mesh hole6  = Mesh::makeHole(-20.0f, FY, +28.0f, 90.0f);   // 90°
+    Mesh hole7  = Mesh::makeHole(-22.0f, FY, -35.0f,  0.0f);
+    Mesh hole8  = Mesh::makeHole(-19.0f, FY,  -8.0f, 90.0f);   // 90°
+    Mesh hole9w = Mesh::makeHole(-48.0f, FY,  -8.0f,  0.0f);   // tunnel west approach
+    Mesh hole9e = Mesh::makeHole(+48.0f, FY,  -8.0f,  0.0f);   // tunnel east exit
+    Mesh hole10 = Mesh::makeHole(+22.0f, FY, -35.0f,  0.0f);
+    Mesh hole11 = Mesh::makeHole(+55.0f, FY, -35.0f,  0.0f);
+    Mesh hole12 = Mesh::makeHole(+80.0f, FY,  -8.0f,  0.0f);
+    Mesh hole13 = Mesh::makeHole(+80.0f, FY, +15.0f,  0.0f);
+    Mesh hole14 = Mesh::makeHole(+80.0f, FY, +40.0f,  0.0f);
+    Mesh hole15 = Mesh::makeHole(+48.0f, FY, +40.0f,  0.0f);
+    Mesh hole16 = Mesh::makeHole(+48.0f, FY, +15.0f,  0.0f);
+    Mesh hole17 = Mesh::makeHole(+16.0f, FY, +40.0f,  0.0f);
+    Mesh hole18 = Mesh::makeHole(+16.0f, FY, +15.0f,  0.0f);   // FINISH
 
     // ── Shader uniforms ──────────────────────────────────────────────────────
     glUseProgram(shader);
