@@ -108,7 +108,7 @@ public:
     // Produces a red cuboid 28 × 0.2 × 10 centred at (cx, cy, cz).
     // rotY: Y-axis rotation in degrees — 0° = east-west, 90° = north-south.
     // After construction call setup() yourself (already called inside).
-    static Mesh makeHole(float cx, float cy, float cz, float rotY = 0.0f);
+    static Mesh makeHole();
 
     // ── Connector strip ───────────────────────────────────────────────────────
     // Thin red cuboid of size (lenX, 0.2, lenZ) centred at (cx, cy, cz).

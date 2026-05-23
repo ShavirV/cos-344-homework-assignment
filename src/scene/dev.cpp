@@ -9,6 +9,9 @@
 #include "../core/shader.hpp"
 #include "../core/Mesh.h"
 
+#include "../objects/Hole9e.h"
+#include "../objects/Hole9w.h"
+
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
 
@@ -91,6 +94,13 @@ int main()
     Mesh ground = Mesh::makeCuboid(210.0f, 0.5f, 125.0f, 0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
+    Hole9E hole9e;
+    hole9e.translate(48.0f, 0.35f, -8.0f);
+
+    Hole9W hole9w;
+    hole9w.translate(-48.0f, 0.35f, -8.0f);
+
+
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
@@ -102,6 +112,8 @@ int main()
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
 
         ground.draw(shader, false);
+        hole9e.draw(shader, false);
+        hole9w.draw(shader, false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

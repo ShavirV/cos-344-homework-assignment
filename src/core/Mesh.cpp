@@ -606,13 +606,10 @@ Mesh Mesh::makeHill(float topWidth,    float topDepth,
 // A fairway: flat red cuboid 28 × 0.2 × 10, centred at (cx, cy, cz).
 // rotY: Y-axis rotation in degrees (0° = length along X, 90° = length along Z).
 //
-Mesh Mesh::makeHole(float cx, float cy, float cz, float rotY)
+Mesh Mesh::makeHole()
 {
     // Fairway colour: bright red so it reads clearly from above.
     Mesh h = Mesh::makeCuboid(28.0f, 0.2f, 15.0f, 1.0f, 0.05f, 0.05f, 1.0f);
-    if (rotY != 0.0f)
-        h.rotate(rotY, 0.0f, 1.0f, 0.0f);
-    h.translate(cx, cy, cz);
     h.setup();
     return h;
 }
