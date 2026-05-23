@@ -12,6 +12,7 @@
 #include "../objects/Hole9E.h"
 #include "../objects/Hole9W.h"
 #include "../objects/Hole11.h"
+#include "../objects/Hole12.h"
 #include "../objects/Hole16.h"
 
 const int WIDTH  = 1280;
@@ -126,8 +127,12 @@ int main()
 
        Mesh hole16platform = Mesh::makeHole();
        float lastTime = (float)glfwGetTime();
+
     Hole11 hole11(1.0);
     hole11.translate(0.0f, 0.35f, -8.0f);
+
+    Hole12 hole12;
+    hole12.translate(0.0f, 0.35f, -8.0f);
 
 
     while (!glfwWindowShouldClose(window))
@@ -143,14 +148,16 @@ int main()
         glUseProgram(shader);
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
 
-        hole16.setCameraData(view, projection, cameraPos);
-        hole16.update(deltaTime);
+        // hole16.setCameraData(view, projection, cameraPos);
+        // hole16.update(deltaTime);
 
         //ground.draw(shader, false);
         // //hole9e.draw(shader, false);
         // //hole9w.draw(shader, false);
-        hole11.draw(shader,false);
-        hole16.draw(shader, false);
+        //hole11.draw(shader,false);
+        //hole16.draw(shader, false);
+
+        hole12.draw(shader,false);
         
 
         glfwSwapBuffers(window);
