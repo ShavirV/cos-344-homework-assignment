@@ -1,6 +1,7 @@
 #pragma once
 #include "../core/Mesh.h"
 #include <functional>
+#include "Water.h"
 
 // =============================================================================
 // Hole 16 — "The Island"
@@ -46,19 +47,32 @@ class Hole16
 {
 public:
     static const int MAX_MESHES = 32;
-
+    WaterMesh* waterStream = nullptr;
+    WaterMesh* waterMoat   = nullptr;
+    
+    glm::mat4 camView = glm::mat4(1.0f);
+    glm::mat4 camProj = glm::mat4(1.0f);
+    glm::vec3 camPos  = glm::vec3(0.0f);
+    
     Hole16();
     ~Hole16();
-
+    
     Hole16(const Hole16&)            = delete;
     Hole16& operator=(const Hole16&) = delete;
-
+    
     void draw     (GLuint shaderProgram, bool wireframe = false);
     void translate(float x, float y, float z);
     void rotate   (float angle, float ax, float ay, float az);
     void scale    (float sx, float sy, float sz);
+    
+    // Call every frame before draw()
+    void update(float deltaTime);
 
-private:
+    // Call once after init, and again if camera changes
+    void setCameraData(const glm::mat4& view,
+                       const glm::mat4& proj,
+                       const glm::vec3& camPos);
+    private:
     Mesh*  meshes[MAX_MESHES];
     int    meshCount;
     void   addMesh(Mesh* m);

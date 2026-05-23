@@ -13,8 +13,8 @@
 #include "../objects/Hole9W.h"
 #include "../objects/Hole16.h"
 
-const int WIDTH  = 1920;
-const int HEIGHT = 1080;
+const int WIDTH  = 1280;
+const int HEIGHT = 720;
 bool wireframeMode = false;
 
 // ── Camera ────────────────────────────────────────────────────────────────────
@@ -123,16 +123,24 @@ int main()
         
        Hole16 hole16;
 
+       Mesh hole16platform = Mesh::makeHole();
+       float lastTime = (float)glfwGetTime();
 
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // ── Fix 2: update view matrix every frame ─────────────────────────────
+        float currentTime = (float)glfwGetTime();
+        float deltaTime   = currentTime - lastTime;
+        lastTime          = currentTime;
+
         glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         glUseProgram(shader);
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
+
+        hole16.setCameraData(view, projection, cameraPos);
+        hole16.update(deltaTime);
 
         //ground.draw(shader, false);
         //hole9e.draw(shader, false);

@@ -57,7 +57,7 @@ static const float ISLAND_Z      = 0.0f;
 // ── Water placeholder Y ───────────────────────────────────────────────────────
 // TODO: Replace with animated Water mesh between ISLAND_R and (ARC_INNER_R-0.5)
 // centred at (ISLAND_X, WATER_Y, ISLAND_Z) when water system is implemented.
-static const float WATER_Y       = -0.15f;
+static const float WATER_Y       = 0.10f;
 
 // ── Stream ────────────────────────────────────────────────────────────────────
 // Crosses the 30° gap between the tee (0°) and green (330°) arc ends.
@@ -68,7 +68,7 @@ static const float WATER_Y       = -0.15f;
 // P2: handle on the green side        (+X, pulled toward green tip)
 // P3: just past the green-side end    (green approach)
 //
-static const float    STREAM_Y  = -0.20f;
+static const float    STREAM_Y  = 0.10f;
 static const float    STREAM_W  =  3.5f;
 static const int      STREAM_SEGS = 6;
 static const glm::vec2 STREAM_P0 = { 14.5f,  2.0f  };
@@ -480,15 +480,40 @@ Hole16::Hole16()
 
     // ── [10] Tree island — top surface ───────────────────────────────────────
     // Blender tree asset to be placed at (ISLAND_X, ISLAND_Y + ISLAND_WALL_H, ISLAND_Z)
-    // Water moat TODO: annular surface from ISLAND_R to (ARC_INNER_R - 0.5)
-    //                   at Y=WATER_Y, centred at (ISLAND_X, WATER_Y, ISLAND_Z)
+    // ── Water moat — animated water ───────────────────────────────────────────
+    // Annular water between ISLAND_R and (ARC_INNER_R - 0.5), approximated
+    // with a square plane sized to the outer diameter.
     {
-        Mesh* iTop = new Mesh(Mesh::makeCylinder(
-            ISLAND_R - 0.2f, 0.20f, 36,
-            0.30f, 0.21f, 0.09f, 1.0f));
-        iTop->translate(ISLAND_X, ISLAND_Y + ISLAND_WALL_H, ISLAND_Z);
-        iTop->setup();
-        addMesh(iTop);
+        waterMoat = new WaterMesh();
+
+        float moatDiam             = (ARC_INNER_R - 0.5f) * 2.0f;
+        waterMoat->planeWidth      = moatDiam;
+        waterMoat->planeLength     = moatDiam;
+        waterMoat->gridResolution  = 32;
+
+        // Calm standing water — very small waves, slow scroll.
+        waterMoat->waves[0] = { glm::vec2( 1.0f,  0.0f), 0.05f, 5.0f };
+        waterMoat->waves[1] = { glm::vec2( 0.0f,  1.0f), 0.04f, 4.0f };
+        waterMoat->waves[2] = { glm::vec2( 0.7f,  0.7f), 0.03f, 3.0f };
+        waterMoat->waves[3] = { glm::vec2(-0.5f,  0.5f), 0.02f, 2.0f };
+
+        waterMoat->scrollSpeed0   = 0.04f;
+        waterMoat->scrollSpeed1   = 0.03f;
+        waterMoat->colorShallow   = glm::vec3(0.22f, 0.50f, 0.52f);
+        waterMoat->colorDeep      = glm::vec3(0.03f, 0.14f, 0.24f);
+        waterMoat->foamThreshold  = 0.15f;  // almost no foam — still water
+
+        waterMoat->modelMatrix =
+            glm::translate(glm::mat4(1.0f),
+                        glm::vec3(ISLAND_X, WATER_Y + 0.01f, ISLAND_Z));
+
+        waterMoat->init(
+            "src/shaders/water.vert",
+            "src/shaders/water.frag",
+            "src/assets/textures/water_normal.bmp",
+            "src/assets/textures/water_normal2.bmp",
+            "src/assets/textures/water_foam.bmp"
+        );
     }
 
     // ── [11] Large ground disc ────────────────────────────────────────────────
@@ -516,15 +541,45 @@ Hole16::Hole16()
     // Cubic Bezier crossing the gap between tee (0°) and green (330°) arc ends.
     // Bows outward (+X) for a natural meander away from the island.
     {
-        for (int s = 0; s < STREAM_SEGS; s++)
-        {
-            float t0 = (float)s       / STREAM_SEGS;
-            float t1 = (float)(s + 1) / STREAM_SEGS;
-            Mesh* seg = new Mesh(makeStreamSegment(
-                STREAM_P0, STREAM_P1, STREAM_P2, STREAM_P3,
-                t0, t1, STREAM_Y, STREAM_W));
-            addMesh(seg);
-        }
+        waterStream = new WaterMesh();
+
+        // Stream runs along the Bezier, which bows in the +X direction.
+        // Main flow is roughly south (−Z), biased slightly toward +X.
+        waterStream->planeWidth     = STREAM_W + 0.5f;
+        waterStream->planeLength    = 30.0f;
+        waterStream->gridResolution = 12;
+
+        waterStream->waves[0] = { glm::vec2( 0.1f, -1.0f), 0.12f, 4.0f };
+        waterStream->waves[1] = { glm::vec2( 0.2f, -1.0f), 0.07f, 2.5f };
+        waterStream->waves[2] = { glm::vec2(-0.1f, -1.0f), 0.05f, 1.8f };
+        waterStream->waves[3] = { glm::vec2( 0.0f, -0.8f), 0.04f, 1.2f };
+
+        waterStream->scrollSpeed0  = 0.22f;
+        waterStream->scrollSpeed1  = 0.14f;
+        waterStream->colorShallow  = glm::vec3(0.28f, 0.58f, 0.55f);
+        waterStream->colorDeep     = glm::vec3(0.04f, 0.18f, 0.28f);
+        waterStream->foamThreshold = 0.06f;
+
+        // Position at the Bezier midpoint (t=0.5), rotated to align with tangent.
+        glm::vec2 mid     = bezier(STREAM_P0, STREAM_P1, STREAM_P2, STREAM_P3, 0.5f);
+        glm::vec2 tan     = glm::normalize(bezierTangent(
+                                STREAM_P0, STREAM_P1, STREAM_P2, STREAM_P3, 0.5f));
+        float headingDeg  = glm::degrees(atan2f(tan.y, tan.x));
+
+        waterStream->modelMatrix =
+            glm::rotate(
+                glm::translate(glm::mat4(1.0f),
+                            glm::vec3(mid.x, STREAM_Y + 0.02f, mid.y)),
+                glm::radians(headingDeg),
+                glm::vec3(0.0f, 1.0f, 0.0f));
+
+        waterStream->init(
+            "src/shaders/water.vert",
+            "src/shaders/water.frag",
+            "src/assets/textures/water_normal.bmp",
+            "src/assets/textures/water_normal2.bmp",
+            "src/assets/textures/water_foam.bmp"
+        );
     }
 
     // ── [16] Bridge ───────────────────────────────────────────────────────────
@@ -609,6 +664,8 @@ Hole16::~Hole16()
         delete meshes[i];
         meshes[i] = nullptr;
     }
+    delete waterStream;
+    delete waterMoat;
 }
 
 void Hole16::addMesh(Mesh* m)
@@ -621,6 +678,12 @@ void Hole16::draw(GLuint shaderProgram, bool wireframe)
 {
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shaderProgram, wireframe);
+
+    // Water drawn last — alpha blended, must come after all opaque geometry.
+    if (waterStream)
+        waterStream->draw(camView, camProj, camPos);
+    if (waterMoat)
+        waterMoat->draw(camView, camProj, camPos);
 }
 
 void Hole16::translate(float x, float y, float z)
@@ -639,4 +702,19 @@ void Hole16::scale(float sx, float sy, float sz)
 {
     for (int i = 0; i < meshCount; i++)
         meshes[i]->scale(sx, sy, sz);
+}
+
+void Hole16::update(float deltaTime)
+{
+    if (waterStream) waterStream->update(deltaTime);
+    if (waterMoat)   waterMoat->update(deltaTime);
+}
+
+void Hole16::setCameraData(const glm::mat4& view,
+                           const glm::mat4& proj,
+                           const glm::vec3& pos)
+{
+    camView = view;
+    camProj = proj;
+    camPos  = pos;
 }
