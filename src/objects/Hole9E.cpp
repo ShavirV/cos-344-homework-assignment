@@ -16,24 +16,18 @@ Hole9E::Hole9E()
     rock->setup();
     addMesh(rock);
 
-    // ── Tunnel mouth (east) ───────────────────────────────────────────────────
-    // Outer ring: brown cylinder, rotated 90° around Z so it faces along X.
-//   Mesh* outerMouth = new Mesh(Mesh::makeCylinder(3.5f, 5.5f, 32,
-//                                                    0.22f, 0.14f, 0.05f, 1.0f));
-//     outerMouth->rotate(90.0f, 0.0f, 0.0f, 1.0f);   // face along X
-//     outerMouth->translate(-28.0f, 3.65f, 0.0f);     // west end of the east fairway
-//     outerMouth->setup();
-//     addMesh(outerMouth);
-
-//     // Inner circle: slightly smaller, very dark cylinder to fake the hollow opening.
-//     Mesh* innerMouth = new Mesh(Mesh::makeCylinder(3.0f, 0.2f, 32,
-//                                                    0.05f, 0.05f, 0.05f, 1.0f));
-//     innerMouth->rotate(90.0f, 0.0f, 0.0f, 1.0f);   // face along X
-//     innerMouth->translate(-28.0f, 3.65f, 0.0f);     // same centre as outer
-//     innerMouth->setup();
-//     addMesh(innerMouth);    // Positioned at the west end of the east fairway, where it exits the volcano.
-    // Offset is relative to the fairway origin — translate() moves it with the hole.
+    Mesh* mouth = new Mesh(Mesh::makeTunnel(
+    3.5f,   // outer radius
+    2.5f,   // inner radius  (1.0 thick wall)
+    2.0f,   // depth/length of the tunnel section
+    32,
+    0.22f, 0.14f, 0.05f, 1.0f));                       
+    mouth->translate(33.0f, -44.0f, 0.0f);  
   
+mouth->rotate(90.0f, 0.0f, 0.0f, 1.0f);   // face along X
+mouth->setup();
+addMesh(mouth);
+
 }
 
 Hole9E::~Hole9E()

@@ -112,7 +112,7 @@ int main()
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
 
         ground.draw(shader, false);
-        //hole9e.draw(shader, false);
+        hole9e.draw(shader, false);
         hole9w.draw(shader, false);
 
         glfwSwapBuffers(window);

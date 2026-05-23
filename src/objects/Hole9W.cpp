@@ -22,7 +22,7 @@ Mesh* mouth = new Mesh(Mesh::makeTunnel(
     2.0f,   // depth/length of the tunnel section
     32,
     0.22f, 0.14f, 0.05f, 1.0f));                       
-    mouth->translate(-33.0f, 52.0f, 0.0f);  // move up 5 units
+    mouth->translate(-33.0f, 51.0f, 0.0f);  // move up 5 units
   
 mouth->rotate(90.0f, 0.0f, 0.0f, 1.0f);   // face along X
 mouth->setup();
