@@ -132,25 +132,68 @@ int main()
     // cy = 0.35 places the fairway flush on top of the ground slab (0.5 tall).
     const float FY = 0.35f;
 
-    Mesh hole1  = Mesh::makeHole(-80.0f, FY, +40.0f,  0.0f);   // START
-    Mesh hole2  = Mesh::makeHole(-80.0f, FY, +15.0f,  0.0f);
-    Mesh hole3  = Mesh::makeHole(-48.0f, FY, +40.0f,  0.0f);
-    Mesh hole4  = Mesh::makeHole(-48.0f, FY, +15.0f,  0.0f);
-    Mesh hole5  = Mesh::makeHole(-80.0f, FY,  -8.0f,  0.0f);
-    Mesh hole6  = Mesh::makeHole(-20.0f, FY, +28.0f, 90.0f);   // 90°
-    Mesh hole7  = Mesh::makeHole(-22.0f, FY, -35.0f,  0.0f);
-    Mesh hole8  = Mesh::makeHole(-19.0f, FY,  -8.0f, 90.0f);   // 90°
-    Mesh hole9w = Mesh::makeHole(-48.0f, FY,  -8.0f,  0.0f);   // tunnel west approach
-    Mesh hole9e = Mesh::makeHole(+48.0f, FY,  -8.0f,  0.0f);   // tunnel east exit
-    Mesh hole10 = Mesh::makeHole(+22.0f, FY, -35.0f,  0.0f);
-    Mesh hole11 = Mesh::makeHole(+55.0f, FY, -35.0f,  0.0f);
-    Mesh hole12 = Mesh::makeHole(+80.0f, FY,  -8.0f,  0.0f);
-    Mesh hole13 = Mesh::makeHole(+80.0f, FY, +15.0f,  0.0f);
-    Mesh hole14 = Mesh::makeHole(+80.0f, FY, +40.0f,  0.0f);
-    Mesh hole15 = Mesh::makeHole(+48.0f, FY, +40.0f,  0.0f);
-    Mesh hole16 = Mesh::makeHole(+48.0f, FY, +15.0f,  0.0f);
-    Mesh hole17 = Mesh::makeHole(+16.0f, FY, +40.0f,  0.0f);
-    Mesh hole18 = Mesh::makeHole(+16.0f, FY, +15.0f,  0.0f);   // FINISH
+const float FY = 0.35f;
+
+    Mesh hole1 = Mesh::makeHole();
+    hole1.rotate(0.0f, 0.0f, 1.0f, 0.0f);
+    hole1.translate(-80.0f, FY, +40.0f);   // START
+
+    Mesh hole2 = Mesh::makeHole();
+    hole2.translate(-80.0f, FY, +15.0f);
+
+    Mesh hole3 = Mesh::makeHole();
+    hole3.translate(-48.0f, FY, +40.0f);
+
+    Mesh hole4 = Mesh::makeHole();
+    hole4.translate(-48.0f, FY, +15.0f);
+
+    Mesh hole5 = Mesh::makeHole();
+    hole5.translate(-80.0f, FY,  -8.0f);
+
+    Mesh hole6 = Mesh::makeHole();
+    hole6.rotate(90.0f, 0.0f, 1.0f, 0.0f);
+    hole6.translate(-20.0f, FY, +28.0f);
+
+    Mesh hole7 = Mesh::makeHole();
+    hole7.translate(-22.0f, FY, -35.0f);
+
+    Mesh hole8 = Mesh::makeHole();
+    hole8.rotate(90.0f, 0.0f, 1.0f, 0.0f);
+    hole8.translate(-19.0f, FY,  -8.0f);
+
+    // Hole 9 — tunnel west and east use their own classes (with borders + rock)
+    Mesh hole9w = Mesh::makeHole();
+    hole9w.translate(-48.0f, FY, -8.0f);
+
+    Mesh hole9e = Mesh::makeHole();
+    hole9e.translate(+48.0f, FY, -8.0f);
+
+    Mesh hole10 = Mesh::makeHole();
+    hole10.translate(+22.0f, FY, -35.0f);
+
+    Mesh hole11 = Mesh::makeHole();
+    hole11.translate(+55.0f, FY, -35.0f);
+
+    Mesh hole12 = Mesh::makeHole();
+    hole12.translate(+80.0f, FY,  -8.0f);
+
+    Mesh hole13 = Mesh::makeHole();
+    hole13.translate(+80.0f, FY, +15.0f);
+
+    Mesh hole14 = Mesh::makeHole();
+    hole14.translate(+80.0f, FY, +40.0f);
+
+    Mesh hole15 = Mesh::makeHole();
+    hole15.translate(+48.0f, FY, +40.0f);
+
+    Mesh hole16 = Mesh::makeHole();
+    hole16.translate(+48.0f, FY, +15.0f);
+
+    Mesh hole17 = Mesh::makeHole();
+    hole17.translate(+16.0f, FY, +40.0f);
+
+    Mesh hole18 = Mesh::makeHole();
+    hole18.translate(+16.0f, FY, +15.0f);  // FINISH
 
     // ── Shader uniforms ──────────────────────────────────────────────────────
     glUseProgram(shader);

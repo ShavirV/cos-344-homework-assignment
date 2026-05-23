@@ -104,11 +104,65 @@ public:
     // NEW — GOLF-COURSE FACTORY METHODS  (moved from main.cpp)
     // =========================================================================
 
-    // ── Fairway (one hole) ────────────────────────────────────────────────────
-    // Produces a red cuboid 28 × 0.2 × 10 centred at (cx, cy, cz).
-    // rotY: Y-axis rotation in degrees — 0° = east-west, 90° = north-south.
-    // After construction call setup() yourself (already called inside).
-    static Mesh makeHole();
+// ── makeHole ──────────────────────────────────────────────────────────────────
+// Unchanged — returns just the fairway slab at the origin.
+//
+static Mesh makeHole();
+// ── buildHoleMeshes ───────────────────────────────────────────────────────────
+// Builds the fairway (via makeHole) + 4 border strips and pushes all of them
+// into the caller's mesh array. All meshes sit at the origin; the caller
+// translates the whole group into world space.
+//
+// Fairway:  28 (X) × 0.2 (Y) × 15 (Z)
+// Borders:  thickness 0.5, height 0.4 (slightly taller → reads as a kerb)
+//           long sides run along X, short sides run along Z
+//           short sides are widened by 2×BT so corners are fully covered
+//
+static void buildHoleMeshes(float rotY, Mesh** out, int& count, int maxCount)
+{
+    const float FW = 28.0f;   // fairway length (X)
+    const float FH =  0.2f;   // fairway height (Y)  — kept for offset math
+    const float FD = 15.0f;   // fairway depth  (Z)
+
+    const float BT =  0.5f;   // border thickness
+    const float BH =  0.4f;   // border height (kerb)
+
+    const float BR = 0.9f, BG = 0.9f, BB = 0.9f;   // off-white / concrete
+
+    // ── Fairway ───────────────────────────────────────────────────────────────
+    Mesh* fairway = new Mesh(Mesh::makeHole());
+    if (rotY != 0.0f) fairway->rotate(rotY, 0.0f, 1.0f, 0.0f);
+    if (count < maxCount) out[count++] = fairway;
+
+    // ── Long borders (parallel to X axis, one on each Z side) ────────────────
+    Mesh* borderZPos = new Mesh(Mesh::makeCuboid(FW, BH, BT, BR, BG, BB, 1.0f));
+    borderZPos->translate(0.0f, 0.0f, (FD + BT) * 0.5f);
+    if (rotY != 0.0f) borderZPos->rotate(rotY, 0.0f, 1.0f, 0.0f);
+    borderZPos->setup();
+    if (count < maxCount) out[count++] = borderZPos;
+
+    Mesh* borderZNeg = new Mesh(Mesh::makeCuboid(FW, BH, BT, BR, BG, BB, 1.0f));
+    borderZNeg->translate(0.0f, 0.0f, -(FD + BT) * 0.5f);
+    if (rotY != 0.0f) borderZNeg->rotate(rotY, 0.0f, 1.0f, 0.0f);
+    borderZNeg->setup();
+    if (count < maxCount) out[count++] = borderZNeg;
+
+    // ── Short borders (parallel to Z axis, one on each X side) ───────────────
+    // Extended by BT on each Z end so corners are fully covered.
+    Mesh* borderXPos = new Mesh(Mesh::makeCuboid(BT, BH, FD + BT * 2.0f,
+                                                 BR, BG, BB, 1.0f));
+    borderXPos->translate((FW + BT) * 0.5f, 0.0f, 0.0f);
+    if (rotY != 0.0f) borderXPos->rotate(rotY, 0.0f, 1.0f, 0.0f);
+    borderXPos->setup();
+    if (count < maxCount) out[count++] = borderXPos;
+
+    Mesh* borderXNeg = new Mesh(Mesh::makeCuboid(BT, BH, FD + BT * 2.0f,
+                                                 BR, BG, BB, 1.0f));
+    borderXNeg->translate(-(FW + BT) * 0.5f, 0.0f, 0.0f);
+    if (rotY != 0.0f) borderXNeg->rotate(rotY, 0.0f, 1.0f, 0.0f);
+    borderXNeg->setup();
+    if (count < maxCount) out[count++] = borderXNeg;
+}
 
     // ── Connector strip ───────────────────────────────────────────────────────
     // Thin red cuboid of size (lenX, 0.2, lenZ) centred at (cx, cy, cz).
@@ -132,4 +186,12 @@ public:
     // Replaces the free addTree() that was in main.cpp.
     static void addTreeTo(std::vector<Mesh>& out,
                           float x, float z, float scale = 1.0f);
+
+                          // ── makeRock ──────────────────────────────────────────────────────────────────
+// A rocky obstacle built from makeHill with asymmetric top/bottom proportions
+// and grey colouring to read as a boulder. Built at the origin — caller
+// translates into world space.
+// scale: overall size multiplier (1.0 = ~3 wide, ~2 tall, ~2.5 deep)
+static Mesh makeRock(float scale = 1.0f);
 };
+

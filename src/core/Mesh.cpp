@@ -706,3 +706,24 @@ void Mesh::addTreeTo(std::vector<Mesh>& out, float x, float z, float scale)
     canopy.setup();
     out.push_back(std::move(canopy));
 }
+
+// ── makeRock ──────────────────────────────────────────────────────────────────
+// Rocky boulder obstacle. Wraps makeHill with:
+//   - narrow top, wider base  → looks like a natural boulder
+//   - slight asymmetry in depth vs width → non-uniform silhouette
+//   - grey colour (0.55, 0.55, 0.55)
+//   - the makeHill jitter gives the sides their rough, rocky texture
+// Built at the origin; caller is responsible for translate/rotate.
+//
+Mesh Mesh::makeRock(float scale)
+{
+    Mesh rock = Mesh::makeHill(
+        1.5f * scale,   // topWidth    — narrow top
+        1.2f * scale,   // topDepth
+        3.0f * scale,   // bottomWidth — wider base
+        2.5f * scale,   // bottomDepth
+        2.0f * scale,   // height
+        0.55f, 0.55f, 0.55f, 1.0f   // grey
+    );
+    return rock;
+}

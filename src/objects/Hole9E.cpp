@@ -1,14 +1,18 @@
-#include "Hole9e.h"
+#include "Hole9E.h"
 
-Hole9E::Hole9E(float rotY)
+Hole9E::Hole9E()
     : meshCount(0)
 {
     for (int i = 0; i < MAX_MESHES; i++)
         meshes[i] = nullptr;
 
-    // Build fairway at the origin — caller translates into world space.
-    Mesh* fairway = new Mesh(Mesh::makeHole());
-    addMesh(fairway);
+    // ── Fairway + 4 borders ───────────────────────────────────────────────────
+    Mesh::buildHoleMeshes(0, meshes, meshCount, MAX_MESHES);
+
+    // ── Rock obstacle ─────────────────────────────────────────────────────────
+    Mesh* rock = new Mesh(Mesh::makeRock(1.2f));
+    rock->setup();
+    addMesh(rock);
 }
 
 Hole9E::~Hole9E()
@@ -32,16 +36,12 @@ void Hole9E::draw(GLuint shaderProgram, bool wireframe)
         meshes[i]->draw(shaderProgram, wireframe);
 }
 
-// Translate every mesh in the hole by (x, y, z).
 void Hole9E::translate(float x, float y, float z)
 {
     for (int i = 0; i < meshCount; i++)
         meshes[i]->translate(x, y, z);
 }
 
-// Rotate every mesh around the world origin by angle degrees.
-// Because all meshes are built at the origin, calling rotate() before
-// translate() spins the whole hole about its own centre.
 void Hole9E::rotate(float angle, float ax, float ay, float az)
 {
     for (int i = 0; i < meshCount; i++)

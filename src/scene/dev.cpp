@@ -9,8 +9,8 @@
 #include "../core/shader.hpp"
 #include "../core/Mesh.h"
 
-#include "../objects/Hole9e.h"
-#include "../objects/Hole9w.h"
+#include "../objects/Hole9E.h"
+#include "../objects/Hole9W.h"
 
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;

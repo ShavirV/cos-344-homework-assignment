@@ -1,7 +1,7 @@
 #pragma once
 #include "../core/Mesh.h"
 
-// Hole 9 — East exit fairway
+// Hole 9 — West approach fairway
 //
 // All meshes are built at the origin. The caller is responsible for
 // positioning the hole via translate() and rotate() before drawing.
@@ -10,18 +10,18 @@
 //
 // MAX_MESHES controls how many mesh objects this hole can hold.
 // Increase it as more objects (flags, walls, etc.) are added.
-class Hole9E
+class Hole9W
 {
 public:
     static const int MAX_MESHES = 8;
 
     // rotY: optional Y-axis rotation in degrees (0 = length runs along X).
-    Hole9E(float rotY = 0.0f);
-    ~Hole9E();
+    Hole9W();
+    ~Hole9W();
 
     // Non-copyable — meshes own GPU buffers.
-    Hole9E(const Hole9E&)            = delete;
-    Hole9E& operator=(const Hole9E&) = delete;
+    Hole9W(const Hole9W&)            = delete;
+    Hole9W& operator=(const Hole9W&) = delete;
 
     // Draw all meshes belonging to this hole.
     void draw(GLuint shaderProgram, bool wireframe = false);
