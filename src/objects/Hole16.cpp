@@ -14,18 +14,18 @@
 
 static const float ARC_INNER_R   = 10.0f;   // inner edge of fairway band
 static const float ARC_OUTER_R   = 19.0f;   // outer edge of fairway band
-static const float ARC_START_DEG = 100.0f;  // tee end
+static const float ARC_START_DEG = 00.0f;  // tee end
 static const float ARC_END_DEG   = 330.0f;  // green approach end
-static const int   ARC_RING_SEGS = 48;      // angular subdivisions
-static const int   ARC_RAD_SEGS  = 8;       // radial subdivisions (across width)
+static const int   ARC_RING_SEGS = 80;      // angular subdivisions
+static const int   ARC_RAD_SEGS  = 10;       // radial subdivisions (across width)
 
 // ── Fairway height function parameters ───────────────────────────────────────
 // Height is a sum of two sinusoids in the arc-length direction plus a gentle
 // radial cross-slope, giving rolling hills along the course and a slight
 // crown in the centre of the band. Peak-to-trough ≈ 1.8 world units.
-static const float HILL_FREQ_A   = 4.5f;    // cycles over the full arc
+static const float HILL_FREQ_A   = 5.5f;    // cycles over the full arc
 static const float HILL_AMP_A    = 1.0f;    // metres
-static const float HILL_FREQ_B   = 35.8f;    // higher-frequency ripple
+static const float HILL_FREQ_B   = 9.8f;    // higher-frequency ripple
 static const float HILL_AMP_B    = 0.4f;
 static const float CROWN_AMP     = 0.25f;   // cross-slope crown height
 
