@@ -11,6 +11,11 @@
 
 #include "../objects/Hole9E.h"
 #include "../objects/Hole9W.h"
+//put mine
+#include "../objects/Hole5.h"
+#include "../objects/Hole6.h"
+#include "../objects/Hole7.h"
+#include "../objects/Hole8.h"
 
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
@@ -99,6 +104,24 @@ int main()
 
     Hole9W hole9w;
     hole9w.translate(-48.0f, 0.35f, -8.0f);
+//put mine, call hole7 and variable name
+    
+    // ── Hole 5: Waterfall entry ───────────────────────────────────────────────
+    Hole5 hole5;
+    hole5.translate(-48.0f, 0.35f, 30.0f);   // adjust to fit course grid
+
+    // ── Hole 6: Bridge crossing ───────────────────────────────────────────────
+    Hole6 hole6;
+    hole6.translate(-48.0f, 0.35f, 60.0f);
+ 
+    // ── Hole 7: Swamp hazard ──────────────────────────────────────────────────
+    Hole7 hole7;
+    hole7.translate(-48.0f, 0.35f, 90.0f);
+ 
+    // ── Hole 8: Downhill drop ─────────────────────────────────────────────────
+    // Hole 8's staircase extends ~47 units in +X, so position accordingly.
+    Hole8 hole8;
+    hole8.translate(-62.0f, 0.35f, 120.0f);
 
 
     while (!glfwWindowShouldClose(window))
@@ -112,8 +135,17 @@ int main()
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
 
         ground.draw(shader, false);
-        hole9e.draw(shader, false);
-        hole9w.draw(shader, false);
+        // hole9e.draw(shader, false);
+        // hole9w.draw(shader, false);
+
+        
+    //put my hole
+        hole5.draw(shader, false);
+        // hole6.draw(shader, false);
+        //hole7.draw(shader, false);
+        // hole8.draw(shader, false);
+ 
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();

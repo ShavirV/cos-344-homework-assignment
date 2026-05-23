@@ -132,7 +132,6 @@ int main()
     // cy = 0.35 places the fairway flush on top of the ground slab (0.5 tall).
     const float FY = 0.35f;
 
-const float FY = 0.35f;
 
     Mesh hole1 = Mesh::makeHole();
     hole1.rotate(0.0f, 0.0f, 1.0f, 0.0f);
