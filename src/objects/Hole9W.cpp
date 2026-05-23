@@ -7,18 +7,26 @@ Hole9W::Hole9W()
         meshes[i] = nullptr;
 
     // ── Fairway + 4 borders ───────────────────────────────────────────────────
-    // buildHoleMeshes allocates all 5 meshes and writes owning pointers into
-    // our array. We own them from this point; destructor deletes them.
     Mesh::buildHoleMeshes(0, meshes, meshCount, MAX_MESHES);
 
-    // Apply Y rotation to every mesh now in the array (rotates around origin,
-    // which is the hole centre at this point — before any translate).
 
     // ── Rock obstacle ─────────────────────────────────────────────────────────
-    // Added after rotation so its local offset is in the rotated frame.
     Mesh* rock = new Mesh(Mesh::makeRock(1.0f));
+    rock->translate(6.0f, 0.1f, 4.0f);
     rock->setup();
     addMesh(rock);
+
+Mesh* mouth = new Mesh(Mesh::makeTunnel(
+    3.5f,   // outer radius
+    2.5f,   // inner radius  (1.0 thick wall)
+    2.0f,   // depth/length of the tunnel section
+    32,
+    0.22f, 0.14f, 0.05f, 1.0f));                       
+    mouth->translate(-33.0f, 52.0f, 0.0f);  // move up 5 units
+  
+mouth->rotate(90.0f, 0.0f, 0.0f, 1.0f);   // face along X
+mouth->setup();
+addMesh(mouth);
 }
 
 Hole9W::~Hole9W()

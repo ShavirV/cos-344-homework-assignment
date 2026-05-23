@@ -193,5 +193,9 @@ static void buildHoleMeshes(float rotY, Mesh** out, int& count, int maxCount)
 // translates into world space.
 // scale: overall size multiplier (1.0 = ~3 wide, ~2 tall, ~2.5 deep)
 static Mesh makeRock(float scale = 1.0f);
+
+static Mesh makeTunnel(float outerRadius, float innerRadius,
+                               float height, int sectors,
+                               float r, float g, float b, float a);
 };
 
