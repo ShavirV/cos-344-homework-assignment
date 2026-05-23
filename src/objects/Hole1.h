@@ -1,14 +1,10 @@
 #pragma once
 #include "../core/Mesh.h"
 
-// Hole 1 — START
 class Hole1
 {
 public:
-    static const int MAX_MESHES = 8;
-
-    #define C_GREEN      0.15f, 0.50f, 0.15f, 1.0f
-    #define C_DARKGRASS  0.08f, 0.32f, 0.08f, 1.0f
+    static const int MAX_MESHES = 200;  // Increased for all decorations
 
     Hole1();
     ~Hole1();
@@ -24,5 +20,5 @@ private:
     Mesh* meshes[MAX_MESHES];
     int   meshCount;
 
-    void addMesh(Mesh* m);
+    void addMesh(Mesh* m);s
 };
