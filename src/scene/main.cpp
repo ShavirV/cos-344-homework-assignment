@@ -1,3 +1,38 @@
+// main.cpp  —  COS344 Miniature Golf Course
+//
+// Holes are flat red cuboids 28 (length) × 0.2 (height) × 20 (width).
+// Rotation: 0° = runs along X,  90° = runs along Z.
+// Half-extents: 0° → hx=14, hz=10   |   90° → hx=10, hz=14
+// All positions verified with >= 3 world-unit gap between every pair.
+//
+// Directed play order:
+//   1→2→3→4→5→6→7→8→9(tunnel)→10→11→12→13→14→15→16→17→18
+//
+//  Hole  | cx    | cz    | rot
+//  ------+-------+-------+----
+//  H1    | -80   | +40   |  0°   START
+//  H2    | -80   | +15   |  0°
+//  H3    | -48   | +40   |  0°
+//  H4    | -48   | +15   |  0°
+//  H5    | -80   |  -8   |  0°
+//  H6    | -20   | +28   | 90°
+//  H7    | -22   | -35   |  0°
+//  H8    | -19   |  -8   | 90°
+//  H9W   | -48   |  -8   |  0°   tunnel west approach
+//  H9E   | +48   |  -8   |  0°   tunnel east exit
+//  H10   | +22   | -35   |  0°
+//  H11   | +55   | -35   |  0°
+//  H12   | +80   |  -8   |  0°
+//  H13   | +80   | +15   |  0°
+//  H14   | +80   | +40   |  0°
+//  H15   | +48   | +40   |  0°
+//  H16   | +48   | +15   |  0°
+//  H17   | +16   | +40   |  0°
+//  H18   | +16   | +15   |  0°   FINISH
+//
+//  Volcano centre: (0, y=20, -10)   base radius 20, height 40
+//  Tunnel mouths:  x = ±20,  y = 4, z = -8  (cylinders rotated 90° around Z)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
@@ -12,35 +47,18 @@
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
 
-// ── Camera state ─────────────────────────────────────────────────────────────
-glm::vec3 cameraPos   = glm::vec3(0.0f, 20.0f, 50.0f);
-glm::vec3 cameraFront = glm::normalize(glm::vec3(0.0f, -20.0f, -50.0f));
+// ── Camera ─────────────────────────────────────────────────────────────────
+glm::vec3 cameraPos   = glm::vec3(0.0f, 90.0f, 160.0f);
+glm::vec3 cameraFront = glm::normalize(glm::vec3(0.0f, -90.0f, -160.0f));
 glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
-const float SPEED     = 0.5f;
-const float LOOK_SPEED = 1.0f;   // degrees per frame
+const float SPEED      = 0.5f;
+const float LOOK_SPEED = 1.0f;
+float yaw   = -90.0f;
+float pitch = -29.0f;
 
-float yaw   = -90.0f;   // start facing -Z
-float pitch = -21.8f;   // start angled slightly down (matches original front vector)
-
-const char* getError()
-{
-    const char* errorDescription;
-    glfwGetError(&errorDescription);
-    return errorDescription;
-}
-
-inline void startUpGLFW()
-{
-    if (!glfwInit())
-        throw getError();
-}
-
-inline void startUpGLEW()
-{
-    glewExperimental = true;
-    glewInit();
-    glGetError();
-}
+const char* getError() { const char* d; glfwGetError(&d); return d; }
+inline void startUpGLFW() { if (!glfwInit()) throw getError(); }
+inline void startUpGLEW() { glewExperimental = true; glewInit(); glGetError(); }
 
 inline GLFWwindow* setUp()
 {
@@ -50,125 +68,103 @@ inline GLFWwindow* setUp()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Miniature Golf Course", NULL, NULL);
-    if (window == NULL)
-    {
-        std::cout << getError() << std::endl;
-        glfwTerminate();
-        throw "Failed to open GLFW window.";
-    }
-    glfwMakeContextCurrent(window);
+    GLFWwindow* w = glfwCreateWindow(WIDTH, HEIGHT, "Miniature Golf Course", NULL, NULL);
+    if (!w) { std::cout << getError() << std::endl; glfwTerminate(); throw "Failed to open window."; }
+    glfwMakeContextCurrent(w);
     startUpGLEW();
-    return window;
+    return w;
 }
 
 void processInput(GLFWwindow* window)
 {
-    // ── Look (arrow keys) ────────────────────────────────────────────────────
     if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) yaw   -= LOOK_SPEED;
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) yaw   += LOOK_SPEED;
     if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS) pitch += LOOK_SPEED;
     if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) pitch -= LOOK_SPEED;
-
-    // Clamp pitch so the camera doesn't flip over
     if (pitch >  89.0f) pitch =  89.0f;
     if (pitch < -89.0f) pitch = -89.0f;
 
-    // Rebuild cameraFront from yaw/pitch
     cameraFront = glm::normalize(glm::vec3(
-        cosf(glm::radians(yaw)) * cosf(glm::radians(pitch)),
+        cosf(glm::radians(yaw))  * cosf(glm::radians(pitch)),
         sinf(glm::radians(pitch)),
-        sinf(glm::radians(yaw)) * cosf(glm::radians(pitch))
-    ));
+        sinf(glm::radians(yaw))  * cosf(glm::radians(pitch))));
 
-    // ── Move (WASD) ──────────────────────────────────────────────────────────
-    glm::vec3 flat  = glm::normalize(glm::vec3(cameraFront.x, 0.0f, cameraFront.z));
+    glm::vec3 flat  = glm::normalize(glm::vec3(cameraFront.x, 0.f, cameraFront.z));
     glm::vec3 right = glm::normalize(glm::cross(flat, cameraUp));
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) cameraPos += SPEED * flat;
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) cameraPos -= SPEED * flat;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) cameraPos -= SPEED * right;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) cameraPos += SPEED * right;
+    if (glfwGetKey(window, GLFW_KEY_SPACE)      == GLFW_PRESS) cameraPos += SPEED * cameraUp;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) cameraPos -= SPEED * cameraUp;
+}
+
+// ── makeHole ───────────────────────────────────────────────────────────────
+// Fairway: 28 long × 0.2 tall × 20 wide, red.
+// rot90 = false → length along X;  rot90 = true → length along Z.
+static Mesh makeHole(float cx, float cz, bool rot90 = false)
+{
+    const float FY = 0.35f;
+    Mesh h = Mesh::makeCuboid(28.0f, 0.2f, 15.0f, 1.0f, 0.05f, 0.05f, 1.0f);
+    if (rot90) h.rotate(90.0f, 0.0f, 1.0f, 0.0f);
+    h.translate(cx, FY, cz);
+    h.setup();
+    return h;
 }
 
 int main()
 {
     GLFWwindow* window;
-    try
-    {
-        window = setUp();
-    }
-    catch (const char* e)
-    {
-        std::cout << e << std::endl;
-        throw;
-    }
+    try { window = setUp(); }
+    catch (const char* e) { std::cout << e << std::endl; throw; }
 
     glEnable(GL_DEPTH_TEST);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-
+    glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
     GLuint shader = LoadShaders("src/shaders/vertex.glsl", "src/shaders/fragment.glsl");
 
-    // ── Ground plane ─────────────────────────────────────────────────────────
-    Mesh ground = Mesh::makeCuboid(160.0f, 0.1f, 100.0f,
-                                   0.13f, 0.55f, 0.13f, 1.0f);
+    // ── Ground ──────────────────────────────────────────────────────────────
+    Mesh ground = Mesh::makeCuboid(210.0f, 0.5f, 125.0f, 0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
-    Mesh hole1 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
-                                  1.0f, 0.0f, 0.0f, 1.0f);
-    hole1.rotate(90, 0.0f, 1.0f, 0.0f);
-    hole1.translate(-30.0f, 0.1f, -70.0f);
-    hole1.setup();
-
-    Mesh hole2 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
-                                  1.0f, 0.0f, 0.0f, 1.0f);
-    hole2.rotate(45, 0.0f, 1.0f, 0.0f);
-    hole2.translate(-40.0f, 0.1f, -50.0f);
-    hole2.setup();
-
- 
-    Mesh hole3 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
-                                  1.0f, 0.0f, 0.0f, 1.0f);
-     hole3.translate(-60.0f, 0.1f, -35.0f);
-    hole3.setup();
-
-    Mesh hole4 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
-                                  1.0f, 0.0f, 0.0f, 1.0f);
-    hole4.rotate(90, 0.0f, 1.0f, 0.0f);
-    hole4.translate(13.0f, 2.0f, -39.0f);
-    hole4.setup();
-
-    Mesh hole5 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
-                                  1.0f, 0.0f, 0.0f, 1.0f);
-    hole5.rotate(-20, 0.0f, 1.0f, 0.0f);
-    hole5.translate(-15.0f, 5.0f, 27.0f);
-    hole5.setup();
-
-    Mesh hole6 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
-                                  1.0f, 0.0f, 0.0f, 1.0f);
-    hole6.rotate(20, 0.0f, 1.0f, 0.0f);
-    hole6.translate(5.0f, 7.0f, 23.0f);
-
-    Mesh hole7 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
-                                  1.0f, 0.0f, 0.0f, 1.0f);
-    hole7.rotate(90, 0.0f, 1.0f, 0.0f);
-    hole7.translate(10.0f, 9.0f, 20.0f);
-
-    Mesh hole8 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
-                                  1.0f, 0.0f, 0.0f, 1.0f);
-    hole8.translate(30.0f, 10.0f, -40.0f);
-
-    Mesh hole9 = Mesh::makeCuboid(30.0f, 0.1f, 15.0f,
-                                  1.0f, 0.0f, 0.0f, 1.0f);
-    hole9.rotate(-30, 0.0f, 1.0f, 0.0f);
-    hole9.translate(40.0f, 10.0f, -60.0f);
-
-    Mesh volcano = Mesh::makeCone(30.0f, 30.0f, 64,
-                                  0.39f, 0.26f, 0.13f, 0.5f);
-    volcano.translate(-5.0f, 10.0f, -15.0f);
+    // ── Volcano ──────────────────────────────────────────────────────────────
+    Mesh volcano = Mesh::makeCone(20.0f, 40.0f, 64, 0.40f, 0.26f, 0.10f, 1.0f);
+    volcano.translate(0.0f, 20.0f, -10.0f);
     volcano.setup();
 
+    // ── Tunnel mouths (hole 9 passes through volcano base along X at z=-8) ──
+    Mesh tunnelW = Mesh::makeCylinder(3.5f, 5.5f, 32, 0.22f, 0.14f, 0.05f, 1.0f);
+    tunnelW.rotate(90.0f, 0.0f, 0.0f, 1.0f);
+    tunnelW.translate(-20.0f, 4.0f, -8.0f);
+    tunnelW.setup();
+
+    Mesh tunnelE = Mesh::makeCylinder(3.5f, 5.5f, 32, 0.22f, 0.14f, 0.05f, 1.0f);
+    tunnelE.rotate(90.0f, 0.0f, 0.0f, 1.0f);
+    tunnelE.translate( 20.0f, 4.0f, -8.0f);
+    tunnelE.setup();
+
+    // ── Holes ────────────────────────────────────────────────────────────────
+    Mesh hole1  = makeHole(-80.0f, +40.0f);          // START
+    Mesh hole2  = makeHole(-80.0f, +15.0f);
+    Mesh hole3  = makeHole(-48.0f, +40.0f);
+    Mesh hole4  = makeHole(-48.0f, +15.0f);
+    Mesh hole5  = makeHole(-80.0f,  -8.0f);
+    Mesh hole6  = makeHole(-20.0f, +28.0f, true);    // 90°
+    Mesh hole7  = makeHole(-22.0f, -35.0f);
+    Mesh hole8  = makeHole(-19.0f,  -8.0f, true);    // 90°
+    Mesh hole9w = makeHole(-48.0f,  -8.0f);          // tunnel west approach
+    Mesh hole9e = makeHole(+48.0f,  -8.0f);          // tunnel east exit
+    Mesh hole10 = makeHole(+22.0f, -35.0f);
+    Mesh hole11 = makeHole(+55.0f, -35.0f);
+    Mesh hole12 = makeHole(+80.0f,  -8.0f);
+    Mesh hole13 = makeHole(+80.0f, +15.0f);
+    Mesh hole14 = makeHole(+80.0f, +40.0f);
+    Mesh hole15 = makeHole(+48.0f, +40.0f);
+    Mesh hole16 = makeHole(+48.0f, +15.0f);
+    Mesh hole17 = makeHole(+16.0f, +40.0f);
+    Mesh hole18 = makeHole(+16.0f, +15.0f);          // FINISH
+
+    // ── Shader uniforms ──────────────────────────────────────────────────────
     glUseProgram(shader);
     GLint locModel = glGetUniformLocation(shader, "model");
     GLint locView  = glGetUniformLocation(shader, "view");
@@ -178,38 +174,44 @@ int main()
               << " projection=" << locProj << " colour=" << locCol << std::endl;
 
     glm::mat4 projection = glm::perspective(
-        glm::radians(45.0f),
-        (float)WIDTH / (float)HEIGHT,
-        0.1f, 200.0f
-    );
+        glm::radians(45.0f), (float)WIDTH / HEIGHT, 0.1f, 500.0f);
 
+    // ── Render loop ──────────────────────────────────────────────────────────
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
-
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 view = glm::lookAt(
-            cameraPos,
-            cameraPos + cameraFront,
-            cameraUp
-        );
-
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         glUseProgram(shader);
         glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
 
         ground.draw(shader, false);
-        hole1.draw(shader, false);
-        hole2.draw(shader, false);
-        hole3.draw(shader, false);
-        hole4.draw(shader, false);
-        hole5.draw(shader, false);
-        hole6.draw(shader, false);
-        hole7.draw(shader, false);
-        hole8.draw(shader, false);
-        hole9.draw(shader, false);
+
         volcano.draw(shader, false);
+        tunnelW.draw(shader, false);
+        tunnelE.draw(shader, false);
+
+        hole1.draw(shader,  false);
+        hole2.draw(shader,  false);
+        hole3.draw(shader,  false);
+        hole4.draw(shader,  false);
+        hole5.draw(shader,  false);
+        hole6.draw(shader,  false);
+        hole7.draw(shader,  false);
+        hole8.draw(shader,  false);
+        hole9w.draw(shader, false);
+        hole9e.draw(shader, false);
+        hole10.draw(shader, false);
+        hole11.draw(shader, false);
+        hole12.draw(shader, false);
+        hole13.draw(shader, false);
+        hole14.draw(shader, false);
+        hole15.draw(shader, false);
+        hole16.draw(shader, false);
+        hole17.draw(shader, false);
+        hole18.draw(shader, false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
