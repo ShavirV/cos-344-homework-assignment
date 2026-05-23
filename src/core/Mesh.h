@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
+#include <functional>
 
 // ── Vertex layout ─────────────────────────────────────────────────────────────
 struct Vertex
@@ -121,7 +122,7 @@ static Mesh makeHole();
 static void buildHoleMeshes(float rotY, Mesh** out, int& count, int maxCount)
 {
     const float FW = 28.0f;   // fairway length (X)
-    const float FH =  0.2f;   // fairway height (Y)  — kept for offset math
+    //const float FH =  0.2f;   // fairway height (Y)  — kept for offset math
     const float FD = 15.0f;   // fairway depth  (Z)
 
     const float BT =  0.5f;   // border thickness
@@ -193,5 +194,159 @@ static void buildHoleMeshes(float rotY, Mesh** out, int& count, int maxCount)
 // translates into world space.
 // scale: overall size multiplier (1.0 = ~3 wide, ~2 tall, ~2.5 deep)
 static Mesh makeRock(float scale = 1.0f);
-};
 
+// These are general-purpose terrain / course utilities that any hole can use.
+// All methods are static (no instance required), follow the same RGBA colour
+// convention as existing factories, and call setup() internally before
+// returning, matching the pattern of makeCylinder / makeCone etc.
+// =============================================================================
+
+// ── makeArcFairway ────────────────────────────────────────────────────────────
+// Subdivided arc-ribbon surface with per-vertex height control.
+//
+// innerR / outerR   : radii bounding the ribbon.
+// startAngle / endAngle : sweep in degrees (CCW from +X in XZ plane).
+// ringSegs / radialSegs : angular and radial subdivisions.
+// heightFn(arcT, radialT) → float : called for every vertex.
+//   arcT    [0,1] = position along arc.
+//   radialT [0,1] = position across the band (0=inner, 1=outer).
+//   Return 0 for a flat infill copy; return a sinusoidal function for hills.
+// r,g,b,a : surface colour.
+//
+// Normals are computed analytically from the surface partial derivatives, so
+// shading is smooth across the undulating surface.
+// UVs: u = arcT * uScale, v = radialT * vScale.
+//
+static Mesh makeArcFairway(float innerR, float outerR,
+                           float startAngle, float endAngle,
+                           int ringSegs, int radialSegs,
+                           const std::function<float(float,float)>& heightFn,
+                           float r, float g, float b, float a = 1.0f,
+                           float uScale = 4.0f, float vScale = 2.0f);
+
+// ── makeArcBorder ─────────────────────────────────────────────────────────────
+// Full 3-D paver kerb following an arc edge. All paver segments are merged into
+// one Mesh (one VAO) for efficiency.
+//
+// radius       : arc radius at which the border edge sits.
+// paverWidth   : radial depth of each paver slab.
+// paverRaise   : how far the paver top rises above the fairway surface.
+// startAngle / endAngle : must match the arc they border (degrees).
+// segs         : angular subdivision count.
+// side         : +1 = outer (extrudes outward), -1 = inner.
+// heightFn     : same contract as makeArcFairway. The paver bottom is always
+//                Y=0; the top is heightFn(t,edge) + paverRaise.
+//                Pass flat lambda for ground-level infill pavers.
+// r,g,b,a      : paver colour.
+//
+static Mesh makeArcBorder(float radius, float paverWidth,
+                          float paverRaise,
+                          float startAngle, float endAngle,
+                          int segs, int side,
+                          const std::function<float(float,float)>& heightFn,
+                          float r = 0.76f, float g = 0.74f,
+                          float b = 0.70f, float a = 1.0f);
+
+// ── makeHeightmapTerrain ──────────────────────────────────────────────────────
+// General flat-grid terrain mesh driven by an arbitrary height function.
+// Useful for the surrounding ground, volcano flanks, sand bunkers, etc.
+//
+// width / depth  : total XZ extent of the grid, centred at origin.
+// segsX / segsZ  : vertex subdivisions in each direction.
+// heightFn(nx,nz) → float : called per vertex, nx/nz in [0,1].
+// r,g,b,a        : surface colour.
+//
+// Normals are computed per-quad (finite-difference approximation using
+// neighbouring vertices), giving correct shading over arbitrary terrain.
+//
+static Mesh makeHeightmapTerrain(float width, float depth,
+                                 int segsX, int segsZ,
+                                 const std::function<float(float,float)>& heightFn,
+                                 float r, float g, float b, float a = 1.0f);
+
+// ── makeArcWall ───────────────────────────────────────────────────────────────
+// Vertical retaining wall following a circular arc. Useful for the inner face
+// of raised island walls, bowl walls, or sunken sand bunker sides.
+//
+// radius      : wall centreline radius.
+// wallHeight  : total height of the wall.
+// startAngle / endAngle : arc sweep in degrees.
+// segs        : angular subdivision count.
+// bottomY     : Y of the base of the wall (default 0 = ground).
+// topY        : Y of the top of the wall (= bottomY + wallHeight).
+//               The wall's top edge can be straight (uniform topY) or
+//               driven by topHeightFn(arcT) → float for a stepped profile.
+// r,g,b,a     : wall colour.
+//
+static Mesh makeArcWall(float radius, float wallHeight,
+                        float startAngle, float endAngle,
+                        int segs,
+                        float bottomY,
+                        float r, float g, float b, float a = 1.0f);
+
+// ── makeAnnularDisc ───────────────────────────────────────────────────────────
+// Flat ring surface (annulus) — useful for water moat surfaces, path rings,
+// or the gap fill between an island and the surrounding fairway.
+//
+// innerR / outerR : ring radii.
+// y               : flat Y position of the disc.
+// segs            : angular subdivision count.
+// r,g,b,a         : surface colour.
+//
+static Mesh makeAnnularDisc(float innerR, float outerR,
+                            float y, int segs,
+                            float r, float g, float b, float a = 1.0f);
+
+// ── makeSlopedStrip ───────────────────────────────────────────────────────────
+// A subdivided quad strip that rises linearly from one end to the other —
+// a general-purpose ramp / incline with smooth shading.
+// More controllable than makeRamp (which uses a pre-built cuboid) because
+// the top and bottom edges are independently positioned.
+//
+// x0,y0,z0  : centre of the low end.
+// x1,y1,z1  : centre of the high end.
+// width      : perpendicular width of the strip.
+// segs       : longitudinal subdivisions (use >= 4 for smooth normal lighting).
+// r,g,b,a    : strip colour.
+//
+static Mesh makeSlopedStrip(float x0, float y0, float z0,
+                            float x1, float y1, float z1,
+                            float width, int segs,
+                            float r, float g, float b, float a = 1.0f);
+
+// ── makePathStrip ─────────────────────────────────────────────────────────────
+// A flat quad strip following a cubic Bezier centreline.
+// Suitable for connector paths, cart tracks, or curved walkways.
+//
+// p0..p3  : XZ Bezier control points (Y is fixed at pathY).
+// width   : strip width perpendicular to the curve tangent.
+// segs    : number of quad segments approximating the curve.
+// pathY   : height of the strip.
+// r,g,b,a : strip colour.
+//
+static Mesh makePathStrip(glm::vec2 p0, glm::vec2 p1,
+                          glm::vec2 p2, glm::vec2 p3,
+                          float width, int segs, float pathY,
+                          float r, float g, float b, float a = 1.0f);
+
+// ── makeSteppedTerrain ────────────────────────────────────────────────────────
+// A series of flat horizontal platforms connected by vertical risers,
+// producing a stepped hillside. Useful for volcano terracing or retaining walls
+// that separate different elevation zones.
+//
+// x, z          : world-space XZ centre of the stepped formation.
+// stepsX        : number of steps in the X direction.
+// stepsZ        : number of steps in the Z direction.
+// stepWidth     : XZ extent of each step tread.
+// stepHeight    : vertical rise per step.
+// riserDepth    : depth of the vertical riser face.
+// r,g,b,a       : step colour (riser uses a slightly darkened version).
+//
+// Pushes all step treads and risers into `out` as separate meshes.
+static void makeSteppedTerrain(std::vector<Mesh>& out,
+                               float x, float z,
+                               int stepsX, int stepsZ,
+                               float stepWidth, float stepHeight,
+                               float riserDepth,
+                               float r, float g, float b, float a = 1.0f);
+};
