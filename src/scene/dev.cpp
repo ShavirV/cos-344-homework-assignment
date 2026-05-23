@@ -11,6 +11,10 @@
 
 #include "../objects/Hole9E.h"
 #include "../objects/Hole9W.h"
+#include "../objects/Hole1.h"
+#include "../objects/Hole2.h"
+#include "../objects/Hole3.h"
+#include "../objects/Hole4.h"
 
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
@@ -100,6 +104,15 @@ int main()
     Hole9W hole9w;
     hole9w.translate(-48.0f, 0.35f, -8.0f);
 
+    Hole1 hole1;
+    Hole2 hole2;
+    Hole3 hole3;
+        
+        // ── Hole 4: windmill hole ─────────────────────────────────────────────────
+    // Fairway centre: X=-48, Y=0.35 (flush on ground slab), Z=+15
+    // (Matches the layout table in main.cpp: H4 | -48 | +15 | 0°)
+    Hole4 hole4;
+    hole4.translate(-48.0f, 0.35f, 15.0f);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -114,6 +127,10 @@ int main()
         ground.draw(shader, false);
         hole9e.draw(shader, false);
         hole9w.draw(shader, false);
+        hole1.draw(shader, false);
+        hole2.draw(shader, false);
+        hole3.draw(shader, false);
+        hole4.draw(shader, false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
