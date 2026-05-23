@@ -16,7 +16,7 @@ public:
     static const int MAX_MESHES = 8;
 
     // rotY: optional Y-axis rotation in degrees (0 = length runs along X).
-    Hole9E();
+    Hole9E(float s = 1.0);
     ~Hole9E();
 
     // Non-copyable — meshes own GPU buffers.

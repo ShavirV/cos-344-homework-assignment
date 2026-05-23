@@ -647,44 +647,97 @@ Mesh Mesh::makeRamp(float x0, float y0, float z0,
                     float x1, float y1, float z1,
                     float width)
 {
-    // Vector from low end to high end.
     float dx  = x1 - x0;
     float dy  = y1 - y0;
     float dz  = z1 - z0;
 
-    // 3-D length of the ramp.
     float len3D = sqrtf(dx*dx + dy*dy + dz*dz);
-    if (len3D < 0.001f)
-        len3D = 0.001f;   // degenerate guard
+    if (len3D < 0.001f) len3D = 0.001f;
 
-    // Horizontal distance (in XZ plane) — used to compute slope angle.
-    float lenXZ = sqrtf(dx*dx + dz*dz);
-
-    // Slope angle in radians (positive = ramp rising in +Y direction).
+    float lenXZ    = sqrtf(dx*dx + dz*dz);
     float slopeRad = atan2f(dy, lenXZ);
+    float headingRad = atan2f(dz, dx);
 
-    // Heading angle around Y axis: angle from +X toward the target XZ direction.
-    float headingRad = atan2f(dz, dx);   // atan2(z, x) gives angle in XZ plane
+    float w = width / 2.0f;
+    float h = dy;        // full height of the wedge
+    float d = lenXZ;     // horizontal run
 
-    // Ramp body: length along X (will be rotated into world space).
-    //            height = 0.2 (thin slab, same as a fairway).
-    //            depth  = width (cross-section perpendicular to travel).
-    Mesh ramp = Mesh::makeCuboid(len3D, 0.2f, width, 0.85f, 0.05f, 0.05f, 1.0f);
+    Mesh mesh(0.20f, 0.45f, 0.10f, 1.0f);  // same green as landmass
 
-    // 1) Tilt around Z axis by the slope angle so the slab rises from -X to +X.
-    //    (We built the cuboid lying flat along X; tilting around Z lifts one end.)
-    ramp.rotate(glm::degrees(-slopeRad), 0.0f, 0.0f, 1.0f);
+    // 8 vertices: 4 at base (y=0), 4 at top-end (y=h)
+    // Base rectangle (z = -d/2 .. +d/2, all at y = -h/2)
+    glm::vec3 bBL = {-w, -h/2.0f,  d/2.0f};  // base back left
+    glm::vec3 bBR = { w, -h/2.0f,  d/2.0f};  // base back right
+    glm::vec3 bFL = {-w, -h/2.0f, -d/2.0f};  // base front left
+    glm::vec3 bFR = { w, -h/2.0f, -d/2.0f};  // base front right
 
-    // 2) Spin around Y to align the travel direction with the world heading.
-    ramp.rotate(glm::degrees(headingRad), 0.0f, 1.0f, 0.0f);
+    // Top edge (only at the high end, z = -d/2)
+    glm::vec3 tFL = {-w,  h/2.0f, -d/2.0f};  // top front left
+    glm::vec3 tFR = { w,  h/2.0f, -d/2.0f};  // top front right
 
-    // 3) Translate to midpoint between the two ends.
-    ramp.translate((x0 + x1) * 0.5f,
+    // ── Bottom face ───────────────────────────────────────────────────────────
+    glm::vec3 nDn = {0, -1, 0};
+    unsigned int base = mesh.vertexCount;
+    mesh.addVertex({bFL, nDn, {0,0}});
+    mesh.addVertex({bFR, nDn, {1,0}});
+    mesh.addVertex({bBR, nDn, {1,1}});
+    mesh.addVertex({bBL, nDn, {0,1}});
+    mesh.addTriangle(base+0, base+2, base+1);
+    mesh.addTriangle(base+2, base+0, base+3);
+
+    // ── Slope (top) face ──────────────────────────────────────────────────────
+    glm::vec3 nSlope = glm::normalize(glm::vec3(0, d, h));
+    base = mesh.vertexCount;
+    mesh.addVertex({bBL, nSlope, {0,0}});
+    mesh.addVertex({bBR, nSlope, {1,0}});
+    mesh.addVertex({tFR, nSlope, {1,1}});
+    mesh.addVertex({tFL, nSlope, {0,1}});
+    mesh.addTriangle(base+0, base+1, base+2);
+    mesh.addTriangle(base+2, base+3, base+0);
+
+    // ── Back face (vertical wall at base end) ─────────────────────────────────
+    glm::vec3 nBack = {0, 0, 1};
+    base = mesh.vertexCount;
+    mesh.addVertex({bBL, nBack, {0,0}});
+    mesh.addVertex({bBR, nBack, {1,0}});
+    mesh.addVertex({bBR, nBack, {1,0}});  // no height at back
+    mesh.addVertex({bBL, nBack, {0,0}});
+    // just a degenerate edge — skip, back is open at ground level
+
+    // ── Front face (vertical wall at high end) ────────────────────────────────
+    glm::vec3 nFront = {0, 0, -1};
+    base = mesh.vertexCount;
+    mesh.addVertex({bFL, nFront, {0,0}});
+    mesh.addVertex({bFR, nFront, {1,0}});
+    mesh.addVertex({tFR, nFront, {1,1}});
+    mesh.addVertex({tFL, nFront, {0,1}});
+    mesh.addTriangle(base+0, base+1, base+2);
+    mesh.addTriangle(base+2, base+3, base+0);
+
+    // ── Left triangular face ──────────────────────────────────────────────────
+    glm::vec3 nLeft = {-1, 0, 0};
+    base = mesh.vertexCount;
+    mesh.addVertex({bBL, nLeft, {0,0}});
+    mesh.addVertex({bFL, nLeft, {1,0}});
+    mesh.addVertex({tFL, nLeft, {1,1}});
+    mesh.addTriangle(base+0, base+1, base+2);
+
+    // ── Right triangular face ─────────────────────────────────────────────────
+    glm::vec3 nRight = {1, 0, 0};
+    base = mesh.vertexCount;
+    mesh.addVertex({bBR, nRight, {0,0}});
+    mesh.addVertex({tFR, nRight, {1,1}});
+    mesh.addVertex({bFR, nRight, {1,0}});
+    mesh.addTriangle(base+0, base+1, base+2);
+
+    // ── Orient and place ──────────────────────────────────────────────────────
+    mesh.rotate(glm::degrees(headingRad), 0.0f, 1.0f, 0.0f);
+    mesh.translate((x0 + x1) * 0.5f,
                    (y0 + y1) * 0.5f,
                    (z0 + z1) * 0.5f);
 
-    ramp.setup();
-    return ramp;
+    mesh.setup();
+    return mesh;
 }
 
 // ── addTreeTo ────────────────────────────────────────────────────────────────
