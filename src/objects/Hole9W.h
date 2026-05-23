@@ -13,7 +13,7 @@
 class Hole9W
 {
 public:
-    static const int MAX_MESHES = 8;
+    static const int MAX_MESHES = 15;
 
     // rotY: optional Y-axis rotation in degrees (0 = length runs along X).
     Hole9W();

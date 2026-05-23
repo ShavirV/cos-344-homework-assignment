@@ -24,9 +24,9 @@ Hole9E::Hole9E()
     0.22f, 0.14f, 0.05f, 1.0f));                       
     mouth->translate(33.0f, -44.0f, 0.0f);  
   
-mouth->rotate(90.0f, 0.0f, 0.0f, 1.0f);   // face along X
-mouth->setup();
-addMesh(mouth);
+    mouth->rotate(90.0f, 0.0f, 0.0f, 1.0f);   // face along X
+    mouth->setup();
+    addMesh(mouth);
 
 }
 

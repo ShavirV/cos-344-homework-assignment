@@ -197,5 +197,8 @@ static Mesh makeRock(float scale = 1.0f);
 static Mesh makeTunnel(float outerRadius, float innerRadius,
                                float height, int sectors,
                                float r, float g, float b, float a);
+
+static Mesh makeCylinderNoTop(float radius, float height, int sectors,
+                               float r, float g, float b, float a);
 };
 
