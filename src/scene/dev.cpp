@@ -1,14 +1,14 @@
 // =============================================================================
 // dev.cpp
-// Standalone viewer for COS344 Practical Holes 13-15.
+// Standalone viewer for COS344 Practical Hole 13.
 //
-// Shows ONE hole at a time, framed to fill the viewport with a fly-camera
-// for free exploration. There is no surrounding course, no other holes -
-// just the selected hole displayed in isolation, which is the point of this
-// test harness.
+// Shows the current hole(s) framed in the viewport with a fly-camera for
+// free exploration. Right now only Hole 13 is wired in; Hole 14 / 15 will
+// be added the same way once they exist. Look for the "ADD HOLE 14/15"
+// markers below — adding a new hole is a five-line change in each spot.
 //
 // Controls:
-//   1 / 2 / 3   - switch to Hole 13 / 14 / 15
+//   1           - switch to Hole 13   (2 / 3 will switch to 14 / 15 later)
 //   R           - re-frame camera on current hole
 //   W / S       - fly forward / back
 //   A / D       - strafe left / right
@@ -38,17 +38,15 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "../objects/Hole13.h"
-#include "../objects/Hole14.h"
-#include "../objects/Hole15.h"
+// ADD HOLE 14/15: when those classes exist, add their #includes here.
+// #include "../objects/Hole14.h"
+// #include "../objects/Hole15.h"
+
 
 // -----------------------------------------------------------------------------
 // Inline Blinn-Phong shader. The hole classes expect these exact uniform
 // names: uMVP, uModel, uNormalMat, uLightDir, uLightColor, uAmbient, uViewPos.
 // -----------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// Upgraded Blinn-Phong shaders with emissive, lava point-light, rim light,
-// procedural noise variation, tone-mapping, and gamma correction.
-// ---------------------------------------------------------------------------
 static const char* VERTEX_SRC =
     "#version 330 core\n"
     "layout(location = 0) in vec3 aPos;\n"
@@ -68,68 +66,168 @@ static const char* VERTEX_SRC =
     "    gl_Position = uMVP * vec4(aPos, 1.0);\n"
     "}\n";
 
-static const char* FRAGMENT_SRC =
-    "#version 330 core\n"
-    "in vec3 vWorldPos;\n"
-    "in vec3 vNormal;\n"
-    "in vec3 vColor;\n"
-    "uniform vec3  uLightDir;\n"
-    "uniform vec3  uLightColor;\n"
-    "uniform vec3  uAmbient;\n"
-    "uniform vec3  uViewPos;\n"
-    "uniform float uEmissive;\n"
-    "uniform vec3  uEmissiveColor;\n"
-    "uniform vec3  uLavaLightPos;\n"
-    "uniform vec3  uLavaLightColor;\n"
-    "uniform float uLavaLightIntensity;\n"
-    "out vec4 FragColor;\n"
-    // Value-noise helpers
-    "float hash3(vec3 p){\n"
-    "    p=fract(p*vec3(127.1,311.7,74.7));\n"
-    "    p+=dot(p,p.yxz+19.19);\n"
-    "    return fract((p.x+p.y)*p.z);\n"
-    "}\n"
-    "float noise3(vec3 p){\n"
-    "    vec3 i=floor(p), f=fract(p);\n"
-    "    f=f*f*(3.0-2.0*f);\n"
-    "    return mix(mix(mix(hash3(i),hash3(i+vec3(1,0,0)),f.x),\n"
-    "                   mix(hash3(i+vec3(0,1,0)),hash3(i+vec3(1,1,0)),f.x),f.y),\n"
-    "               mix(mix(hash3(i+vec3(0,0,1)),hash3(i+vec3(1,0,1)),f.x),\n"
-    "                   mix(hash3(i+vec3(0,1,1)),hash3(i+vec3(1,1,1)),f.x),f.y),f.z);\n"
-    "}\n"
-    "void main(){\n"
-    "    vec3 N=normalize(vNormal);\n"
-    "    vec3 L=normalize(uLightDir);\n"
-    "    vec3 V=normalize(uViewPos-vWorldPos);\n"
-    "    vec3 H=normalize(L+V);\n"
-    // Micro-variation
-    "    float nv=noise3(vWorldPos*2.5)*0.06-0.03;\n"
-    "    vec3 base=clamp(vColor+nv,0.0,1.0);\n"
-    // Diffuse + specular
-    "    float diff=max(dot(N,L),0.0);\n"
-    "    float spec=pow(max(dot(N,H),0.0),28.0)*0.18;\n"
-    "    vec3 lit=base*(uAmbient+diff*uLightColor)+spec*uLightColor;\n"
-    // Lava point light
-    "    if(uLavaLightIntensity>0.001){\n"
-    "        vec3 lv=uLavaLightPos-vWorldPos;\n"
-    "        float ld=length(lv); lv/=ld;\n"
-    "        float la=max(dot(N,lv),0.0);\n"
-    "        float atten=uLavaLightIntensity/(1.0+0.04*ld*ld);\n"
-    "        lit+=base*la*uLavaLightColor*atten;\n"
-    "    }\n"
-    // Rim light
-    "    float rim=pow(1.0-max(dot(N,V),0.0),3.5)*0.12;\n"
-    "    lit+=rim*uLightColor;\n"
-    // Emissive override
-    "    if(uEmissive>0.5){\n"
-    "        float sh=noise3(vWorldPos*3.0)*0.3+0.7;\n"
-    "        lit=base*uEmissiveColor*sh*3.5;\n"
-    "    }\n"
-    // Reinhard tone-map + gamma
-    "    lit=lit/(lit+vec3(1.0));\n"
-    "    lit=pow(clamp(lit,0.0,1.0),vec3(1.0/2.2));\n"
-    "    FragColor=vec4(lit,1.0);\n"
-    "}\n";
+// Fragment shader.
+//
+// Adds procedural-noise "textures" for the turf and kerb materials, and a
+// hemisphere ambient term so shadows pick up a hint of sky-blue while lit
+// surfaces tilt warm. The shader identifies the material from the base
+// vertex colour (no extra attribute or uniform required), so Hole13's
+// geometry code does not need to change to opt in.
+//
+// All noise is computed in code via integer-coord hashing — no texture
+// uploads, in line with the spec's no-prebuilt-textures rule.
+static const char* FRAGMENT_SRC = R"GLSL(
+#version 330 core
+
+in vec3 vWorldPos;
+in vec3 vNormal;
+in vec3 vColor;
+
+uniform vec3 uLightDir;     // direction TO the sun
+uniform vec3 uLightColor;   // sun colour
+uniform vec3 uAmbient;      // base ambient term (used as the "ground bounce" colour)
+uniform vec3 uViewPos;      // camera position in world space
+
+out vec4 FragColor;
+
+// ── Hash + value noise ──────────────────────────────────────────────────────
+// Cheap deterministic 2D hash. Not cryptographic — just stable per-coordinate
+// pseudo-random values to drive the noise.
+float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+// Single-octave value noise: sample the four integer-corner hash values and
+// smooth-interpolate between them.
+float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    // Smoothstep weights (Hermite) to soften the bilinear blend.
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    float a = hash21(i);
+    float b = hash21(i + vec2(1.0, 0.0));
+    float c = hash21(i + vec2(0.0, 1.0));
+    float d = hash21(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// Fractal Brownian Motion — three octaves of value noise. Gives the
+// multi-scale look real materials have: small detail + bigger blotches.
+float fbm(vec2 p) {
+    float v = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 3; ++i) {
+        v += amp * vnoise(p);
+        p *= 2.07;        // non-integer ratio avoids alignment artefacts
+        amp *= 0.5;
+    }
+    return v;
+}
+
+// ── Material-specific shading ───────────────────────────────────────────────
+
+// Turf: per-blade colour variation + larger wear patches.
+// World-space XZ is used so the noise "sticks" to the ground as the camera
+// moves (it would crawl with view-space coords).
+vec3 shadeTurf(vec3 baseGreen, vec3 worldPos) {
+    vec2 uv = worldPos.xz;
+
+    // High-frequency variation — individual blade-clump tints.
+    float n1 = vnoise(uv * 8.0);
+    // Medium variation — patchy wear, slightly drier areas.
+    float n2 = fbm(uv * 0.6);
+
+    // Tint between a slightly bluer-green and a slightly yellower-green.
+    vec3 coolGreen = baseGreen * vec3(0.85, 1.00, 0.70);  // healthy / shaded
+    vec3 warmGreen = baseGreen * vec3(1.15, 1.00, 0.55);  // sun-bleached / dry
+    vec3 tinted    = mix(coolGreen, warmGreen, n1);
+
+    // Darker wear patches around 30% of the surface.
+    float wear = smoothstep(0.45, 0.65, n2);
+    tinted *= mix(1.0, 0.70, wear);
+
+    // A touch of fine "blade speckle" — small brightness jitter.
+    float speckle = vnoise(uv * 35.0) * 0.10 - 0.05;
+    tinted += vec3(speckle * 0.5, speckle, speckle * 0.3);
+
+    return tinted;
+}
+
+// Concrete kerb: aggregate speckle (fine) + weathering blotches (coarse).
+vec3 shadeKerb(vec3 baseGrey, vec3 worldPos) {
+    vec2 uv = worldPos.xz;
+
+    // Fine aggregate — high-frequency noise, ±10% brightness jitter.
+    float aggregate = vnoise(uv * 25.0) * 0.20 - 0.10;
+    // Larger weathering — slow stains and water marks.
+    float weather   = fbm(uv * 0.8);
+    // Slightly cool weathered patches, slightly warm fresh patches.
+    vec3 fresh   = baseGrey * 1.05;
+    vec3 stained = baseGrey * vec3(0.85, 0.88, 0.92);  // cooler grey
+    vec3 tinted  = mix(stained, fresh, smoothstep(0.35, 0.65, weather));
+
+    tinted += vec3(aggregate);
+    return tinted;
+}
+
+// ── Material identification from the base colour ────────────────────────────
+// Green-dominant high-saturation → turf. Roughly grey (R≈G≈B and bright) → kerb.
+// Anything else falls through to "use the colour as-is" — covers the tee
+// patch, cup, flag, pole.
+bool looksLikeTurf(vec3 c) {
+    return c.g > c.r + 0.15 && c.g > c.b + 0.15 && c.g > 0.30;
+}
+bool looksLikeKerb(vec3 c) {
+    float maxc = max(c.r, max(c.g, c.b));
+    float minc = min(c.r, min(c.g, c.b));
+    return (maxc - minc) < 0.10 && maxc > 0.50;
+}
+
+void main() {
+    // Material-specific base colour with procedural variation.
+    vec3 base;
+    if (looksLikeTurf(vColor))      base = shadeTurf(vColor, vWorldPos);
+    else if (looksLikeKerb(vColor)) base = shadeKerb(vColor, vWorldPos);
+    else                            base = vColor;
+
+    vec3 N = normalize(vNormal);
+    vec3 L = normalize(uLightDir);
+    vec3 V = normalize(uViewPos - vWorldPos);
+    vec3 H = normalize(L + V);
+
+    // ── Hemisphere ambient ───────────────────────────────────────────────────
+    // Surfaces facing up pick up sky-blue; surfaces facing down pick up the
+    // ground-bounce colour passed in via uAmbient. Reads as outdoor light
+    // without needing a full GI solution.
+    vec3 skyColor    = vec3(0.55, 0.70, 0.95);            // hardcoded noon sky
+    vec3 groundBounce = uAmbient * 1.20;                  // tint from uAmbient
+    float hemi = 0.5 + 0.5 * N.y;                          // 1 facing up, 0 down
+    vec3 ambient = mix(groundBounce, skyColor, hemi) * 0.55;
+
+    // ── Diffuse (Lambert) ────────────────────────────────────────────────────
+    float diff = max(dot(N, L), 0.0);
+
+    // ── Specular (Blinn-Phong) ───────────────────────────────────────────────
+    // Turf is matte → very low spec power, almost no contribution.
+    // Kerb is slightly glossy concrete → moderate.
+    // Other materials (cup, flag) → default.
+    float specStrength = 0.10;
+    float specPower    = 24.0;
+    if (looksLikeTurf(vColor)) { specStrength = 0.02; specPower = 8.0;  }
+    if (looksLikeKerb(vColor)) { specStrength = 0.18; specPower = 32.0; }
+    float spec = pow(max(dot(N, H), 0.0), specPower) * specStrength;
+
+    // Combine, then gently roll off highlights so the noon sun on bright
+    // turf doesn't blow to pure white. Identity for shadowed pixels,
+    // compressive only at the top.
+    vec3 lit = base * (ambient + diff * uLightColor) + spec * uLightColor;
+    lit = lit / (1.0 + 0.4 * lit);
+
+    FragColor = vec4(lit, 1.0);
+}
+)GLSL";
 
 static GLuint compileShader(GLenum type, const char* src) {
     GLuint s = glCreateShader(type);
@@ -210,14 +308,12 @@ static bool   g_needFrame = true;  // request a camera reframe on hole switch
 
 // Forward declarations of the hole instances so callbacks can reference them.
 static Hole13* g_h13 = NULL;
-static Hole14* g_h14 = NULL;
-static Hole15* g_h15 = NULL;
+// ADD HOLE 14/15: declare g_h14 / g_h15 pointers here when those classes exist.
 
 static void frameCurrent() {
     glm::vec3 c(0.0f); float r = 50.0f;
     if (g_activeHole == 13 && g_h13) { c = g_h13->sceneCenter(); r = g_h13->sceneRadius(); }
-    if (g_activeHole == 14 && g_h14) { c = g_h14->sceneCenter(); r = g_h14->sceneRadius(); }
-    if (g_activeHole == 15 && g_h15) { c = g_h15->sceneCenter(); r = g_h15->sceneRadius(); }
+    // ADD HOLE 14/15: add the matching `if` lines here.
     g_cam.frameOn(c, r);
 }
 
@@ -225,8 +321,7 @@ static void key_cb(GLFWwindow* w, int key, int /*sc*/, int action, int /*mods*/)
     if (action != GLFW_PRESS) return;
     if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(w, GLFW_TRUE);
     if (key == GLFW_KEY_1) { g_activeHole = 13; g_needFrame = true; }
-    if (key == GLFW_KEY_2) { g_activeHole = 14; g_needFrame = true; }
-    if (key == GLFW_KEY_3) { g_activeHole = 15; g_needFrame = true; }
+    // ADD HOLE 14/15: bind keys 2 / 3 here.
     if (key == GLFW_KEY_R) g_needFrame = true;
     if (key == GLFW_KEY_TAB) {
         g_wireframe = !g_wireframe;
@@ -282,7 +377,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // for macOS
 
     GLFWwindow* win = glfwCreateWindow(g_winW, g_winH,
-        "COS344 - Holes 13-15 (press 1/2/3, R to reframe)", NULL, NULL);
+        "COS344 - Hole 13 (press 1 to select, R to reframe)", NULL, NULL);
     if (!win) {
         std::cerr << "Window creation failed\n";
         glfwTerminate(); return 1;
@@ -311,14 +406,11 @@ int main() {
     GLuint program = buildProgram();
 
     Hole13 hole13;  g_h13 = &hole13;
-    Hole14 hole14;  g_h14 = &hole14;
-    Hole15 hole15;  g_h15 = &hole15;
-    hole13.init(program, "volcano.glb");  // path relative to working dir
-    hole14.init(program);
-    hole15.init(program);
+    hole13.init(program);
+    // ADD HOLE 14/15: declare, point g_h14/g_h15 at, and init the new instances here.
 
     double prevTime = glfwGetTime();
-    std::cout << "Controls: 1/2/3 switch hole; R reframe; WASD + Space/Shift fly; "
+    std::cout << "Controls: 1 selects Hole 13; R reframe; WASD + Space/Shift fly; "
                  "mouse look; TAB wireframe; M release mouse; ESC quit.\n";
 
     while (!glfwWindowShouldClose(win)) {
@@ -339,13 +431,13 @@ int main() {
                                           0.1f, 500.0f);
         glm::mat4 view = g_cam.view();
 
-        // Daytime sun direction (report 7.1: directional light at high angle)
-        glm::vec3 sunDir = glm::normalize(glm::vec3(0.5f, 0.85f, 0.4f));
+        // Noon sun direction (near-vertical, slight tilt so kerb sides still get hit).
+        glm::vec3 sunDir = glm::normalize(glm::vec3(0.15f, 0.96f, 0.25f));
 
         switch (g_activeHole) {
             case 13: hole13.draw(view, proj, sunDir, g_cam.pos); break;
-            case 14: hole14.draw(view, proj, sunDir, g_cam.pos); break;
-            case 15: hole15.draw(view, proj, sunDir, g_cam.pos); break;
+            // ADD HOLE 14/15: add the matching case branches here.
+            default: hole13.draw(view, proj, sunDir, g_cam.pos); break;
         }
 
         std::ostringstream oss;
@@ -359,8 +451,7 @@ int main() {
     }
 
     hole13.cleanup();
-    hole14.cleanup();
-    hole15.cleanup();
+    // ADD HOLE 14/15: clean up the new instances here.
     glDeleteProgram(program);
     glfwTerminate();
     return 0;
