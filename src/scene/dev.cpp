@@ -38,8 +38,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "../objects/Hole13.h"
-// ADD HOLE 14/15: when those classes exist, add their #includes here.
-// #include "../objects/Hole14.h"
+#include "../objects/Hole14.h"
+// ADD HOLE 15: when that class exists, add its #include here.
 // #include "../objects/Hole15.h"
 
 
@@ -308,12 +308,14 @@ static bool   g_needFrame = true;  // request a camera reframe on hole switch
 
 // Forward declarations of the hole instances so callbacks can reference them.
 static Hole13* g_h13 = NULL;
-// ADD HOLE 14/15: declare g_h14 / g_h15 pointers here when those classes exist.
+static Hole14* g_h14 = NULL;
+// ADD HOLE 15: declare g_h15 pointer here when that class exists.
 
 static void frameCurrent() {
     glm::vec3 c(0.0f); float r = 50.0f;
     if (g_activeHole == 13 && g_h13) { c = g_h13->sceneCenter(); r = g_h13->sceneRadius(); }
-    // ADD HOLE 14/15: add the matching `if` lines here.
+    if (g_activeHole == 14 && g_h14) { c = g_h14->sceneCenter(); r = g_h14->sceneRadius(); }
+    // ADD HOLE 15: add the matching `if` line here.
     g_cam.frameOn(c, r);
 }
 
@@ -321,7 +323,8 @@ static void key_cb(GLFWwindow* w, int key, int /*sc*/, int action, int /*mods*/)
     if (action != GLFW_PRESS) return;
     if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(w, GLFW_TRUE);
     if (key == GLFW_KEY_1) { g_activeHole = 13; g_needFrame = true; }
-    // ADD HOLE 14/15: bind keys 2 / 3 here.
+    if (key == GLFW_KEY_2) { g_activeHole = 14; g_needFrame = true; }
+    // ADD HOLE 15: bind key 3 here.
     if (key == GLFW_KEY_R) g_needFrame = true;
     if (key == GLFW_KEY_TAB) {
         g_wireframe = !g_wireframe;
@@ -377,7 +380,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // for macOS
 
     GLFWwindow* win = glfwCreateWindow(g_winW, g_winH,
-        "COS344 - Hole 13 (press 1 to select, R to reframe)", NULL, NULL);
+        "COS344 - Holes 13 & 14 (press 1/2 to select, R to reframe)", NULL, NULL);
     if (!win) {
         std::cerr << "Window creation failed\n";
         glfwTerminate(); return 1;
@@ -407,10 +410,12 @@ int main() {
 
     Hole13 hole13;  g_h13 = &hole13;
     hole13.init(program);
-    // ADD HOLE 14/15: declare, point g_h14/g_h15 at, and init the new instances here.
+    Hole14 hole14;  g_h14 = &hole14;
+    hole14.init(program);
+    // ADD HOLE 15: declare, point g_h15 at, and init the new instance here.
 
     double prevTime = glfwGetTime();
-    std::cout << "Controls: 1 selects Hole 13; R reframe; WASD + Space/Shift fly; "
+    std::cout << "Controls: 1/2 select Hole 13/14; R reframe; WASD + Space/Shift fly; "
                  "mouse look; TAB wireframe; M release mouse; ESC quit.\n";
 
     while (!glfwWindowShouldClose(win)) {
@@ -436,7 +441,8 @@ int main() {
 
         switch (g_activeHole) {
             case 13: hole13.draw(view, proj, sunDir, g_cam.pos); break;
-            // ADD HOLE 14/15: add the matching case branches here.
+            case 14: hole14.draw(view, proj, sunDir, g_cam.pos); break;
+            // ADD HOLE 15: add the matching case branch here.
             default: hole13.draw(view, proj, sunDir, g_cam.pos); break;
         }
 
@@ -451,7 +457,8 @@ int main() {
     }
 
     hole13.cleanup();
-    // ADD HOLE 14/15: clean up the new instances here.
+    hole14.cleanup();
+    // ADD HOLE 15: clean up the new instance here.
     glDeleteProgram(program);
     glfwTerminate();
     return 0;
