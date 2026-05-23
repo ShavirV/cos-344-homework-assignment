@@ -121,7 +121,7 @@ static Mesh makeHole();
 static void buildHoleMeshes(float rotY, Mesh** out, int& count, int maxCount)
 {
     const float FW = 28.0f;   // fairway length (X)
-    const float FH =  0.2f;   // fairway height (Y)  — kept for offset math
+    //const float FH =  0.2f;   // fairway height (Y)  — kept for offset math
     const float FD = 15.0f;   // fairway depth  (Z)
 
     const float BT =  0.5f;   // border thickness
@@ -193,5 +193,56 @@ static void buildHoleMeshes(float rotY, Mesh** out, int& count, int maxCount)
 // translates into world space.
 // scale: overall size multiplier (1.0 = ~3 wide, ~2 tall, ~2.5 deep)
 static Mesh makeRock(float scale = 1.0f);
-};
 
+// =============================================================================
+// ADD TO Mesh.h — paste these declarations into the factory methods section
+// after makeRock().
+// =============================================================================
+
+// ── makeArcFairway ────────────────────────────────────────────────────────────
+// C-shaped fairway surface built as a subdivided arc ribbon.
+//
+// innerR / outerR   : radii of the inner and outer edges of the band.
+// startAngle / endAngle : arc sweep in degrees (CCW from +X in the XZ plane).
+// ringSegs          : number of subdivisions along the arc direction.
+// radialSegs        : number of subdivisions across the band width.
+//
+// Each vertex Y is determined by fairwayHeight(arcT, radialT), which sums two
+// sinusoidal waves in the arc direction and a crown term across the band, giving
+// a naturally rolling, hilly surface without any flat regions.
+//
+// The top surface normal at each vertex is computed as the cross product of the
+// two surface tangents (dPos/dTheta × dPos/dRadius), so lighting responds
+// correctly to the undulating geometry.
+//
+// UVs are tiled: u = arcT * 4, v = radialT * 2, suitable for a repeating
+// grass texture.
+//
+static Mesh makeArcFairway(float innerR, float outerR,
+                           float startAngle, float endAngle,
+                           int ringSegs, int radialSegs);
+
+// ── makeArcBorder ─────────────────────────────────────────────────────────────
+// Vertical kerb strip following the inner or outer edge of a fairway arc.
+//
+// radius          : the arc radius at which the border sits.
+// borderThickness : how far the border extrudes radially beyond `radius`.
+// borderHeight    : height of the kerb above the fairway surface.
+// startAngle / endAngle : must match the arc they border (degrees).
+// segs            : angular subdivision count (match ringSegs of the fairway).
+// side            : +1 = outer border (extrudes outward), -1 = inner border.
+//
+// Each border quad's bottom edge is pinned to the fairway surface height at
+// that angular position (via fairwayHeight) so the kerb sits flush rather
+// than floating or clipping through.
+//
+static Mesh makeArcBorder(float radius, float borderThickness,
+    float borderHeight,
+    float startAngle, float endAngle,
+    int segs, int side);
+
+
+
+
+
+};

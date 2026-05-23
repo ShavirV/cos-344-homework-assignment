@@ -11,9 +11,11 @@
 
 #include "../objects/Hole9E.h"
 #include "../objects/Hole9W.h"
+#include "../objects/Hole16.h"
 
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
+bool wireframeMode = false;
 
 // ── Camera ────────────────────────────────────────────────────────────────────
 glm::vec3 cameraPos   = glm::vec3(0.0f, 90.0f, 160.0f);
@@ -64,8 +66,27 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) cameraPos -= SPEED * flat;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) cameraPos -= SPEED * right;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) cameraPos += SPEED * right;
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) cameraPos.y += SPEED;
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) cameraPos.y -= SPEED;
     if (glfwGetKey(window, GLFW_KEY_SPACE)      == GLFW_PRESS) cameraPos += SPEED * cameraUp;
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) cameraPos -= SPEED * cameraUp;
+
+    static bool enterPressed = false;
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS) {
+        if (!enterPressed) {
+            wireframeMode = !wireframeMode;
+            if (wireframeMode) {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                std::cout << "Wireframe mode ON" << std::endl;
+            } else {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                std::cout << "Wireframe mode OFF" << std::endl;
+            }
+            enterPressed = true;
+        }
+    } else {
+        enterPressed = false;
+    }
 }
 
 int main()
@@ -94,11 +115,13 @@ int main()
     Mesh ground = Mesh::makeCuboid(210.0f, 0.5f, 125.0f, 0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
-    Hole9E hole9e;
-    hole9e.translate(48.0f, 0.35f, -8.0f);
+    // Hole9E hole9e;
+    // hole9e.translate(48.0f, 0.35f, -8.0f);
 
-    Hole9W hole9w;
-    hole9w.translate(-48.0f, 0.35f, -8.0f);
+    // Hole9W hole9w;
+    // hole9w.translate(-48.0f, 0.35f, -8.0f);
+        
+       Hole16 hole16;
 
 
     while (!glfwWindowShouldClose(window))
@@ -111,9 +134,10 @@ int main()
         glUseProgram(shader);
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
 
-        ground.draw(shader, false);
-        hole9e.draw(shader, false);
-        hole9w.draw(shader, false);
+        //ground.draw(shader, false);
+        //hole9e.draw(shader, false);
+        //hole9w.draw(shader, false);
+        hole16.draw(shader, false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

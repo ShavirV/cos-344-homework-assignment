@@ -727,3 +727,144 @@ Mesh Mesh::makeRock(float scale)
     );
     return rock;
 }
+
+// =============================================================================
+// ADD TO Mesh.cpp — paste after makeRock() at the bottom of the file.
+// These are the two factory methods declared in Mesh.h that are called
+// internally by Hole16 via its private builder methods.  They are plain
+// static free functions here because they depend on fairwayHeight(), which
+// is defined at the top of Hole16.cpp and must remain there (it encodes the
+// per-hole terrain character).  Hole16 calls them through its own wrappers
+// (Hole16::makeArcFairway / Hole16::makeArcBorder) which know the height fn.
+//
+// If you later want a truly generic arc primitive that other holes can reuse,
+// pass the height function as a std::function<float(float,float)> parameter.
+// =============================================================================
+
+// ── fairwayHeight — local height function (copy from Hole16.cpp) ─────────────
+// arcT   : [0,1] normalised position along the arc
+// radialT: [0,1] normalised position across the band (0=inner, 1=outer)
+//
+// This duplicate exists so that makeArcBorder (which must pin border bottoms
+// to the surface) can call it when implemented as a Mesh:: static.  When used
+// only from Hole16, the version in Hole16.cpp is sufficient.
+//
+// NOTE: keep the constants here in sync with the ones at the top of Hole16.cpp.
+static float h16_fairwayHeight(float arcT, float radialT)
+{
+    const float HILL_FREQ_A = 2.5f,  HILL_AMP_A = 0.70f;
+    const float HILL_FREQ_B = 4.8f,  HILL_AMP_B = 0.35f;
+    const float CROWN_AMP   = 0.25f;
+
+    float h = HILL_AMP_A * sinf(arcT * HILL_FREQ_A * 2.0f * (float)M_PI)
+            + HILL_AMP_B * sinf(arcT * HILL_FREQ_B * 2.0f * (float)M_PI + 1.1f);
+    float crown = CROWN_AMP * (1.0f - fabsf(radialT * 2.0f - 1.0f));
+    return h + crown;
+}
+
+// ── Mesh::makeArcFairway ─────────────────────────────────────────────────────
+Mesh Mesh::makeArcFairway(float innerR, float outerR,
+                          float startAngle, float endAngle,
+                          int ringSegs, int radialSegs)
+{
+    Mesh mesh(0.15f, 0.55f, 0.12f, 1.0f);   // grass green
+
+    float startRad = startAngle * (float)M_PI / 180.0f;
+    float endRad   = endAngle   * (float)M_PI / 180.0f;
+
+    int cols = radialSegs + 1;
+    int rows = ringSegs   + 1;
+
+    for (int i = 0; i < rows; i++)
+    {
+        float arcT  = (float)i / ringSegs;
+        float angle = startRad + (endRad - startRad) * arcT;
+        float cosA  = cosf(angle);
+        float sinA  = sinf(angle);
+
+        for (int j = 0; j < cols; j++)
+        {
+            float radialT = (float)j / radialSegs;
+            float radius  = innerR + (outerR - innerR) * radialT;
+            float y       = h16_fairwayHeight(arcT, radialT);
+
+            glm::vec3 pos    = { radius * cosA, y, radius * sinA };
+            glm::vec3 dTheta = { -radius * sinA, 0.0f, radius * cosA };
+            glm::vec3 dRad   = { cosA, 0.0f, sinA };
+            glm::vec3 n      = glm::normalize(glm::cross(dRad, dTheta));
+            if (n.y < 0.0f) n = -n;
+
+            mesh.addVertex({ pos, n, { arcT * 4.0f, radialT * 2.0f } });
+        }
+    }
+
+    for (int i = 0; i < ringSegs; i++)
+    {
+        for (int j = 0; j < radialSegs; j++)
+        {
+            unsigned int tl = (unsigned int)( i      * cols + j     );
+            unsigned int tr = (unsigned int)( i      * cols + j + 1 );
+            unsigned int bl = (unsigned int)((i + 1) * cols + j     );
+            unsigned int br = (unsigned int)((i + 1) * cols + j + 1 );
+
+            mesh.addTriangle(tl, bl, tr);
+            mesh.addTriangle(tr, bl, br);
+        }
+    }
+
+    mesh.setup();
+    return mesh;
+}
+
+// ── Mesh::makeArcBorder ───────────────────────────────────────────────────────
+Mesh Mesh::makeArcBorder(float radius, float borderThickness,
+                         float borderHeight,
+                         float startAngle, float endAngle,
+                         int segs, int side)
+{
+    const float PAVER_THICKNESS = 0.4f;
+    
+    // Create a vector to hold all segment meshes
+    std::vector<Mesh> segments;
+    
+    float startRad = startAngle * (float)M_PI / 180.0f;
+    float endRad   = endAngle   * (float)M_PI / 180.0f;
+
+    for (int i = 0; i < segs; i++)
+    {
+        float t0 = (float)i       / segs;
+        float t1 = (float)(i + 1) / segs;
+        float a0 = startRad + (endRad - startRad) * t0;
+        float a1 = startRad + (endRad - startRad) * t1;
+        float aMid = (a0 + a1) / 2.0f;
+
+        float radialEdge = (side > 0) ? 1.0f : 0.0f;
+        float y0    = h16_fairwayHeight(t0, radialEdge);
+        float y1    = h16_fairwayHeight(t1, radialEdge);
+        float yMid  = (y0 + y1) / 2.0f;
+
+        // Position at the outer edge
+        float rPos = radius + side * borderThickness;
+        float cx = rPos * cosf(aMid);
+        float cz = rPos * sinf(aMid);
+        float cy = yMid + borderHeight / 2.0f;
+        
+        // Box dimensions
+        float arcLength = (a1 - a0) * rPos;
+        float angleDeg = glm::degrees(aMid);
+        
+        // Create a 3D box for this segment
+        Mesh box = Mesh::makeCuboid(arcLength, borderHeight, PAVER_THICKNESS,
+                                    0.78f, 0.76f, 0.72f, 1.0f);
+        box.rotate(angleDeg, 0.0f, 1.0f, 0.0f);
+        box.translate(cx, cy, cz);
+        box.setup();
+        
+        segments.push_back(std::move(box));
+    }
+    
+    // Return the first segment (or combine them in your scene)
+    // You'll need to add all segments to your hole's mesh list
+    if (segments.empty()) return Mesh(0.78f, 0.76f, 0.72f, 1.0f);
+    return std::move(segments[0]);
+}
