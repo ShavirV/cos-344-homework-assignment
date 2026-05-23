@@ -141,9 +141,9 @@ int main()
         
     //put my hole
         hole5.draw(shader, false);
-        // hole6.draw(shader, false);
-        //hole7.draw(shader, false);
-        // hole8.draw(shader, false);
+        hole6.draw(shader, false);
+        hole7.draw(shader, false);
+        hole8.draw(shader, false);
  
 
 
