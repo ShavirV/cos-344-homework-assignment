@@ -1,184 +1,164 @@
 #include "Hole16.h"
 #include <cmath>
+#include <functional>
 
 // =============================================================================
 // Constants — all in local hole space
 // =============================================================================
 
-// ── Arc geometry ──────────────────────────────────────────────────────────────
-// The C-shape sweeps from 200° to 340° (CCW from +X in the XZ plane),
-// opening toward the east (+X). That gives a natural C orientation where:
-//   - Tee is at the south-west tip   (~200°)
-//   - Green is at the north-west tip (~340°)
-//   - The open mouth of the C faces east toward the tree island
-
-static const float ARC_INNER_R   = 10.0f;   // inner edge of fairway band
-static const float ARC_OUTER_R   = 19.0f;   // outer edge of fairway band
-static const float ARC_START_DEG = 00.0f;  // tee end
+// ── Arc geometry ─────────────────────────────────────────────────────────────
+// Arc sweeps CCW from 0° (east, +X) to 330° (south-east).
+// This leaves a 30° gap between 330° and 360°/0° which is where the stream
+// and bridge cross — the "mouth" of the C.
+//
+//         330°  (green end)
+//          ╲
+//   (C arc) ╲___________) 0° (tee end, east)
+//
+//            ISLAND inside
+//
+static const float ARC_INNER_R   = 10.0f;
+static const float ARC_OUTER_R   = 19.0f;
+static const float ARC_START_DEG =  0.0f;   // tee end
 static const float ARC_END_DEG   = 330.0f;  // green approach end
-static const int   ARC_RING_SEGS = 80;      // angular subdivisions
-static const int   ARC_RAD_SEGS  = 10;       // radial subdivisions (across width)
+static const int   ARC_RING_SEGS = 80;
+static const int   ARC_RAD_SEGS  = 10;
 
-// ── Fairway height function parameters ───────────────────────────────────────
-// Height is a sum of two sinusoids in the arc-length direction plus a gentle
-// radial cross-slope, giving rolling hills along the course and a slight
-// crown in the centre of the band. Peak-to-trough ≈ 1.8 world units.
-static const float HILL_FREQ_A   = 5.5f;    // cycles over the full arc
-static const float HILL_AMP_A    = 1.0f;    // metres
-static const float HILL_FREQ_B   = 9.8f;    // higher-frequency ripple
-static const float HILL_AMP_B    = 0.4f;
-static const float CROWN_AMP     = 0.25f;   // cross-slope crown height
+// ── Fairway height parameters ─────────────────────────────────────────────────
+static const float HILL_FREQ_A  = 5.5f;
+static const float HILL_AMP_A   = 1.0f;
+static const float HILL_FREQ_B  = 9.8f;
+static const float HILL_AMP_B   = 0.4f;
+static const float CROWN_AMP    = 0.25f;
 
-// ── Green (raised island at the north-west arc tip) ───────────────────────────
-// The last ~20° of the arc rises onto a frustum-style raised disc.
-static const float GREEN_R       = 5.5f;    // radius of the raised green disc
-static const float GREEN_Y       = 2.0f;    // height above local Y=0
-static const float GREEN_WALL_H  = 1.8f;    // retaining wall height
-static const float GREEN_X       = 13.6f;   // local X position (north-west tip)
-static const float GREEN_Z       = -5.0f;   // local Z position
+// ── Border paver geometry ─────────────────────────────────────────────────────
+// BORDER_H: height the paver rises above the fairway surface.
+// PAVER_W:  depth of the paver slab (radial thickness).
+// The paver extends downward from the fairway surface all the way to Y=0
+// so it is never floating or partially underground.
+static const float BORDER_H     = 0.35f;
+static const float PAVER_W      = 0.45f;
 
-// ── Tree island ───────────────────────────────────────────────────────────────
-// Raised disc at the centre of the C, surrounded by a water moat.
-// The actual tree is a Blender asset — only the island geometry is here.
+// ── Green (raised, at arc end tip ~330°) ─────────────────────────────────────
+// Arc mid-radius at 330°: (10+19)/2 = 14.5  cos(330°)=0.866  sin(330°)=-0.5
+static const float GREEN_R      = 5.5f;
+static const float GREEN_Y      = 2.0f;
+static const float GREEN_WALL_H = 2.2f;   // tall enough to reach ground from GREEN_Y
+static const float GREEN_X      = 12.56f; // (ARC_INNER+ARC_OUTER)/2 * cos(330°)
+static const float GREEN_Z      = -7.25f; // (ARC_INNER+ARC_OUTER)/2 * sin(330°)
+
+// ── Tree island (inside the C, near origin) ───────────────────────────────────
 static const float ISLAND_R      = 6.0f;
-static const float ISLAND_Y      = 0.8f;    // slightly raised above fairway base
+static const float ISLAND_Y      = 0.8f;
 static const float ISLAND_WALL_H = 1.0f;
-static const float ISLAND_X      = 2.0f;   // local centre (inside the C mouth)
+static const float ISLAND_X      = 2.0f;
 static const float ISLAND_Z      = 0.0f;
 
-// ── Water moat placeholder Y ─────────────────────────────────────────────────
-// Water meshes are intentionally omitted here. When the water system is
-// implemented, place an annular water surface at Y = WATER_Y between
-// ISLAND_R and (ARC_INNER_R - 0.5) centred on (ISLAND_X, WATER_Y, ISLAND_Z).
+// ── Water placeholder Y ───────────────────────────────────────────────────────
+// TODO: Replace with animated Water mesh between ISLAND_R and (ARC_INNER_R-0.5)
+// centred at (ISLAND_X, WATER_Y, ISLAND_Z) when water system is implemented.
 static const float WATER_Y       = -0.15f;
 
 // ── Stream ────────────────────────────────────────────────────────────────────
-// The curved stream crosses the mouth of the C between the tee (south) and
-// the green approach (north). It is approximated by 5 quad-slab segments
-// following a cubic Bezier whose control points curve it slightly westward
-// (into the page) creating a natural meander.
+// Crosses the 30° gap between the tee (0°) and green (330°) arc ends.
+// Bezier bows outward (+X direction, away from the island) for a natural curve.
 //
-// Control points are in XZ, Y is fixed. The curve goes from south of the
-// C mouth to north of it, bowing gently west.
-static const float STREAM_Y      = -0.20f;
-static const float STREAM_W      = 3.5f;
+// P0: just past the tee-side arc end  (outward, slightly +Z)
+// P1: handle pulling the curve east   (+X)
+// P2: handle on the green side        (+X, pulled toward green tip)
+// P3: just past the green-side end    (green approach)
+//
+static const float    STREAM_Y  = -0.20f;
+static const float    STREAM_W  =  3.5f;
+static const int      STREAM_SEGS = 6;
+static const glm::vec2 STREAM_P0 = { 14.5f,  2.0f  };
+static const glm::vec2 STREAM_P1 = { 21.0f, -1.5f  };
+static const glm::vec2 STREAM_P2 = { 20.0f, -6.5f  };
+static const glm::vec2 STREAM_P3 = { 12.6f, -9.5f  };
 
-// Bezier control points (XZ):
-//   P0 = south entry (near tee exit)
-//   P1, P2 = interior handles pulling the curve westward
-//   P3 = north exit (near green approach)
-static const glm::vec2 STREAM_P0 = { 12.0f,  14.0f };
-static const glm::vec2 STREAM_P1 = {  4.0f,   8.0f };
-static const glm::vec2 STREAM_P2 = {  5.0f,  -8.0f };
-static const glm::vec2 STREAM_P3 = { 12.0f, -14.0f };
+// ── Bridge ────────────────────────────────────────────────────────────────────
+// Sits at the midpoint of the stream, spanning it.
+// Centre ≈ midpoint between tee-side and green-side arc ends.
+static const float BRIDGE_X     = 17.73f;  // (19.0 + 16.45) / 2
+static const float BRIDGE_Z     = -4.75f;  // (0.0  + -9.5 ) / 2
+static const float BRIDGE_ROT   = -105.0f; // aligned to stream direction
+static const float BRIDGE_L     =  8.0f;   // longer than stream width
+static const float BRIDGE_W     =  4.5f;
+static const float BRIDGE_Y     =  0.08f;
 
-static const int STREAM_SEGS     = 5;
+// ── Tee disc ──────────────────────────────────────────────────────────────────
+// Arc start = 0°, mid-radius = 14.5, so tee is at (14.5, 0).
+static const float TEE_R        =  2.2f;
+static const float TEE_Y        =  0.05f;
+static const float TEE_X        = 14.5f;   // (ARC_INNER+ARC_OUTER)/2 * cos(0°)
+static const float TEE_Z        =  0.0f;
 
-// ── Bridge (over the stream, connecting path to green approach) ────────────────
-static const float BRIDGE_Y      = 0.05f;
-static const float BRIDGE_W      = 4.5f;
-static const float BRIDGE_L      = 5.5f;
-static const float BRIDGE_X      = 11.5f;
-static const float BRIDGE_Z      = 0.0f;
-
-// ── Rock obstacles ────────────────────────────────────────────────────────────
-// Three boulders scattered around the outer arc at different angles.
+// ── Rock obstacles (arc-angle, radial-fraction, scale) ────────────────────────
 struct RockSpec { float angle; float radialFrac; float scale; };
 static const RockSpec ROCKS[] = {
-    { 240.0f, 0.55f, 1.1f },   // south-west, mid-band
-    { 275.0f, 0.35f, 0.85f },  // west, inner side
-    { 315.0f, 0.7f,  1.3f },   // north-west, outer side
+    {  60.0f, 0.55f, 1.1f  },
+    { 150.0f, 0.35f, 0.85f },
+    { 240.0f, 0.70f, 1.3f  },
 };
 
-// ── Hill bumps ────────────────────────────────────────────────────────────────
-// Additional makeHill bumps placed on the fairway surface for extra relief.
-// (arc angle degrees, radial fraction 0=inner..1=outer, height)
+// ── Hill bumps (arc-angle, radial-fraction, height) ───────────────────────────
 struct HillSpec { float angle; float radialFrac; float h; };
 static const HillSpec HILLS[] = {
-    { 230.0f, 0.5f, 1.0f },
-    { 265.0f, 0.6f, 0.8f },
-    { 300.0f, 0.4f, 1.2f },
+    { 100.0f, 0.50f, 1.0f },
+    { 200.0f, 0.60f, 0.8f },
+    { 280.0f, 0.40f, 1.2f },
 };
 
-// ── Tee disc ─────────────────────────────────────────────────────────────────
-static const float TEE_R         = 2.2f;
-static const float TEE_Y         = 0.05f;
-// Tee position = arc start tip
-static const float TEE_ANGLE_RAD = ARC_START_DEG * (float)M_PI / 180.0f;
-static const float TEE_X         = (ARC_INNER_R + ARC_OUTER_R) * 0.5f
-                                    * cosf(TEE_ANGLE_RAD);
-static const float TEE_Z         = (ARC_INNER_R + ARC_OUTER_R) * 0.5f
-                                    * sinf(TEE_ANGLE_RAD);
-
 // =============================================================================
-// Helpers
+// Local helpers
 // =============================================================================
 
-// Evaluate a cubic Bezier at parameter t, returning an XZ position.
 static glm::vec2 bezier(glm::vec2 p0, glm::vec2 p1,
-                        glm::vec2 p2, glm::vec2 p3, float t)
+                         glm::vec2 p2, glm::vec2 p3, float t)
 {
-    float u  = 1.0f - t;
-    float u2 = u * u,  u3 = u2 * u;
-    float t2 = t * t,  t3 = t2 * t;
-    return u3*p0 + 3.0f*u2*t*p1 + 3.0f*u*t2*p2 + t3*p3;
+    float u = 1.0f - t;
+    return u*u*u*p0 + 3.0f*u*u*t*p1 + 3.0f*u*t*t*p2 + t*t*t*p3;
 }
 
-// Evaluate the Bezier tangent (derivative) at t.
 static glm::vec2 bezierTangent(glm::vec2 p0, glm::vec2 p1,
-                               glm::vec2 p2, glm::vec2 p3, float t)
+                                glm::vec2 p2, glm::vec2 p3, float t)
 {
     float u = 1.0f - t;
     return 3.0f*(u*u*(p1-p0) + 2.0f*u*t*(p2-p1) + t*t*(p3-p2));
 }
 
-// Signed sinusoidal height for a fairway vertex.
-// arcT   : [0,1] position along the arc (angular direction)
-// radialT: [0,1] position across the band (0=inner, 1=outer)
+// Height function — encodes this hole's unique terrain character.
+// arcT    [0,1]: position along the arc sweep
+// radialT [0,1]: position across the band (0=inner edge, 1=outer edge)
 static float fairwayHeight(float arcT, float radialT)
 {
-    float h  = HILL_AMP_A * sinf(arcT * HILL_FREQ_A * 2.0f * (float)M_PI)
-             + HILL_AMP_B * sinf(arcT * HILL_FREQ_B * 2.0f * (float)M_PI + 1.1f);
-    // Crown: highest in the middle of the band, slopes to edges.
+    float h = HILL_AMP_A * sinf(arcT * HILL_FREQ_A * 2.0f * (float)M_PI)
+            + HILL_AMP_B * sinf(arcT * HILL_FREQ_B * 2.0f * (float)M_PI + 1.1f);
     float crown = CROWN_AMP * (1.0f - fabsf(radialT * 2.0f - 1.0f));
     return h + crown;
 }
 
-// Compute an outward face normal for a quad given its four corners (CCW order).
-static glm::vec3 quadNormal(glm::vec3 a, glm::vec3 b,
-                            glm::vec3 c, glm::vec3 /*d*/)
-{
-    return glm::normalize(glm::cross(b - a, c - a));
-}
-
 // =============================================================================
-// Mesh::makeArcFairway
+// Hole16::makeArcFairway
 // =============================================================================
-// Builds a C-shaped ribbon mesh. For each ring step i and radial step j we
-// compute:
-//   angle  = lerp(startAngle, endAngle, i / ringSegs)
-//   radius = lerp(innerR, outerR, j / radialSegs)
-//   x      = radius * cos(angle)
-//   z      = radius * sin(angle)
-//   y      = fairwayHeight(i/ringSegs, j/radialSegs)
+// Builds the hilly C-shaped ribbon surface.
 //
-// Vertices are wound CCW when viewed from above (+Y), matching the cuboid
-// convention used throughout this codebase.
+// heightFn: called as heightFn(arcT, radialT) to get the Y at each vertex.
+//   Pass fairwayHeight for the hilly arc, or a lambda returning 0.0f for a
+//   flat ground-level shadow copy (used for the base infill plane).
 //
 Mesh Hole16::makeArcFairway(float innerR, float outerR,
                             float startAngle, float endAngle,
-                            int ringSegs, int radialSegs)
+                            int ringSegs, int radialSegs,
+                            const std::function<float(float,float)>& heightFn)
 {
-    // Grass green — same visual language as makeHole's red but for fairway.
     Mesh mesh(0.15f, 0.55f, 0.12f, 1.0f);
 
     float startRad = startAngle * (float)M_PI / 180.0f;
     float endRad   = endAngle   * (float)M_PI / 180.0f;
+    int cols = radialSegs + 1;
+    int rows = ringSegs   + 1;
 
-    int cols = radialSegs + 1;   // vertices across the band
-    int rows = ringSegs   + 1;   // vertices along the arc
-
-    // ── Emit vertices ─────────────────────────────────────────────────────────
     for (int i = 0; i < rows; i++)
     {
         float arcT  = (float)i / ringSegs;
@@ -190,107 +170,158 @@ Mesh Hole16::makeArcFairway(float innerR, float outerR,
         {
             float radialT = (float)j / radialSegs;
             float radius  = innerR + (outerR - innerR) * radialT;
-            float y       = fairwayHeight(arcT, radialT);
+            float y       = heightFn(arcT, radialT);
 
-            glm::vec3 pos = { radius * cosA, y, radius * sinA };
-
-            // Normal: approximate upward + outward component
-            // (computed analytically from partial derivatives of the surface)
-            // dPos/dTheta direction (tangent along arc):
+            glm::vec3 pos    = { radius * cosA, y, radius * sinA };
             glm::vec3 dTheta = { -radius * sinA, 0.0f, radius * cosA };
-            // dPos/dRadius direction (tangent across band):
             glm::vec3 dRad   = { cosA, 0.0f, sinA };
-            // Normal = cross(dRad, dTheta), normalised
-            glm::vec3 n = glm::normalize(glm::cross(dRad, dTheta));
-            // Ensure normal points generally upward
+            glm::vec3 n      = glm::normalize(glm::cross(dRad, dTheta));
             if (n.y < 0.0f) n = -n;
 
-            glm::vec2 uv = { arcT * 4.0f, radialT * 2.0f };   // tiled UVs
-
-            mesh.addVertex({ pos, n, uv });
+            mesh.addVertex({ pos, n, { arcT * 4.0f, radialT * 2.0f } });
         }
     }
 
-    // ── Emit indices (CCW when viewed from above) ─────────────────────────────
     for (int i = 0; i < ringSegs; i++)
-    {
         for (int j = 0; j < radialSegs; j++)
         {
-            // Quad corners:
-            //   tl — tr
-            //   |       |
-            //   bl — br
             unsigned int tl = (unsigned int)( i      * cols + j     );
             unsigned int tr = (unsigned int)( i      * cols + j + 1 );
             unsigned int bl = (unsigned int)((i + 1) * cols + j     );
             unsigned int br = (unsigned int)((i + 1) * cols + j + 1 );
-
-            // Two CCW triangles (viewed from +Y):
             mesh.addTriangle(tl, bl, tr);
             mesh.addTriangle(tr, bl, br);
         }
-    }
 
     mesh.setup();
     return mesh;
 }
 
 // =============================================================================
-// Mesh::makeArcBorder
+// Hole16::makeArcBorder
 // =============================================================================
-// Thin vertical strip following the inner or outer edge of the arc.
-// Each sector of the strip is a quad — two triangles — with a normal pointing
-// radially outward (outer border) or inward (inner border).
+// Builds a single merged mesh of all paver segments along the arc edge.
 //
-Mesh Hole16::makeArcBorder(float radius, float borderThickness,
-                           float borderHeight,
+// Each paver is a full 3-D cuboid:
+//   - Width  (arc direction) : arc-length of one segment
+//   - Depth  (radial)        : PAVER_W
+//   - Height                 : from Y=0 (ground) up to fairwayHeight + BORDER_H
+//
+// This gives the paver real depth (front/back/top/bottom faces) and ensures
+// it never floats — it always reaches the ground regardless of terrain height.
+//
+// Because Mesh is non-copyable we merge all segment vertices into ONE Mesh
+// rather than building separate meshes and combining. This is both more
+// efficient (one VAO) and avoids the segments[0]-only bug.
+//
+Mesh Hole16::makeArcBorder(float radius, float borderWidth,
+                           float borderRaise,
                            float startAngle, float endAngle,
-                           int segs, int side)
+                           int segs, int side,
+                           const std::function<float(float,float)>& heightFn)
 {
-    // Concrete / kerb colour
-    Mesh mesh(0.78f, 0.76f, 0.72f, 1.0f);
+    Mesh mesh(0.76f, 0.74f, 0.70f, 1.0f);  // concrete / sandstone
 
     float startRad = startAngle * (float)M_PI / 180.0f;
     float endRad   = endAngle   * (float)M_PI / 180.0f;
 
-    // The border is a thin band at `radius`, extruded outward by side*borderThickness
-    // and raised by borderHeight. We emit one quad per arc segment.
+    // The paver sits at radius + side*borderWidth/2 (centred on the edge line).
+    float paverCentreR = radius + (float)side * borderWidth * 0.5f;
 
     for (int i = 0; i < segs; i++)
     {
         float t0 = (float)i       / segs;
         float t1 = (float)(i + 1) / segs;
-        float a0 = startRad + (endRad - startRad) * t0;
-        float a1 = startRad + (endRad - startRad) * t1;
-
-        // Height at the fairway surface for this arc position
-        float yInner0 = fairwayHeight(t0, side > 0 ? 1.0f : 0.0f);
-        float yInner1 = fairwayHeight(t1, side > 0 ? 1.0f : 0.0f);
-
-        float rInner  = radius;
-        float rOuter  = radius + side * borderThickness;
-
-        // Four corners of the border quad (bottom of inner edge, top, etc.)
-        // We build it as a vertical face aligned to the arc.
-        glm::vec3 p0b = { rInner * cosf(a0), yInner0,              rInner * sinf(a0) };
-        glm::vec3 p0t = { rInner * cosf(a0), yInner0 + borderHeight, rInner * sinf(a0) };
-        glm::vec3 p1b = { rInner * cosf(a1), yInner1,              rInner * sinf(a1) };
-        glm::vec3 p1t = { rInner * cosf(a1), yInner1 + borderHeight, rInner * sinf(a1) };
-
-        // Outward-facing normal (averaged between the two angles)
+        float a0   = startRad + (endRad - startRad) * t0;
+        float a1   = startRad + (endRad - startRad) * t1;
         float aMid = (a0 + a1) * 0.5f;
-        glm::vec3 n = glm::normalize(glm::vec3(
-            (float)side * cosf(aMid), 0.0f, (float)side * sinf(aMid)));
 
-        unsigned int base = (unsigned int)mesh.vertexCount;
-        mesh.addVertex({ p0b, n, { t0, 0.0f } });
-        mesh.addVertex({ p1b, n, { t1, 0.0f } });
-        mesh.addVertex({ p1t, n, { t1, 1.0f } });
-        mesh.addVertex({ p0t, n, { t0, 1.0f } });
+        // Terrain height at the edge where this paver sits.
+        float radialEdge = (side > 0) ? 1.0f : 0.0f;
+        float surfY = heightFn((t0 + t1) * 0.5f, radialEdge);
 
-        // CCW winding when viewed from the outside (normal direction)
-        mesh.addTriangle(base+0, base+1, base+2);
-        mesh.addTriangle(base+2, base+3, base+0);
+        // Full paver height: from the ground (Y=0) up through the surface
+        // and then borderRaise above it.  Clamp to at least borderRaise so
+        // negative terrain heights don't produce zero-height pavers.
+        float bottomY = 0.0f;
+        float topY    = surfY + borderRaise;
+        float paverH  = topY - bottomY;
+        if (paverH < 0.05f) paverH = 0.05f;
+
+        // Arc-chord length for this segment (approximation).
+        float segArcLen = fabsf(a1 - a0) * paverCentreR * 1.02f; // 2% overlap
+
+        // Centre of this paver in world space (before rotation).
+        float cx = paverCentreR * cosf(aMid);
+        float cz = paverCentreR * sinf(aMid);
+        float cy = bottomY + paverH * 0.5f;   // vertically centred
+
+        // Build the cuboid in local space: length along X, height along Y,
+        // depth along Z (radial direction after rotation).
+        // We need 8 corners, 6 faces, 12 triangles.
+        float hw = segArcLen * 0.5f;   // half arc-length
+        float hh = paverH    * 0.5f;   // half height
+        float hd = borderWidth * 0.5f; // half radial depth
+
+        // Rotated basis vectors: the paver's local X aligns with the arc tangent.
+        float cosA = cosf(aMid), sinA = sinf(aMid);
+        // tangent along arc (CCW): (-sinA, 0, cosA)
+        // radial outward:          ( cosA, 0, sinA)
+        glm::vec3 tang   = { -sinA, 0.0f,  cosA };  // arc direction
+        glm::vec3 radial = {  cosA * (float)side, 0.0f, sinA * (float)side }; // paver depth dir
+        glm::vec3 up     = {  0.0f, 1.0f,  0.0f };
+
+        // 8 corners
+        glm::vec3 centre = { cx, cy, cz };
+        glm::vec3 c[8];
+        for (int s = 0; s < 2; s++) {       // arc sign: -hw / +hw
+            for (int v = 0; v < 2; v++) {   // vertical: -hh / +hh
+                for (int d = 0; d < 2; d++) { // depth: -hd / +hd
+                    float ts = (s == 0) ? -hw : hw;
+                    float vs = (v == 0) ? -hh : hh;
+                    float ds = (d == 0) ? -hd : hd;
+                    c[s*4 + v*2 + d] = centre + tang*ts + up*vs + radial*ds;
+                }
+            }
+        }
+        // c layout:  [arc-][vert-][dep-] = 0
+        //            [arc-][vert-][dep+] = 1
+        //            [arc-][vert+][dep-] = 2
+        //            [arc-][vert+][dep+] = 3
+        //            [arc+][vert-][dep-] = 4
+        //            [arc+][vert-][dep+] = 5
+        //            [arc+][vert+][dep-] = 6
+        //            [arc+][vert+][dep+] = 7
+
+        // Helper: emit one quad face (CCW from outside).
+        auto emitFace = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c2, glm::vec3 d,
+                            glm::vec3 n)
+        {
+            unsigned int base = (unsigned int)mesh.vertexCount;
+            mesh.addVertex({ a, n, {0.0f, 0.0f} });
+            mesh.addVertex({ b, n, {1.0f, 0.0f} });
+            mesh.addVertex({ c2,n, {1.0f, 1.0f} });
+            mesh.addVertex({ d, n, {0.0f, 1.0f} });
+            mesh.addTriangle(base+0, base+1, base+2);
+            mesh.addTriangle(base+2, base+3, base+0);
+        };
+
+        glm::vec3 nTang   = tang;
+        glm::vec3 nRadOut = radial;
+        glm::vec3 nRadIn  = -radial;
+
+        // Top face (+Y)
+        emitFace(c[2], c[6], c[7], c[3],  up);
+        // Bottom face (-Y)
+        emitFace(c[1], c[5], c[4], c[0], -up);
+        // Outer radial face (away from fairway)
+        emitFace(c[1], c[3], c[7], c[5],  nRadOut);
+        // Inner radial face (toward fairway)
+        emitFace(c[4], c[6], c[2], c[0],  nRadIn);
+        // Arc-start end cap
+        emitFace(c[0], c[2], c[3], c[1], -nTang);
+        // Arc-end end cap
+        emitFace(c[5], c[7], c[6], c[4],  nTang);
     }
 
     mesh.setup();
@@ -298,16 +329,8 @@ Mesh Hole16::makeArcBorder(float radius, float borderThickness,
 }
 
 // =============================================================================
-// Mesh::makeStreamSegment
+// Hole16::makeStreamSegment
 // =============================================================================
-// One short rectangular slab representing a section of the curved stream.
-// We evaluate the Bezier at the midpoint of [t0,t1], build a cuboid aligned
-// to the tangent direction, then place it at that position.
-//
-// This gives a piecewise-linear approximation to the curve that looks smooth
-// when STREAM_SEGS >= 5. The Y coordinate of all stream segments is fixed at
-// streamY.
-//
 Mesh Hole16::makeStreamSegment(glm::vec2 p0, glm::vec2 p1,
                                glm::vec2 p2, glm::vec2 p3,
                                float t0, float t1,
@@ -315,32 +338,23 @@ Mesh Hole16::makeStreamSegment(glm::vec2 p0, glm::vec2 p1,
 {
     float tMid = (t0 + t1) * 0.5f;
 
-    // Centre of this segment
     glm::vec2 centre  = bezier(p0, p1, p2, p3, tMid);
-    // Tangent direction (XZ), normalised
     glm::vec2 tangent = bezierTangent(p0, p1, p2, p3, tMid);
-    if (glm::length(tangent) < 1e-6f) tangent = glm::vec2(0,1);
+    if (glm::length(tangent) < 1e-6f) tangent = glm::vec2(1.0f, 0.0f);
     tangent = glm::normalize(tangent);
 
-    // Segment length = arc-length approximation between t0 and t1
     glm::vec2 pStart = bezier(p0, p1, p2, p3, t0);
     glm::vec2 pEnd   = bezier(p0, p1, p2, p3, t1);
-    float segLen = glm::length(pEnd - pStart) * 1.15f;   // slight overlap to avoid gaps
+    float segLen = glm::length(pEnd - pStart) * 1.12f;
 
-    // Heading angle around Y: atan2(tangent.y, tangent.x)
-    //   tangent.x corresponds to world X, tangent.y to world Z
     float headingDeg = glm::degrees(atan2f(tangent.y, tangent.x));
 
-    // Water / stream colour — placeholder blue until water system is active
-    Mesh slab = Mesh::makeCuboid(segLen, 0.15f, width,
+    // Placeholder water: flat blue slab at streamY.
+    // TODO: replace with Water mesh when water system is implemented.
+    Mesh slab = Mesh::makeCuboid(segLen, 0.12f, width,
                                  0.18f, 0.42f, 0.72f, 1.0f);
-
-    // Rotate to align the slab's long axis (X) with the tangent direction
     slab.rotate(headingDeg, 0.0f, 1.0f, 0.0f);
-
-    // Place at the curve midpoint
     slab.translate(centre.x, streamY, centre.y);
-
     slab.setup();
     return slab;
 }
@@ -348,137 +362,159 @@ Mesh Hole16::makeStreamSegment(glm::vec2 p0, glm::vec2 p1,
 // =============================================================================
 // Constructor
 // =============================================================================
-
 Hole16::Hole16()
     : meshCount(0)
 {
     for (int i = 0; i < MAX_MESHES; i++)
         meshes[i] = nullptr;
 
-    // ── [0] Arc fairway ───────────────────────────────────────────────────────
+    // ── [0] Hilly arc fairway ─────────────────────────────────────────────────
     {
         Mesh* fairway = new Mesh(makeArcFairway(
             ARC_INNER_R, ARC_OUTER_R,
             ARC_START_DEG, ARC_END_DEG,
-            ARC_RING_SEGS, ARC_RAD_SEGS));
+            ARC_RING_SEGS, ARC_RAD_SEGS,
+            fairwayHeight));
         addMesh(fairway);
+    }
 
-        {
-        Mesh* flatFairway = new Mesh(makeArcFairway(
+    // ── [1] Ground-level infill arc ───────────────────────────────────────────
+    // A flat copy of the arc at Y=0 fills the visual gap below the hilly
+    // fairway surface, giving the impression of solid terrain underneath.
+    // Using the heightFn parameter eliminates the post-construction vertex
+    // hack that was needed before.
+    {
+        Mesh* base = new Mesh(makeArcFairway(
             ARC_INNER_R, ARC_OUTER_R,
             ARC_START_DEG, ARC_END_DEG,
-            ARC_RING_SEGS, ARC_RAD_SEGS));
-        
-        // Override the height function by directly modifying vertices to Y=0
-        for (int i = 0; i < flatFairway->vertexCount; i++) {
-            flatFairway->vertices[i].position.y = 0.0f;
-            flatFairway->vertices[i].normal = glm::vec3(0.0f, 1.0f, 0.0f);
-        }
-        flatFairway->setup();
-        addMesh(flatFairway);
-        }   
+            ARC_RING_SEGS, ARC_RAD_SEGS,
+            [](float, float){ return 0.0f; }));    // flat at Y=0, no hack needed
+        base->setRGBA(0.04f, 0.79f, 0.16f, 1.0f); // geeen
+        addMesh(base);
     }
 
-    // ── [1] Arc border — outer kerb ───────────────────────────────────────────
+    // ── [2] Outer kerb ────────────────────────────────────────────────────────
+    // Full 3-D paver: reaches from Y=0 upward through the terrain surface.
     {
-        Mesh* borderOuter = new Mesh(makeArcBorder(
-            ARC_OUTER_R, 3.5f, 0.35f,
+        Mesh* kerbOuter = new Mesh(makeArcBorder(
+            ARC_OUTER_R, PAVER_W, BORDER_H,
             ARC_START_DEG, ARC_END_DEG,
-            ARC_RING_SEGS,
-            +1));   // side=+1: extrude radially outward
-        addMesh(borderOuter);
-
-        Mesh* flatBorderOuter = new Mesh(makeArcBorder(
-            ARC_OUTER_R, 3.5f, 0.35f,
-            ARC_START_DEG, ARC_END_DEG,
-            ARC_RING_SEGS,
-            +1));
-        
-        // Override the height function by directly modifying vertices to Y=0
-        for (int i = 0; i < flatBorderOuter->vertexCount; i++) {
-            flatBorderOuter->vertices[i].position.y = 0.0f;
-            flatBorderOuter->vertices[i].normal = glm::vec3(0.0f, 1.0f, 0.0f);
-        }
-        flatBorderOuter->setup();
-        addMesh(flatBorderOuter);
+            ARC_RING_SEGS, +1, fairwayHeight));
+        addMesh(kerbOuter);
     }
 
-    // ── [2] Arc border — inner kerb ───────────────────────────────────────────
+    // ── [3] Outer kerb ground infill ──────────────────────────────────────────
+    // Flat version of the outer border at Y=0, prevents gaps at ground level
+    // where the terrain dips below zero.
     {
-        Mesh* borderInner = new Mesh(makeArcBorder(
-            ARC_INNER_R, 3.5f, 0.35f,
+        Mesh* kerbOuterFlat = new Mesh(makeArcBorder(
+            ARC_OUTER_R, PAVER_W, BORDER_H,
             ARC_START_DEG, ARC_END_DEG,
-            ARC_RING_SEGS,
-            -1));   // side=-1: extrude radially inward
-        addMesh(borderInner);
+            ARC_RING_SEGS, +1,
+            [](float, float){ return 0.0f; }));
+        kerbOuterFlat->setRGBA(0.68f, 0.65f, 0.60f, 1.0f);
+        addMesh(kerbOuterFlat);
     }
 
-    // ── [3] Green retaining wall (frustum cylinder) ───────────────────────────
-    // A short cylinder whose top face is at GREEN_Y forms the retaining wall.
+    // ── [4] Inner kerb ────────────────────────────────────────────────────────
+    {
+        Mesh* kerbInner = new Mesh(makeArcBorder(
+            ARC_INNER_R, PAVER_W, BORDER_H,
+            ARC_START_DEG, ARC_END_DEG,
+            ARC_RING_SEGS, -1, fairwayHeight));
+        addMesh(kerbInner);
+    }
+
+    // ── [5] Inner kerb ground infill ─────────────────────────────────────────
+    {
+        Mesh* kerbInnerFlat = new Mesh(makeArcBorder(
+            ARC_INNER_R, PAVER_W, BORDER_H,
+            ARC_START_DEG, ARC_END_DEG,
+            ARC_RING_SEGS, -1,
+            [](float, float){ return 0.0f; }));
+        kerbInnerFlat->setRGBA(0.68f, 0.65f, 0.60f, 1.0f);
+        addMesh(kerbInnerFlat);
+    }
+
+    // ── [6] Raised green — retaining wall ────────────────────────────────────
+    // Cylinder wall reaching from Y=0 to GREEN_Y so the island never floats.
     {
         Mesh* wall = new Mesh(Mesh::makeCylinder(
-            GREEN_R + 0.4f,     // slightly wider than the green top
-            GREEN_WALL_H, 28,
-            0.68f, 0.62f, 0.52f, 1.0f));   // sandy stone colour
-        wall->translate(GREEN_X, GREEN_Y - GREEN_WALL_H * 0.5f, GREEN_Z);
+            GREEN_R + 0.4f, GREEN_WALL_H, 32,
+            0.68f, 0.62f, 0.52f, 1.0f));
+        // Cylinder origin is at its centre, so offset down so base sits at Y=0
+        wall->translate(GREEN_X, GREEN_WALL_H * 0.5f, GREEN_Z);
         wall->setup();
         addMesh(wall);
     }
 
-    // ── [4] Green surface (raised disc) ──────────────────────────────────────
-    // A very thin cylinder forms the top playing surface of the elevated green.
+    // ── [7] Raised green — playing surface ───────────────────────────────────
     {
         Mesh* green = new Mesh(Mesh::makeCylinder(
-            GREEN_R, 0.18f, 28,
-            0.08f, 0.60f, 0.10f, 1.0f));   // bright putting-green turf
+            GREEN_R, 0.18f, 32,
+            0.08f, 0.62f, 0.10f, 1.0f));
         green->translate(GREEN_X, GREEN_Y, GREEN_Z);
         green->setup();
         addMesh(green);
     }
 
-    // ── [5] Green border ring (kerb around the raised green) ─────────────────
+    // ── [8] Raised green — kerb ring ─────────────────────────────────────────
     {
-        Mesh* greenKerb = new Mesh(Mesh::makeCylinder(
-            GREEN_R + 0.55f, 0.28f, 28,
-            0.78f, 0.74f, 0.68f, 1.0f));   // concrete ring
-        greenKerb->translate(GREEN_X, GREEN_Y + 0.05f, GREEN_Z);
-        greenKerb->setup();
-        // Hollow appearance: the inner green disc sits on top, hiding the centre.
-        addMesh(greenKerb);
+        Mesh* gKerb = new Mesh(Mesh::makeCylinder(
+            GREEN_R + 0.55f, 0.30f, 32,
+            0.76f, 0.72f, 0.66f, 1.0f));
+        gKerb->translate(GREEN_X, GREEN_Y + 0.06f, GREEN_Z);
+        gKerb->setup();
+        addMesh(gKerb);
     }
 
-    // ── [6] Tree island ───────────────────────────────────────────────────────
-    // Raised disc. The Blender tree model will be placed at (ISLAND_X, ISLAND_Y
-    // + ISLAND_WALL_H, ISLAND_Z) by the scene assembly code.
-    // ── Water moat placeholder ────────────────────────────────────────────────
-    // TODO (water system): Add an annular water mesh between ISLAND_R and
-    // (ARC_INNER_R - 0.5f), centred at (ISLAND_X, WATER_Y, ISLAND_Z).
-    // The moat also fills the open mouth of the C between the arc endpoints.
+    // ── [9] Tree island — retaining wall ────────────────────────────────────
     {
-        // Island retaining wall
-        Mesh* islandWall = new Mesh(Mesh::makeCylinder(
-            ISLAND_R, ISLAND_WALL_H, 32,
+        Mesh* iWall = new Mesh(Mesh::makeCylinder(
+            ISLAND_R, ISLAND_WALL_H, 36,
             0.58f, 0.52f, 0.42f, 1.0f));
-        islandWall->translate(ISLAND_X,
-                              ISLAND_Y - ISLAND_WALL_H * 0.5f,
-                              ISLAND_Z);
-        islandWall->setup();
-        addMesh(islandWall);
-
-        // Island top surface (earthy / soil colour — the tree sits here)
-        Mesh* islandTop = new Mesh(Mesh::makeCylinder(
-            ISLAND_R - 0.2f, 0.2f, 32,
-            0.32f, 0.22f, 0.10f, 1.0f));
-        islandTop->translate(ISLAND_X, ISLAND_Y + 0.1f, ISLAND_Z);
-        islandTop->setup();
-        addMesh(islandTop);
+        iWall->translate(ISLAND_X, ISLAND_WALL_H * 0.5f, ISLAND_Z);
+        iWall->setup();
+        addMesh(iWall);
     }
 
-    // ── [7–11] Curved stream ──────────────────────────────────────────────────
-    // Five segments following the cubic Bezier defined by STREAM_P0..P3.
-    // Each segment is a flat blue slab rotated to match the curve tangent.
-    // TODO (water system): Replace these placeholder slabs with animated
-    // water quads from the Water class when implemented.
+    // ── [10] Tree island — top surface ───────────────────────────────────────
+    // Blender tree asset to be placed at (ISLAND_X, ISLAND_Y + ISLAND_WALL_H, ISLAND_Z)
+    // Water moat TODO: annular surface from ISLAND_R to (ARC_INNER_R - 0.5)
+    //                   at Y=WATER_Y, centred at (ISLAND_X, WATER_Y, ISLAND_Z)
+    {
+        Mesh* iTop = new Mesh(Mesh::makeCylinder(
+            ISLAND_R - 0.2f, 0.20f, 36,
+            0.30f, 0.21f, 0.09f, 1.0f));
+        iTop->translate(ISLAND_X, ISLAND_Y + ISLAND_WALL_H, ISLAND_Z);
+        iTop->setup();
+        addMesh(iTop);
+    }
+
+    // ── [11] Large ground disc ────────────────────────────────────────────────
+    // Fills under the entire hole so no gaps appear when viewed from any angle.
+    {
+        Mesh* ground = new Mesh(Mesh::makeCylinder(
+            ARC_OUTER_R + PAVER_W + 2.0f, 0.15f, 64,
+            0.24f, 0.17f, 0.10f, 1.0f));
+        ground->translate(0.0f, -0.08f, 0.0f);
+        ground->setup();
+        addMesh(ground);
+    }
+
+    // ── [12] Tee marker ───────────────────────────────────────────────────────
+    {
+        Mesh* tee = new Mesh(Mesh::makeCylinder(
+            TEE_R, 0.12f, 20,
+            0.85f, 0.82f, 0.18f, 1.0f));   // yellow
+        tee->translate(TEE_X, TEE_Y, TEE_Z);
+        tee->setup();
+        addMesh(tee);
+    }
+
+    // ── [13–15] Stream segments ───────────────────────────────────────────────
+    // Cubic Bezier crossing the gap between tee (0°) and green (330°) arc ends.
+    // Bows outward (+X) for a natural meander away from the island.
     {
         for (int s = 0; s < STREAM_SEGS; s++)
         {
@@ -486,87 +522,28 @@ Hole16::Hole16()
             float t1 = (float)(s + 1) / STREAM_SEGS;
             Mesh* seg = new Mesh(makeStreamSegment(
                 STREAM_P0, STREAM_P1, STREAM_P2, STREAM_P3,
-                t0, t1,
-                STREAM_Y, STREAM_W));
+                t0, t1, STREAM_Y, STREAM_W));
             addMesh(seg);
         }
     }
 
-    // ── [12] Tee marker ───────────────────────────────────────────────────────
+    // ── [16] Bridge ───────────────────────────────────────────────────────────
+    // Spans the stream at its midpoint, aligned to the stream direction.
+    // BRIDGE_ROT aligns the deck with the tangent at t=0.5 of the Bezier.
     {
-        Mesh* tee = new Mesh(Mesh::makeCylinder(
-            TEE_R, 0.12f, 20,
-            0.85f, 0.85f, 0.20f, 1.0f));   // yellow tee marker
-        tee->translate(TEE_X, TEE_Y, TEE_Z);
-        tee->setup();
-        addMesh(tee);
-    }
-
-    // ── [13–15] Rock obstacles ────────────────────────────────────────────────
-    {
-        for (int ri = 0; ri < 3; ri++)
-        {
-            const RockSpec& rs = ROCKS[ri];
-            float a = rs.angle * (float)M_PI / 180.0f;
-            float r = ARC_INNER_R + (ARC_OUTER_R - ARC_INNER_R) * rs.radialFrac;
-            float arcT    = (rs.angle - ARC_START_DEG)
-                            / (ARC_END_DEG - ARC_START_DEG);
-            float yOnArc  = fairwayHeight(arcT, rs.radialFrac);
-
-            Mesh* rock = new Mesh(Mesh::makeRock(rs.scale));
-            rock->translate(r * cosf(a),
-                            yOnArc + rs.scale * 0.6f,   // sit on surface
-                            r * sinf(a));
-            // Rotate each rock randomly so they don't all face the same way
-            rock->rotate(rs.angle * 0.37f, 0.0f, 1.0f, 0.0f);
-            rock->setup();
-            addMesh(rock);
-        }
-    }
-
-    // ── [16–18] Hill bumps ────────────────────────────────────────────────────
-    // Additional makeHill shapes placed on the fairway for extra topographic
-    // interest — rolling knolls the ball must navigate around.
-    {
-        for (int hi = 0; hi < 3; hi++)
-        {
-            const HillSpec& hs = HILLS[hi];
-            float a = hs.angle * (float)M_PI / 180.0f;
-            float r = ARC_INNER_R + (ARC_OUTER_R - ARC_INNER_R) * hs.radialFrac;
-            float arcT   = (hs.angle - ARC_START_DEG)
-                           / (ARC_END_DEG - ARC_START_DEG);
-            float yOnArc = fairwayHeight(arcT, hs.radialFrac);
-
-            // makeHill: top narrower than base for a natural-looking mound.
-            Mesh* hill = new Mesh(Mesh::makeHill(
-                2.5f, 2.0f,          // top width, depth
-                5.5f, 4.5f,          // base width, depth
-                hs.h,                // height
-                0.12f, 0.48f, 0.09f, 1.0f));   // darker grass
-            hill->translate(r * cosf(a), yOnArc, r * sinf(a));
-            hill->rotate(hs.angle * 0.6f, 0.0f, 1.0f, 0.0f);
-            hill->setup();
-            addMesh(hill);
-        }
-    }
-
-    // ── [19–21] Bridge ────────────────────────────────────────────────────────
-    // A simple wooden bridge over the stream at the mouth of the C.
-    // This is where the player crosses from the main course path to the
-    // green approach side. The bridge aligns with the stream's midpoint.
-    {
-        // Deck
         Mesh* deck = new Mesh(Mesh::makeCuboid(
-            BRIDGE_L, 0.18f, BRIDGE_W,
-            0.52f, 0.33f, 0.14f, 1.0f));   // warm wood colour
+            BRIDGE_L, 0.20f, BRIDGE_W,
+            0.52f, 0.33f, 0.14f, 1.0f));
+        deck->rotate(BRIDGE_ROT, 0.0f, 1.0f, 0.0f);
         deck->translate(BRIDGE_X, BRIDGE_Y, BRIDGE_Z);
         deck->setup();
         addMesh(deck);
 
         // Left rail
         Mesh* railL = new Mesh(Mesh::makeCuboid(
-            BRIDGE_L, 0.55f, 0.15f,
+            BRIDGE_L, 0.50f, 0.14f,
             0.42f, 0.26f, 0.10f, 1.0f));
+        railL->rotate(BRIDGE_ROT, 0.0f, 1.0f, 0.0f);
         railL->translate(BRIDGE_X, BRIDGE_Y + 0.35f,
                          BRIDGE_Z - BRIDGE_W * 0.5f + 0.1f);
         railL->setup();
@@ -574,53 +551,71 @@ Hole16::Hole16()
 
         // Right rail
         Mesh* railR = new Mesh(Mesh::makeCuboid(
-            BRIDGE_L, 0.55f, 0.15f,
+            BRIDGE_L, 0.50f, 0.14f,
             0.42f, 0.26f, 0.10f, 1.0f));
+        railR->rotate(BRIDGE_ROT, 0.0f, 1.0f, 0.0f);
         railR->translate(BRIDGE_X, BRIDGE_Y + 0.35f,
                          BRIDGE_Z + BRIDGE_W * 0.5f - 0.1f);
         railR->setup();
         addMesh(railR);
     }
 
-    // ── Ground base (fills under the entire hole) ─────────────────────────────
-    // A large flat disc at Y=0 so there are no gaps visible beneath the arc.
-    // Coloured as rough ground / earth.
+    // ── [17–19] Rock obstacles ────────────────────────────────────────────────
     {
-        Mesh* base = new Mesh(Mesh::makeCylinder(
-            ARC_OUTER_R + 2.0f, 0.15f, 48,
-            0.28f, 0.20f, 0.12f, 1.0f));
-        base->translate(0.0f, -0.12f, 0.0f);
-        base->setup();
-        addMesh(base);
+        for (int ri = 0; ri < 3; ri++)
+        {
+            const RockSpec& rs = ROCKS[ri];
+            float a     = rs.angle * (float)M_PI / 180.0f;
+            float r     = ARC_INNER_R + (ARC_OUTER_R - ARC_INNER_R) * rs.radialFrac;
+            float arcT  = (rs.angle - ARC_START_DEG) / (ARC_END_DEG - ARC_START_DEG);
+            float yOnArc = fairwayHeight(arcT, rs.radialFrac);
+
+            Mesh* rock = new Mesh(Mesh::makeRock(rs.scale));
+            rock->translate(r * cosf(a), yOnArc + rs.scale * 0.6f, r * sinf(a));
+            rock->rotate(rs.angle * 0.37f, 0.0f, 1.0f, 0.0f);
+            rock->setup();
+            addMesh(rock);
+        }
+    }
+
+    // ── [20–22] Hill bumps ────────────────────────────────────────────────────
+    {
+        for (int hi = 0; hi < 3; hi++)
+        {
+            const HillSpec& hs = HILLS[hi];
+            float a     = hs.angle * (float)M_PI / 180.0f;
+            float r     = ARC_INNER_R + (ARC_OUTER_R - ARC_INNER_R) * hs.radialFrac;
+            float arcT  = (hs.angle - ARC_START_DEG) / (ARC_END_DEG - ARC_START_DEG);
+            float yOnArc = fairwayHeight(arcT, hs.radialFrac);
+
+            Mesh* bump = new Mesh(Mesh::makeHill(
+                2.5f, 2.0f, 5.5f, 4.5f, hs.h,
+                0.10f, 0.45f, 0.08f, 1.0f));
+            bump->translate(r * cosf(a), yOnArc, r * sinf(a));
+            bump->rotate(hs.angle * 0.6f, 0.0f, 1.0f, 0.0f);
+            bump->setup();
+            addMesh(bump);
+        }
     }
 }
 
 // =============================================================================
 // Destructor
 // =============================================================================
-
 Hole16::~Hole16()
 {
-    for (int i = 0; i < meshCount; i++)
+    for (int i = 0; i < MAX_MESHES; i++)
     {
         delete meshes[i];
         meshes[i] = nullptr;
     }
 }
 
-// =============================================================================
-// Private helpers
-// =============================================================================
-
 void Hole16::addMesh(Mesh* m)
 {
     if (meshCount < MAX_MESHES)
         meshes[meshCount++] = m;
 }
-
-// =============================================================================
-// Public interface
-// =============================================================================
 
 void Hole16::draw(GLuint shaderProgram, bool wireframe)
 {

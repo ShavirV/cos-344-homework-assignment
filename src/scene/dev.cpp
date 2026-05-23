@@ -13,8 +13,8 @@
 #include "../objects/Hole9W.h"
 #include "../objects/Hole16.h"
 
-const int WIDTH  = 1000;
-const int HEIGHT = 1000;
+const int WIDTH  = 1920;
+const int HEIGHT = 1080;
 bool wireframeMode = false;
 
 // ── Camera ────────────────────────────────────────────────────────────────────

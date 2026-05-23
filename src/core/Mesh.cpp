@@ -1,6 +1,7 @@
 #include "Mesh.h"
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
+#include <functional> 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Life-cycle
@@ -762,12 +763,27 @@ static float h16_fairwayHeight(float arcT, float radialT)
     return h + crown;
 }
 
-// ── Mesh::makeArcFairway ─────────────────────────────────────────────────────
+// =============================================================================
+// ADD TO Mesh.cpp — paste after makeRock() (replacing the old arc stubs).
+//
+// All implementations match the winding / normal conventions of the existing
+// primitives: CCW triangles, normals pointing outward / upward.
+// setup() is called before return so the caller never needs to.
+// =============================================================================
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mesh::makeArcFairway
+// ─────────────────────────────────────────────────────────────────────────────
 Mesh Mesh::makeArcFairway(float innerR, float outerR,
                           float startAngle, float endAngle,
-                          int ringSegs, int radialSegs)
+                          int ringSegs, int radialSegs,
+                          const std::function<float(float,float)>& heightFn,
+                          float r, float g, float b, float a,
+                          float uScale, float vScale)
 {
-    Mesh mesh(0.15f, 0.55f, 0.12f, 1.0f);   // grass green
+    Mesh mesh(r, g, b, a);
 
     float startRad = startAngle * (float)M_PI / 180.0f;
     float endRad   = endAngle   * (float)M_PI / 180.0f;
@@ -786,49 +802,220 @@ Mesh Mesh::makeArcFairway(float innerR, float outerR,
         {
             float radialT = (float)j / radialSegs;
             float radius  = innerR + (outerR - innerR) * radialT;
-            float y       = h16_fairwayHeight(arcT, radialT);
+            float y       = heightFn(arcT, radialT);
 
             glm::vec3 pos    = { radius * cosA, y, radius * sinA };
-            glm::vec3 dTheta = { -radius * sinA, 0.0f, radius * cosA };
+            // Analytic surface normal: cross(dPos/dRadius, dPos/dTheta)
             glm::vec3 dRad   = { cosA, 0.0f, sinA };
+            glm::vec3 dTheta = { -radius * sinA, 0.0f, radius * cosA };
             glm::vec3 n      = glm::normalize(glm::cross(dRad, dTheta));
             if (n.y < 0.0f) n = -n;
 
-            mesh.addVertex({ pos, n, { arcT * 4.0f, radialT * 2.0f } });
+            mesh.addVertex({ pos, n, { arcT * uScale, radialT * vScale } });
         }
     }
 
     for (int i = 0; i < ringSegs; i++)
-    {
         for (int j = 0; j < radialSegs; j++)
         {
             unsigned int tl = (unsigned int)( i      * cols + j     );
             unsigned int tr = (unsigned int)( i      * cols + j + 1 );
             unsigned int bl = (unsigned int)((i + 1) * cols + j     );
             unsigned int br = (unsigned int)((i + 1) * cols + j + 1 );
-
             mesh.addTriangle(tl, bl, tr);
             mesh.addTriangle(tr, bl, br);
         }
+
+    mesh.setup();
+    return mesh;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mesh::makeArcBorder
+// ─────────────────────────────────────────────────────────────────────────────
+// All paver segments are merged into one Mesh — one VAO, one draw call.
+// Each segment is a full 6-face oriented cuboid built from the arc's local
+// tangent and radial basis vectors, so every face has a correct outward normal.
+//
+Mesh Mesh::makeArcBorder(float radius, float paverWidth,
+                         float paverRaise,
+                         float startAngle, float endAngle,
+                         int segs, int side,
+                         const std::function<float(float,float)>& heightFn,
+                         float r, float g, float b, float a)
+{
+    Mesh mesh(r, g, b, a);
+
+    float startRad = startAngle * (float)M_PI / 180.0f;
+    float endRad   = endAngle   * (float)M_PI / 180.0f;
+
+    // Paver centreline sits side*paverWidth/2 outside the edge radius.
+    float paverCentreR = radius + (float)side * paverWidth * 0.5f;
+
+    // Helper: emit one oriented quad into the shared mesh.
+    auto emitFace = [&](glm::vec3 a2, glm::vec3 b2,
+                        glm::vec3 c2, glm::vec3 d2, glm::vec3 n)
+    {
+        unsigned int base = (unsigned int)mesh.vertexCount;
+        mesh.addVertex({ a2, n, {0.0f, 0.0f} });
+        mesh.addVertex({ b2, n, {1.0f, 0.0f} });
+        mesh.addVertex({ c2, n, {1.0f, 1.0f} });
+        mesh.addVertex({ d2, n, {0.0f, 1.0f} });
+        mesh.addTriangle(base+0, base+1, base+2);
+        mesh.addTriangle(base+2, base+3, base+0);
+    };
+
+    for (int i = 0; i < segs; i++)
+    {
+        float t0   = (float)i       / segs;
+        float t1   = (float)(i + 1) / segs;
+        float a0   = startRad + (endRad - startRad) * t0;
+        float a1   = startRad + (endRad - startRad) * t1;
+        float aMid = (a0 + a1) * 0.5f;
+
+        // Terrain-surface Y at this segment's edge position.
+        float radialEdge = (side > 0) ? 1.0f : 0.0f;
+        float surfY      = heightFn((t0 + t1) * 0.5f, radialEdge);
+
+        // Paver bottom always at Y=0 (ground); top above surface.
+        float bottomY = 0.0f;
+        float topY    = surfY + paverRaise;
+        float paverH  = topY - bottomY;
+        if (paverH < 0.05f) paverH = 0.05f;
+
+        // Arc chord length for this segment (with small overlap to close gaps).
+        float segArcLen = fabsf(a1 - a0) * paverCentreR * 1.02f;
+
+        // Centre position of this paver in world XZ.
+        float cosM = cosf(aMid), sinM = sinf(aMid);
+        float cx   = paverCentreR * cosM;
+        float cz   = paverCentreR * sinM;
+        float cy   = bottomY + paverH * 0.5f;
+
+        // Oriented basis (all unit vectors):
+        //   tang   = arc tangent direction (CCW)
+        //   radOut = radially outward direction (away from arc centre), sign-flipped for inner
+        //   up     = world up
+        glm::vec3 tang   = glm::normalize(glm::vec3(-sinM, 0.0f,  cosM));
+        glm::vec3 radOut = glm::normalize(glm::vec3( cosM * (float)side, 0.0f, sinM * (float)side));
+        glm::vec3 up     = glm::vec3(0.0f, 1.0f, 0.0f);
+
+        glm::vec3 centre = glm::vec3(cx, cy, cz);
+
+        float hw = segArcLen     * 0.5f;  // half arc-length
+        float hh = paverH        * 0.5f;  // half height
+        float hd = paverWidth    * 0.5f;  // half radial depth
+
+        // 8 oriented corners:  c[arcSign][vertSign][depSign]
+        //   arcSign  : 0=back (-tang), 1=front (+tang)
+        //   vertSign : 0=bottom (-up), 1=top (+up)
+        //   depSign  : 0=inner (-radOut), 1=outer (+radOut)
+        glm::vec3 c[2][2][2];
+        for (int ai = 0; ai < 2; ai++)
+        for (int vi = 0; vi < 2; vi++)
+        for (int di = 0; di < 2; di++)
+        {
+            float ts = (ai == 0) ? -hw : hw;
+            float vs = (vi == 0) ? -hh : hh;
+            float ds = (di == 0) ? -hd : hd;
+            c[ai][vi][di] = centre + tang*ts + up*vs + radOut*ds;
+        }
+
+        // Emit 6 faces (CCW winding when viewed from outside/top/end):
+        emitFace(c[0][1][0], c[1][1][0], c[1][1][1], c[0][1][1],  up);       // top
+        emitFace(c[0][0][1], c[1][0][1], c[1][0][0], c[0][0][0], -up);       // bottom
+        emitFace(c[0][0][1], c[0][1][1], c[1][1][1], c[1][0][1],  radOut);   // outer radial
+        emitFace(c[1][0][0], c[1][1][0], c[0][1][0], c[0][0][0], -radOut);   // inner radial
+        emitFace(c[0][0][0], c[0][1][0], c[0][1][1], c[0][0][1], -tang);     // arc-start cap
+        emitFace(c[1][0][1], c[1][1][1], c[1][1][0], c[1][0][0],  tang);     // arc-end cap
     }
 
     mesh.setup();
     return mesh;
 }
 
-// ── Mesh::makeArcBorder ───────────────────────────────────────────────────────
-Mesh Mesh::makeArcBorder(float radius, float borderThickness,
-                         float borderHeight,
-                         float startAngle, float endAngle,
-                         int segs, int side)
+// ─────────────────────────────────────────────────────────────────────────────
+// Mesh::makeHeightmapTerrain
+// ─────────────────────────────────────────────────────────────────────────────
+// General-purpose grid terrain. heightFn(nx, nz) with nx,nz in [0,1].
+// Normals are computed by finite-difference from neighbouring vertex heights,
+// giving smooth shading across curved terrain.
+//
+Mesh Mesh::makeHeightmapTerrain(float width, float depth,
+                                int segsX, int segsZ,
+                                const std::function<float(float,float)>& heightFn,
+                                float r, float g, float b, float a)
 {
-    const float PAVER_THICKNESS = 0.4f;
-    
-    // Create a vector to hold all segment meshes
-    std::vector<Mesh> segments;
-    
+    Mesh mesh(r, g, b, a);
+
+    int cols = segsX + 1;
+    int rows = segsZ + 1;
+
+    // Sample height at a normalised grid position (clamped to edge).
+    auto sample = [&](int xi, int zi) -> float {
+        float nx = glm::clamp((float)xi / segsX, 0.0f, 1.0f);
+        float nz = glm::clamp((float)zi / segsZ, 0.0f, 1.0f);
+        return heightFn(nx, nz);
+    };
+
+    for (int zi = 0; zi < rows; zi++)
+    {
+        float nz = (float)zi / segsZ;
+        float wz = (nz - 0.5f) * depth;
+
+        for (int xi = 0; xi < cols; xi++)
+        {
+            float nx = (float)xi / segsX;
+            float wx = (nx - 0.5f) * width;
+            float wy = heightFn(nx, nz);
+
+            // Finite-difference normal from neighbours.
+            float hL = sample(xi - 1, zi);
+            float hR = sample(xi + 1, zi);
+            float hD = sample(xi, zi - 1);
+            float hU = sample(xi, zi + 1);
+            float cellW = width  / segsX;
+            float cellD = depth  / segsZ;
+            glm::vec3 n = glm::normalize(glm::vec3(
+                (hL - hR) / (2.0f * cellW),
+                1.0f,
+                (hD - hU) / (2.0f * cellD)));
+
+            mesh.addVertex({ {wx, wy, wz}, n, {nx, nz} });
+        }
+    }
+
+    for (int zi = 0; zi < segsZ; zi++)
+        for (int xi = 0; xi < segsX; xi++)
+        {
+            unsigned int tl = (unsigned int)( zi      * cols + xi     );
+            unsigned int tr = (unsigned int)( zi      * cols + xi + 1 );
+            unsigned int bl = (unsigned int)((zi + 1) * cols + xi     );
+            unsigned int br = (unsigned int)((zi + 1) * cols + xi + 1 );
+            mesh.addTriangle(tl, bl, tr);
+            mesh.addTriangle(tr, bl, br);
+        }
+
+    mesh.setup();
+    return mesh;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mesh::makeArcWall
+// ─────────────────────────────────────────────────────────────────────────────
+// Vertical curved wall. Each segment is a vertical quad, normals pointing
+// radially inward (wall faces the inside of the arc).
+//
+Mesh Mesh::makeArcWall(float radius, float wallHeight,
+                       float startAngle, float endAngle,
+                       int segs, float bottomY,
+                       float r, float g, float b, float a)
+{
+    Mesh mesh(r, g, b, a);
+
     float startRad = startAngle * (float)M_PI / 180.0f;
     float endRad   = endAngle   * (float)M_PI / 180.0f;
+    float topY     = bottomY + wallHeight;
 
     for (int i = 0; i < segs; i++)
     {
@@ -836,35 +1023,209 @@ Mesh Mesh::makeArcBorder(float radius, float borderThickness,
         float t1 = (float)(i + 1) / segs;
         float a0 = startRad + (endRad - startRad) * t0;
         float a1 = startRad + (endRad - startRad) * t1;
-        float aMid = (a0 + a1) / 2.0f;
 
-        float radialEdge = (side > 0) ? 1.0f : 0.0f;
-        float y0    = h16_fairwayHeight(t0, radialEdge);
-        float y1    = h16_fairwayHeight(t1, radialEdge);
-        float yMid  = (y0 + y1) / 2.0f;
+        glm::vec3 p00 = { radius*cosf(a0), bottomY, radius*sinf(a0) };
+        glm::vec3 p01 = { radius*cosf(a0), topY,    radius*sinf(a0) };
+        glm::vec3 p10 = { radius*cosf(a1), bottomY, radius*sinf(a1) };
+        glm::vec3 p11 = { radius*cosf(a1), topY,    radius*sinf(a1) };
 
-        // Position at the outer edge
-        float rPos = radius + side * borderThickness;
-        float cx = rPos * cosf(aMid);
-        float cz = rPos * sinf(aMid);
-        float cy = yMid + borderHeight / 2.0f;
-        
-        // Box dimensions
-        float arcLength = (a1 - a0) * rPos;
-        float angleDeg = glm::degrees(aMid);
-        
-        // Create a 3D box for this segment
-        Mesh box = Mesh::makeCuboid(arcLength, borderHeight, PAVER_THICKNESS,
-                                    0.78f, 0.76f, 0.72f, 1.0f);
-        box.rotate(angleDeg, 0.0f, 1.0f, 0.0f);
-        box.translate(cx, cy, cz);
-        box.setup();
-        
-        segments.push_back(std::move(box));
+        // Inward normal (toward arc centre).
+        float aMid = (a0 + a1) * 0.5f;
+        glm::vec3 n = glm::normalize(glm::vec3(-cosf(aMid), 0.0f, -sinf(aMid)));
+
+        unsigned int base = (unsigned int)mesh.vertexCount;
+        mesh.addVertex({ p00, n, { t0, 0.0f } });
+        mesh.addVertex({ p10, n, { t1, 0.0f } });
+        mesh.addVertex({ p11, n, { t1, 1.0f } });
+        mesh.addVertex({ p01, n, { t0, 1.0f } });
+        mesh.addTriangle(base+0, base+1, base+2);
+        mesh.addTriangle(base+2, base+3, base+0);
     }
-    
-    // Return the first segment (or combine them in your scene)
-    // You'll need to add all segments to your hole's mesh list
-    if (segments.empty()) return Mesh(0.78f, 0.76f, 0.72f, 1.0f);
-    return std::move(segments[0]);
+
+    mesh.setup();
+    return mesh;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mesh::makeAnnularDisc
+// ─────────────────────────────────────────────────────────────────────────────
+// Flat ring surface. Suitable for water moats, decorative path rings, etc.
+//
+Mesh Mesh::makeAnnularDisc(float innerR, float outerR,
+                           float y, int segs,
+                           float r, float g, float b, float a)
+{
+    Mesh mesh(r, g, b, a);
+
+    glm::vec3 up = {0.0f, 1.0f, 0.0f};
+
+    for (int i = 0; i < segs; i++)
+    {
+        float a0 = (float)i       / segs * 2.0f * (float)M_PI;
+        float a1 = (float)(i + 1) / segs * 2.0f * (float)M_PI;
+        float t0 = (float)i       / segs;
+        float t1 = (float)(i + 1) / segs;
+
+        glm::vec3 innerA = { innerR * cosf(a0), y, innerR * sinf(a0) };
+        glm::vec3 innerB = { innerR * cosf(a1), y, innerR * sinf(a1) };
+        glm::vec3 outerA = { outerR * cosf(a0), y, outerR * sinf(a0) };
+        glm::vec3 outerB = { outerR * cosf(a1), y, outerR * sinf(a1) };
+
+        unsigned int base = (unsigned int)mesh.vertexCount;
+        mesh.addVertex({ innerA, up, { 0.0f, t0 } });
+        mesh.addVertex({ outerA, up, { 1.0f, t0 } });
+        mesh.addVertex({ outerB, up, { 1.0f, t1 } });
+        mesh.addVertex({ innerB, up, { 0.0f, t1 } });
+        mesh.addTriangle(base+0, base+1, base+2);
+        mesh.addTriangle(base+2, base+3, base+0);
+    }
+
+    mesh.setup();
+    return mesh;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mesh::makeSlopedStrip
+// ─────────────────────────────────────────────────────────────────────────────
+// Subdivided ribbon rising from (x0,y0,z0) to (x1,y1,z1).
+// More controllable than makeRamp: vertices are individually placed so normals
+// are consistent across the slope, and segs >= 4 gives smooth shading.
+//
+Mesh Mesh::makeSlopedStrip(float x0, float y0, float z0,
+                           float x1, float y1, float z1,
+                           float width, int segs,
+                           float r, float g, float b, float a)
+{
+    Mesh mesh(r, g, b, a);
+
+    // Travel direction and perpendicular.
+    glm::vec3 travel = glm::normalize(glm::vec3(x1-x0, y1-y0, z1-z0));
+    glm::vec3 worldUp = {0.0f, 1.0f, 0.0f};
+    glm::vec3 perp    = glm::normalize(glm::cross(travel, worldUp));
+    glm::vec3 n       = glm::normalize(glm::cross(perp, travel)); // surface normal
+
+    glm::vec3 start = {x0, y0, z0};
+    glm::vec3 end   = {x1, y1, z1};
+
+    int rows = segs + 1;
+
+    for (int i = 0; i < rows; i++)
+    {
+        float t   = (float)i / segs;
+        glm::vec3 centre = glm::mix(start, end, t);
+        glm::vec3 left   = centre - perp * (width * 0.5f);
+        glm::vec3 right  = centre + perp * (width * 0.5f);
+
+        mesh.addVertex({ left,  n, { 0.0f, t } });
+        mesh.addVertex({ right, n, { 1.0f, t } });
+    }
+
+    for (int i = 0; i < segs; i++)
+    {
+        unsigned int tl = (unsigned int)(i * 2);
+        unsigned int tr = (unsigned int)(i * 2 + 1);
+        unsigned int bl = (unsigned int)((i + 1) * 2);
+        unsigned int br = (unsigned int)((i + 1) * 2 + 1);
+        mesh.addTriangle(tl, bl, tr);
+        mesh.addTriangle(tr, bl, br);
+    }
+
+    mesh.setup();
+    return mesh;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mesh::makePathStrip
+// ─────────────────────────────────────────────────────────────────────────────
+// Flat Bezier-following quad strip. Useful for curved connectors, cart paths,
+// or river banks. Each segment is a quad aligned to the curve tangent.
+//
+Mesh Mesh::makePathStrip(glm::vec2 p0, glm::vec2 p1,
+                         glm::vec2 p2, glm::vec2 p3,
+                         float width, int segs, float pathY,
+                         float r, float g, float b, float a)
+{
+    Mesh mesh(r, g, b, a);
+    glm::vec3 up = {0.0f, 1.0f, 0.0f};
+
+    auto evalBez = [&](float t) -> glm::vec2 {
+        float u = 1.0f - t;
+        return u*u*u*p0 + 3.0f*u*u*t*p1 + 3.0f*u*t*t*p2 + t*t*t*p3;
+    };
+    auto evalTan = [&](float t) -> glm::vec2 {
+        float u = 1.0f - t;
+        return 3.0f*(u*u*(p1-p0) + 2.0f*u*t*(p2-p1) + t*t*(p3-p2));
+    };
+
+    int rows = segs + 1;
+    for (int i = 0; i < rows; i++)
+    {
+        float t   = (float)i / segs;
+        glm::vec2 pos = evalBez(t);
+        glm::vec2 tan = evalTan(t);
+        if (glm::length(tan) < 1e-6f) tan = glm::vec2(1.0f, 0.0f);
+        tan = glm::normalize(tan);
+
+        // Perpendicular in XZ (rotate tan 90° CW).
+        glm::vec2 perp = { tan.y, -tan.x };
+
+        glm::vec3 left  = { pos.x - perp.x*width*0.5f, pathY, pos.y - perp.y*width*0.5f };
+        glm::vec3 right = { pos.x + perp.x*width*0.5f, pathY, pos.y + perp.y*width*0.5f };
+
+        mesh.addVertex({ left,  up, { 0.0f, t } });
+        mesh.addVertex({ right, up, { 1.0f, t } });
+    }
+
+    for (int i = 0; i < segs; i++)
+    {
+        unsigned int tl = (unsigned int)(i * 2);
+        unsigned int tr = (unsigned int)(i * 2 + 1);
+        unsigned int bl = (unsigned int)((i + 1) * 2);
+        unsigned int br = (unsigned int)((i + 1) * 2 + 1);
+        mesh.addTriangle(tl, bl, tr);
+        mesh.addTriangle(tr, bl, br);
+    }
+
+    mesh.setup();
+    return mesh;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mesh::makeSteppedTerrain
+// ─────────────────────────────────────────────────────────────────────────────
+// Pushes step treads (flat cuboids) and risers (vertical cuboids) into `out`.
+// Steps ascend in +Y in the +X direction; use translate/rotate to orient.
+//
+void Mesh::makeSteppedTerrain(std::vector<Mesh>& out,
+                              float x, float z,
+                              int stepsX, int stepsZ,
+                              float stepWidth, float stepHeight,
+                              float riserDepth,
+                              float r, float g, float b, float a)
+{
+    for (int sx = 0; sx < stepsX; sx++)
+    {
+        float stepY  = (float)(sx + 1) * stepHeight;
+        float stepX  = x + (float)sx * stepWidth + stepWidth * 0.5f;
+        float totalZ = (float)stepsZ * stepWidth;
+
+        // Tread — flat top surface of the step.
+        Mesh tread = Mesh::makeCuboid(
+            stepWidth, 0.10f, totalZ,
+            r, g, b, a);
+        tread.translate(stepX, stepY, z);
+        tread.setup();
+        out.push_back(std::move(tread));
+
+        // Riser — vertical face connecting this step to the one below.
+        // Slightly darkened to read as shadow/depth.
+        Mesh riser = Mesh::makeCuboid(
+            riserDepth, stepHeight, totalZ,
+            r * 0.72f, g * 0.72f, b * 0.72f, a);
+        riser.translate(x + (float)sx * stepWidth + riserDepth * 0.5f,
+                        stepY - stepHeight * 0.5f,
+                        z);
+        riser.setup();
+        out.push_back(std::move(riser));
+    }
 }
