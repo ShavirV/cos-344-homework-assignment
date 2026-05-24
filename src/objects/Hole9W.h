@@ -13,10 +13,10 @@
 class Hole9W
 {
 public:
-    static const int MAX_MESHES = 8;
+    static const int MAX_MESHES = 15;
 
     // rotY: optional Y-axis rotation in degrees (0 = length runs along X).
-    Hole9W();
+    Hole9W(float s = 1.0);
     ~Hole9W();
 
     // Non-copyable — meshes own GPU buffers.
