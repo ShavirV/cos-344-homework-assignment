@@ -13,6 +13,7 @@
 #include "../objects/Hole9W.h"
 #include "../objects/Hole16.h"
 #include "../objects/Hole17.h"
+#include "../objects/Hole18.h"
 #include "../objects/Skybox.h"
 
 
@@ -99,6 +100,7 @@ int main()
     catch (const char* e) { std::cout << e << std::endl; throw; }
 
     glEnable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
 
     // ── Fix 1: dark grey background instead of sky blue ──────────────────────
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -117,15 +119,10 @@ int main()
 
     Mesh ground = Mesh::makeCuboid(2100.0f, 0.5f, 1250.0f, 0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
-
-    // Hole9E hole9e;
-    // hole9e.translate(48.0f, 0.35f, -8.0f);
-
-    // Hole9W hole9w;
-    // hole9w.translate(-48.0f, 0.35f, -8.0f);
         
        //Hole16 hole16;
-       Hole17 Hole17;
+       //Hole17 hole17;
+        Hole18 hole18;
 
        Mesh hole16platform = Mesh::makeHole();
        float lastTime = (float)glfwGetTime();
@@ -166,7 +163,7 @@ int main()
         float sunWeight  = sun.intensity;
         float moonWeight = moon.intensity;
 
-        glm::vec3 lightPos   = sunWeight > moonWeight ? sun.position  : moon.position;
+        glm::vec3 lightPos   = sunWeight > moonWeight ? sun.pdosition  : moon.position;
         glm::vec3 lightColor = sunWeight > moonWeight ? sun.color     : moon.color;
         float     lightInt   = sunWeight > moonWeight ? sunWeight      : moonWeight;
 
@@ -183,11 +180,7 @@ int main()
         // hole16.setCameraData(view, projection, cameraPos);
         // hole16.update(deltaTime);
 
-        //ground.draw(shader, false);
-        //hole9e.draw(shader, false);
-        //hole9w.draw(shader, false);
-        // ── Sky (drawn first, depth write off) ───────────────────────────────────
-        Hole17.draw(shader, false);
+        hole18.draw(shader, false);
         
 
         glfwSwapBuffers(window);

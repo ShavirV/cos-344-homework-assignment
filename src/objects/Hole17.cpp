@@ -35,10 +35,10 @@ static const float PAVER_H      = 0.35f;
 static const float CAVE_ENTRY_X =  8.0f;
 static const float CAVE_EXIT_X  = 22.0f;
 static const float CAVE_LEN     = CAVE_EXIT_X - CAVE_ENTRY_X;   // 14.0
-static const float CAVE_HALF_W  =  3.0f;   // half the interior width
-static const float CAVE_FULL_W  =  CAVE_HALF_W * 2.0f;          //  6.0
-static const float CAVE_CEIL_Y  =  3.5f;   // interior ceiling height
-static const float CAVE_WALL_T  =  1.5f;   // wall slab thickness
+static const float CAVE_HALF_W  =  4.2f;   // was 3.0
+static const float CAVE_FULL_W  =  CAVE_HALF_W * 2.0f;
+static const float CAVE_CEIL_Y  =  4.5f;   // interior ceiling height
+static const float CAVE_WALL_T  =  1.5f;   // thicker rock walls         //  6.0
 // The cave centreline follows the Bezier, so at x=15 (midpoint) the Z offset
 // from the Bezier is ≈0. We place the cave symmetrically about the Bezier.
 // The entry/exit arch face centreline Z is evaluated from the Bezier.
@@ -66,13 +66,15 @@ static const int   DOME_SEGS_Z  = 20;
 // ── Stalactites ───────────────────────────────────────────────────────────────
 struct StalSpec { float x; float z; float radius; float length; };
 static const StalSpec STALACTITES[] = {
-    { 10.5f, -1.2f, 0.30f, 1.8f },
-    { 12.0f,  1.8f, 0.22f, 2.4f },
-    { 14.5f, -0.5f, 0.35f, 1.4f },
-    { 17.0f,  1.0f, 0.25f, 2.0f },
-    { 19.5f, -1.5f, 0.28f, 1.6f },
+    { 10.5f, -0.8f, 0.40f, 2.2f },
+    { 12.2f,  1.1f, 0.26f, 2.8f },
+    { 14.0f, -1.5f, 0.45f, 1.9f },
+    { 16.5f,  0.5f, 0.30f, 2.5f },
+    { 18.8f, -1.0f, 0.34f, 2.0f },
+    { 15.2f,  2.0f, 0.22f, 1.7f },
+    { 13.0f, -2.1f, 0.28f, 2.3f },
 };
-static const int STAL_COUNT = 5;
+static const int STAL_COUNT = 7;
 
 // ── Fairway hill bumps (on the open sections only, not inside cave) ────────────
 struct BumpSpec { float arcT; float radialT; float h; };
@@ -162,8 +164,14 @@ static float domeHeight(float nx, float nz)
     // Smooth raised cosine profile.
     float r  = sqrtf(r2);
     float h  = DOME_PEAK * (0.5f + 0.5f * cosf(r * (float)M_PI));
-    // Add mild noise-like variation using harmonics.
-    h += 0.6f * sinf(dx * 3.5f + 0.4f) * cosf(dz * 2.8f) * (1.0f - r);
+
+    h += 0.9f * sinf(dx * 4.0f + 0.6f)
+                * cosf(dz * 3.3f)
+                * (1.0f - r);
+
+    h += 0.35f * sinf(dx * 9.0f)
+                * sinf(dz * 7.0f)
+                * (1.0f - r * 0.7f);
     if (h < 0.0f) h = 0.0f;
     return h;
 }
@@ -597,19 +605,26 @@ Hole17::Hole17()
         addMesh(wallR);
     }
 
-    // ── [8] Cave ceiling ──────────────────────────────────────────────────────
-    // A flat slab: slightly wider than the interior to cover wall tops.
-    // {
-    //     Mesh* ceil = new Mesh(Mesh::makeCuboid(
-    //         CAVE_LEN, 0.4f, CAVE_FULL_W + CAVE_WALL_T * 2.0f + 0.2f,
-    //         0.25f, 0.23f, 0.22f, 1.0f));
-    //     ceil->translate(
-    //         CAVE_ENTRY_X + CAVE_LEN * 0.5f,
-    //         CAVE_CEIL_Y + 0.2f,
-    //         CAVE_Z_CENTRE);
-    //     ceil->setup();
-    //     addMesh(ceil);
-    // }
+   // ── [8] Interior cave ceiling ─────────────────────────────────────────────
+{
+    Mesh* ceil = new Mesh(Mesh::makeHill(
+        CAVE_LEN * 0.55f,          // top width
+        CAVE_FULL_W * 0.75f,       // top depth
+        CAVE_LEN + 2.0f,           // base width
+        CAVE_FULL_W + 3.0f,        // base depth
+        1.8f,                      // height
+        0.26f, 0.24f, 0.22f, 1.0f));
+
+    // ceil->rotate(180.0f, 1.0f, 0.0f, 0.0f);
+
+    ceil->translate(
+        CAVE_ENTRY_X + CAVE_LEN * 0.5f,
+        CAVE_CEIL_Y + 0.2f,
+        CAVE_Z_CENTRE);
+
+    ceil->setup();
+    addMesh(ceil);
+}
 
     // ── [9] Cave entry arch face ──────────────────────────────────────────────
     // Stone frame ring at the entry mouth. The arch opening is a semicircle
@@ -622,33 +637,8 @@ Hole17::Hole17()
             ARCH_R, ARCH_FRAME_W,
             ARCH_WALL_H, CAVE_FULL_W,
             ARCH_SEGS, false,    // normals face −X (outward at entry)
-            0.42f, 0.40f, 0.38f, 1.0f));
+           0.30f, 0.28f, 0.26f, 1.0f));
         addMesh(archEntry);
-    }
-
-    // ── [10] Cave entry fill wall left ────────────────────────────────────────
-    // Fills the rectangular shoulder gap left of the arch on the entry face.
-    {
-        Mesh* fillEntryL = new Mesh(makeArchFillPanel(
-            CAVE_ENTRY_X, CAVE_Z_CENTRE,
-            ARCH_R, CAVE_HALF_W,
-            ARCH_R + ARCH_FRAME_W,   // archTopY = outer arch crown
-            CAVE_CEIL_Y,
-            -1,                      // left side
-            0.38f, 0.36f, 0.34f, 1.0f));
-        addMesh(fillEntryL);
-    }
-
-    // ── [11] Cave entry fill wall right ──────────────────────────────────────
-    {
-        Mesh* fillEntryR = new Mesh(makeArchFillPanel(
-            CAVE_ENTRY_X, CAVE_Z_CENTRE,
-            ARCH_R, CAVE_HALF_W,
-            ARCH_R + ARCH_FRAME_W,
-            CAVE_CEIL_Y,
-            +1,
-            0.38f, 0.36f, 0.34f, 1.0f));
-        addMesh(fillEntryR);
     }
 
     // ── [12] Cave exit arch face ──────────────────────────────────────────────
@@ -659,32 +649,8 @@ Hole17::Hole17()
             ARCH_R, ARCH_FRAME_W,
             ARCH_WALL_H, CAVE_FULL_W,
             ARCH_SEGS, true,     // normals face +X (outward at exit)
-            0.42f, 0.40f, 0.38f, 1.0f));
+           0.30f, 0.28f, 0.26f, 1.0f));
         addMesh(archExit);
-    }
-
-    // ── [13] Cave exit fill wall left ────────────────────────────────────────
-    {
-        Mesh* fillExitL = new Mesh(makeArchFillPanel(
-            CAVE_EXIT_X, CAVE_Z_CENTRE,
-            ARCH_R, CAVE_HALF_W,
-            ARCH_R + ARCH_FRAME_W,
-            CAVE_CEIL_Y,
-            -1,
-            0.38f, 0.36f, 0.34f, 1.0f));
-        addMesh(fillExitL);
-    }
-
-    // ── [14] Cave exit fill wall right ───────────────────────────────────────
-    {
-        Mesh* fillExitR = new Mesh(makeArchFillPanel(
-            CAVE_EXIT_X, CAVE_Z_CENTRE,
-            ARCH_R, CAVE_HALF_W,
-            ARCH_R + ARCH_FRAME_W,
-            CAVE_CEIL_Y,
-            +1,
-            0.38f, 0.36f, 0.34f, 1.0f));
-        addMesh(fillExitR);
     }
 
     // =========================================================================
@@ -739,9 +705,14 @@ Hole17::Hole17()
                 ss.radius, ss.length, 10,
                 0.28f, 0.26f, 0.24f, 1.0f));
             // Flip downward: rotate 180° around Z axis so apex points −Y.
-            stal->rotate(180.0f, 0.0f, 0.0f, 1.0f);
-            // Translate: base at CAVE_CEIL_Y, apex hangs down by ss.length.
-            stal->translate(ss.x, CAVE_CEIL_Y, ss.z);
+            
+            // Place INSIDE the cave ceiling
+            stal->translate(
+                ss.x,
+                CAVE_CEIL_Y - 0.05f,
+                ss.z * 0.6f   // keep closer to cave centre
+            );
+            stal->rotate(180.0f, 1.0f, 0.0f, 0.0f);
             stal->setup();
             addMesh(stal);
         }
@@ -807,7 +778,7 @@ Hole17::Hole17()
         }
     }
 
-    // ── [30–33] Entry/exit boulders ───────────────────────────────────────────
+   // ── [30–33] Entry/exit boulders ───────────────────────────────────────────
     {
         for (int b = 0; b < BOULDER_COUNT; b++)
         {
@@ -819,6 +790,45 @@ Hole17::Hole17()
             addMesh(rock);
         }
     }
+
+    // ── Cave rubble scatter ────────────────────────────────────────────────────
+// {
+//     struct Rubble {
+//         float x, z, scale, rot;
+//     };
+
+//     Rubble rubble[] = {
+//         { 7.0f,  -4.8f, 0.35f, 12.0f },
+//         { 7.8f,  -5.2f, 0.25f, 50.0f },
+//         { 8.5f,  -4.4f, 0.30f, 90.0f },
+
+//         { 7.5f,   4.7f, 0.28f, 20.0f },
+//         { 8.2f,   5.0f, 0.22f, 65.0f },
+
+//         { 22.8f, -4.7f, 0.26f, 35.0f },
+//         { 23.7f, -4.9f, 0.32f, 70.0f },
+
+//         { 23.0f,  4.5f, 0.24f, 10.0f },
+//         { 24.0f,  5.1f, 0.36f, 80.0f },
+//     };
+
+//     int rubbleCount = sizeof(rubble) / sizeof(Rubble);
+
+//     for (int i = 0; i < rubbleCount; i++)
+//     {
+//         Mesh* rock = new Mesh(Mesh::makeRock(rubble[i].scale));
+
+//         rock->rotate(rubble[i].rot, 0.0f, 1.0f, 0.0f);
+
+//         rock->translate(
+//             rubble[i].x,
+//             rubble[i].scale * 0.35f,
+//             rubble[i].z);
+
+//         rock->setup();
+//         addMesh(rock);
+//     }
+// }
 }
 
 // =============================================================================
