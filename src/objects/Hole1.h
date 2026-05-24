@@ -20,5 +20,5 @@ private:
     Mesh* meshes[MAX_MESHES];
     int   meshCount;
 
-    void addMesh(Mesh* m);s
+    void addMesh(Mesh* m);
 };

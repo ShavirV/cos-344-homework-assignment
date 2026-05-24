@@ -1,16 +1,15 @@
 #pragma once
 #include "../core/Mesh.h"
 
-// Hole 2
 class Hole2
 {
 public:
-    static const int MAX_MESHES = 8;
+    static const int MAX_MESHES = 200;
 
     Hole2();
     ~Hole2();
 
-    Hole2(const Hole2&)            = delete;
+    Hole2(const Hole2&) = delete;
     Hole2& operator=(const Hole2&) = delete;
 
     void draw(GLuint shaderProgram, bool wireframe = false);
