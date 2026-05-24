@@ -124,10 +124,8 @@ int main()
     ground.setup();
         
        //Hole16 hole16;
-       //Hole17 hole17;
+       Hole16 hole16;
        //Hole18 hole18;
-       TerrainExample terrainExample;
-       terrainExample.init();
 
        Mesh hole16platform = Mesh::makeHole();
        float lastTime = (float)glfwGetTime();
@@ -182,14 +180,14 @@ int main()
         if (locLightInt   >= 0) glUniform1f (locLightInt,   lightInt);
 
         //for the water redraw
-        // hole16.setCameraData(view, projection, cameraPos);
-        // hole16.update(deltaTime);
+         hole16.setCameraData(view, projection, cameraPos);
+         hole16.update(deltaTime);
 
         // hole18.setCameraData(view, projection, cameraPos);
         // hole18.update(deltaTime);
 
-        //hole17.draw(shader, false);
-        terrainExample.draw(shader, false);
+        hole16.draw(shader, false);
+       
         
 
         glfwSwapBuffers(window);

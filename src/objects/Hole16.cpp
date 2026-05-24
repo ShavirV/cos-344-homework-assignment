@@ -42,7 +42,7 @@ static const float PAVER_W      = 0.45f;
 // ── Green (raised, at arc end tip ~330°) ─────────────────────────────────────
 // Arc mid-radius at 330°: (10+19)/2 = 14.5  cos(330°)=0.866  sin(330°)=-0.5
 static const float GREEN_R      = 5.5f;
-static const float GREEN_Y      = 1.1f;
+static const float GREEN_Y      = 2.1f;
 static const float GREEN_WALL_H = 2.2f;   // tall enough to reach ground from GREEN_Y
 static const float GREEN_X      = 12.56f; // (ARC_INNER+ARC_OUTER)/2 * cos(330°)
 static const float GREEN_Z      = -7.25f; // (ARC_INNER+ARC_OUTER)/2 * sin(330°)
@@ -70,7 +70,7 @@ static const float WATER_Y       = -0.15f;
 //
 static const float    STREAM_Y  = -0.10f;
 static const float    STREAM_W  =  3.5f;
-static const int      STREAM_SEGS = 4;
+static const int      STREAM_SEGS = 6;
 static const glm::vec2 STREAM_P0 = { 14.5f,  2.0f  };
 static const glm::vec2 STREAM_P1 = { 21.0f, -1.5f  };
 static const glm::vec2 STREAM_P2 = { 20.0f, -6.5f  };
@@ -438,15 +438,15 @@ Hole16::Hole16()
 
     // ── [6] Raised green — retaining wall ────────────────────────────────────
     // Cylinder wall reaching from Y=0 to GREEN_Y so the island never floats.
-    // {
-    //     Mesh* wall = new Mesh(Mesh::makeCylinder(
-    //         GREEN_R + 0.4f, GREEN_WALL_H, 32,
-    //         0.68f, 0.62f, 0.52f, 1.0f));
-    //     // Cylinder origin is at its centre, so offset down so base sits at Y=0
-    //     wall->translate(GREEN_X, GREEN_WALL_H * 0.5f, GREEN_Z);
-    //     wall->setup();
-    //     addMesh(wall);
-    // }
+    {
+        Mesh* wall = new Mesh(Mesh::makeCylinder(
+            GREEN_R + 0.4f, GREEN_WALL_H, 32,
+            0.68f, 0.62f, 0.52f, 1.0f));
+        // Cylinder origin is at its centre, so offset down so base sits at Y=0
+        wall->translate(GREEN_X, GREEN_WALL_H * 0.5f, GREEN_Z);
+        wall->setup();
+        addMesh(wall);
+    }
 
     // ── [7] Raised green — playing surface ───────────────────────────────────
     {
@@ -674,16 +674,30 @@ void Hole16::addMesh(Mesh* m)
         meshes[meshCount++] = m;
 }
 
-void Hole16::draw(GLuint shaderProgram, bool wireframe)
+void Hole16::draw(GLuint shaderProgram, bool wireframe,
+                  const glm::vec3& lightDir,
+                  const glm::vec3& lightColor)
 {
+    // Push the directional-light uniforms that dev.cpp does not set program-wide.
+    glUseProgram(shaderProgram);
+    GLint locLD = glGetUniformLocation(shaderProgram, "uLightDir");
+    GLint locVP = glGetUniformLocation(shaderProgram, "uViewPos");
+    GLint locLC = glGetUniformLocation(shaderProgram, "uLightColor");
+    if (locLD != -1) glUniform3fv(locLD, 1, glm::value_ptr(glm::normalize(lightDir)));
+    if (locVP != -1) glUniform3fv(locVP, 1, glm::value_ptr(camPos));
+    if (locLC != -1) glUniform3fv(locLC, 1, glm::value_ptr(lightColor));
+
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shaderProgram, wireframe);
 
     // Water drawn last — alpha blended, must come after all opaque geometry.
+    // Pass the skybox-driven light so water shading tracks the day/night cycle.
     if (waterStream)
-        waterStream->draw(camView, camProj, camPos);
+        waterStream->draw(camView, camProj, camPos,
+                          glm::normalize(lightDir), lightColor);
     if (waterMoat)
-        waterMoat->draw(camView, camProj, camPos);
+        waterMoat->draw(camView, camProj, camPos,
+                        glm::normalize(lightDir), lightColor);
 }
 
 void Hole16::translate(float x, float y, float z)

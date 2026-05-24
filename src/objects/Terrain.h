@@ -187,7 +187,7 @@ public:
     // Expose mesh count for debugging
     int meshCount() const { return m_meshCount; }
 
-    static const int MAX_TERRAIN_MESHES = 8192;
+    static const int MAX_TERRAIN_MESHES = 16384;
 
     Mesh* m_meshes[MAX_TERRAIN_MESHES];
     int   m_meshCount = 0;

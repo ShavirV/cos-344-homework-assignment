@@ -60,7 +60,9 @@ public:
     Hole16(const Hole16&)            = delete;
     Hole16& operator=(const Hole16&) = delete;
     
-    void draw     (GLuint shaderProgram, bool wireframe = false);
+    void draw     (GLuint shaderProgram, bool wireframe = false,
+                   const glm::vec3& lightDir   = glm::vec3(0.45f, 0.80f, 0.35f),
+                   const glm::vec3& lightColor = glm::vec3(1.00f, 0.97f, 0.90f));
     void translate(float x, float y, float z);
     void rotate   (float angle, float ax, float ay, float az);
     void scale    (float sx, float sy, float sz);
