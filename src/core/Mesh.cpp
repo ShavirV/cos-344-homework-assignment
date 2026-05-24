@@ -547,8 +547,8 @@ Mesh Mesh::makeHill(float topWidth,    float topDepth,
         mesh.addVertex({tFR, n, {1.0f, 0.0f}});
         mesh.addVertex({tBR, n, {1.0f, 1.0f}});
         mesh.addVertex({tBL, n, {0.0f, 1.0f}});
-        mesh.addTriangle(base+0, base+1, base+2);
-        mesh.addTriangle(base+2, base+3, base+0);
+        mesh.addTriangle(base+0, base+2, base+1);
+        mesh.addTriangle(base+2, base+0, base+3);
     }
 
     // Bottom face
@@ -607,8 +607,8 @@ Mesh Mesh::makeHill(float topWidth,    float topDepth,
                 unsigned int bl = startIdx + (row + 1) * cols + col;
                 unsigned int br = startIdx + (row + 1) * cols + col + 1;
 
-                mesh.addTriangle(tl, bl, tr);
-                mesh.addTriangle(tr, bl, br);
+                mesh.addTriangle(tl, tr, bl);
+                mesh.addTriangle(tr, br, bl);
             }
         }
     };
