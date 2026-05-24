@@ -729,19 +729,6 @@ Mesh Mesh::makeRock(float scale)
     return rock;
 }
 
-// =============================================================================
-// ADD TO Mesh.cpp — paste after makeRock() at the bottom of the file.
-// These are the two factory methods declared in Mesh.h that are called
-// internally by Hole16 via its private builder methods.  They are plain
-// static free functions here because they depend on fairwayHeight(), which
-// is defined at the top of Hole16.cpp and must remain there (it encodes the
-// per-hole terrain character).  Hole16 calls them through its own wrappers
-// (Hole16::makeArcFairway / Hole16::makeArcBorder) which know the height fn.
-//
-// If you later want a truly generic arc primitive that other holes can reuse,
-// pass the height function as a std::function<float(float,float)> parameter.
-// =============================================================================
-
 // ── fairwayHeight — local height function (copy from Hole16.cpp) ─────────────
 // arcT   : [0,1] normalised position along the arc
 // radialT: [0,1] normalised position across the band (0=inner, 1=outer)

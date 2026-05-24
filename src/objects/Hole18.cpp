@@ -63,17 +63,14 @@ static const float TEE_X         =  9.5f;
 static const float TEE_Z         =  0.0f;
 
 // ── Tee stairs ───────────────────────────────────────────────────────────────
-static const int   TEE_STAIR_COUNT        = 5;
-static const float TEE_STAIR_WIDTH        = 1.2f;
-static const float TEE_STAIR_HEIGHT       = TOP_TEE_Y / TEE_STAIR_COUNT;
-static const float TEE_STAIR_DEPTH        = 0.30f;
-static const float TEE_STAIR_TOTAL_WIDTH  = 5.0f;
+static const int   TEE_STAIR_COUNT  = 5;
+static const float TEE_STAIR_WIDTH  = 1.2f;
+static const float TEE_STAIR_DEPTH  = 3.0f;
+static const float TEE_STAIR_RISE   = TOP_TEE_Y / TEE_STAIR_COUNT;
 
-// Starts slightly before tee and climbs toward it
+// Start far enough back so last step lands at tee X
 static const float TEE_STAIR_START_X =
     TEE_X - (TEE_STAIR_COUNT * TEE_STAIR_WIDTH);
-
-static const float TEE_STAIR_Z = TEE_Z;
 
 // ── Green ─────────────────────────────────────────────────────────────────────
 // Green is at the 360° (=0°) point of the bottom arc, mid-radius = 9.5
@@ -311,33 +308,41 @@ Hole18::Hole18() : meshCount(0)
     }
 
         // ── [11] Tee stairs ──────────────────────────────────────────────────────────
-    {
-        std::vector<Mesh> stairMeshes;
+{
+    float baseY = topArcHeight(0.0f, 0.5f); // ground at start of stairs
 
-        Mesh::makeSteppedTerrain(
-            stairMeshes,
-            TEE_STAIR_START_X,          // x
-            TEE_STAIR_Z,                // z
-            TEE_STAIR_COUNT,            // stepsX
-            1,                          // stepsZ
-            TEE_STAIR_WIDTH,            // stepWidth
-            TEE_STAIR_HEIGHT,           // stepHeight
-            TEE_STAIR_DEPTH,            // riserDepth
-            0.45f, 0.43f, 0.40f, 1.0f  // stone colour
+    for (int i = 0; i < TEE_STAIR_COUNT; i++)
+    {
+        float x = TEE_STAIR_START_X + i * TEE_STAIR_WIDTH + TEE_STAIR_WIDTH * 0.5f;
+        float y = baseY + (i + 0.5f) * TEE_STAIR_RISE;
+
+        Mesh* step = new Mesh(Mesh::makeCuboid(
+            TEE_STAIR_WIDTH,
+            TEE_STAIR_RISE,
+            TEE_STAIR_DEPTH,
+            0.45f, 0.43f, 0.40f, 1.0f));
+
+        step->translate(x, y, TEE_Z);
+        step->setup();
+        addMesh(step);
+
+        // optional riser face reinforcement (prevents lighting artifacts)
+        Mesh* riser = new Mesh(Mesh::makeCuboid(
+            TEE_STAIR_WIDTH,
+            TEE_STAIR_RISE,
+            0.15f,
+            0.35f, 0.33f, 0.30f, 1.0f));
+
+        riser->translate(
+            x,
+            baseY + i * TEE_STAIR_RISE + TEE_STAIR_RISE * 0.5f,
+            TEE_Z - (TEE_STAIR_DEPTH * 0.5f)
         );
 
-        for (Mesh& s : stairMeshes)
-        {
-            s.translate(
-                0.0f,
-                0.0f,
-                -TEE_STAIR_TOTAL_WIDTH * 0.5f + TEE_STAIR_WIDTH * 0.5f
-            );
-
-            Mesh* stair = new Mesh(std::move(s));
-            addMesh(stair);
-        }
+        riser->setup();
+        addMesh(riser);
     }
+}
 
     // ── [24] Flag pole ────────────────────────────────────────────────────────
     {
