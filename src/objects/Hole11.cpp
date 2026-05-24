@@ -98,8 +98,22 @@ void Hole11::draw(GLuint shaderProgram, bool wireframe,
 
 void Hole11::translate(float x, float y, float z)
 {
-    for (int i = 0; i < meshCount; i++)
+    for (int i = 0; i < meshCount; i++){
+        if (i == 2 || i ==3 || i==1)
+        {
+            meshes[i]->rotate(-90, 0.0, 1.0, 0.0);
+        }
+
         meshes[i]->translate(x, y, z);
+
+        if (i == 2 || i ==3 || i==1)
+        {
+            meshes[i]->rotate(90, 0.0, 1.0, 0.0);
+        }
+
+    }
+
+        
 }
 
 void Hole11::rotate(float angle, float ax, float ay, float az)

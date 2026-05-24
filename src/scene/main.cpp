@@ -178,6 +178,9 @@ int main()
     
     Hole10 h10; 
     h10.translate(80.0f, 0.35f, -10.0f);
+
+    Hole11 h11;
+    h11.translate(120.0f, 0.35f, -20.0f);
     
 
     Hole13 h13;
@@ -266,6 +269,11 @@ int main()
 
 
         h10.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+        h11.draw(shader, false,
         glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
         glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
         cameraPos);                                     //camera position
