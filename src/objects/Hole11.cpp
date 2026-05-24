@@ -32,7 +32,7 @@ Hole11::Hole11(float s)
     addMesh(landmass);
 
     // ── Ramp ──────────────────────────────────────────────────────────────────
-    Mesh* hill = new Mesh(Mesh::makeRamp(
+    Mesh* hill = new Mesh(Mesh::makeRamp2(
         -10.0f * s, 0.0f,        -1.0f * s,
          -1.0f * s, 6.0f * s,   -1.0f * s,
         7.5f * s));

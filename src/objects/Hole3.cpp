@@ -1,6 +1,9 @@
 #include "Hole3.h"
+<<<<<<< HEAD
 #include <GL/glew.h>
 #include <glm/gtc/type_ptr.hpp>
+=======
+>>>>>>> e1d69e93665d0f3fb5b714fcf89405de568fb9a6
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Layout (all coords local; origin = centre of the 28×15 bounding box)

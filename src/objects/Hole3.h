@@ -1,6 +1,9 @@
 #pragma once
 #include "../core/Mesh.h"
+<<<<<<< HEAD
 #include <glm/glm.hpp>
+=======
+>>>>>>> e1d69e93665d0f3fb5b714fcf89405de568fb9a6
 
 class Hole3
 {
