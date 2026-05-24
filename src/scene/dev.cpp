@@ -134,7 +134,7 @@ int main()
             "src/assets/textures/sky_day.bmp",
             "src/assets/textures/sky_night.bmp"
         );
-        skybox.dayLengthSecs = 120.0f;  // 2-minute full day cycle — adjust to taste
+        skybox.dayLengthSecs = 60.0f;  // 2-minute full day cycle — adjust to taste
 
     while (!glfwWindowShouldClose(window))
     {

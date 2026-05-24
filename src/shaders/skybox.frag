@@ -79,11 +79,11 @@ void main()
     // we compare worldDir (also rotated), we actually want to compare against
     // the LOCAL dir of the sun in the sphere's own frame.
     // localPos is pre-rotation, sunLocalDir is also pre-rotation → compare those.
-    float sunF  = discFactor(localPos, sunLocalDir,  sunDiscCos,  0.08);
-    float moonF = discFactor(localPos, moonLocalDir, moonDiscCos, 0.05);
+    float sunF  = discFactor(worldDir, sunLocalDir,  sunDiscCos,  0.08);
+    float moonF = discFactor(worldDir, moonLocalDir, moonDiscCos, 0.05);
 
     // Sun glow: brighten the sky around the sun
-    float sunGlow  = clamp(dot(normalize(localPos), normalize(sunLocalDir)),
+    float sunGlow  = clamp(dot(normalize(worldDir), normalize(sunLocalDir)),
                            0.0, 1.0);
     sunGlow = pow(sunGlow, 6.0) * 0.4;
 
@@ -99,7 +99,7 @@ void main()
     color  = mix(color, moonColor, moonF); // hard moon disc
 
     // Moon has a subtle glow too
-    float moonGlow = clamp(dot(normalize(localPos), normalize(moonLocalDir)),
+    float moonGlow = clamp(dot(normalize(worldDir), normalize(moonLocalDir)),   
                            0.0, 1.0);
     moonGlow = pow(moonGlow, 12.0) * 0.08;
     color += moonGlow * moonColor;
