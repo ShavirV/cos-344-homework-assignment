@@ -1,16 +1,19 @@
 #pragma once
 #include "../core/Mesh.h"
 
-// Hole 3
 class Hole3
 {
 public:
-    static const int MAX_MESHES = 8;
+    static const int MAX_MESHES = 200;
+    // Add this alongside the other static factory declarations in Mesh.h:
+static Mesh makeRamp2(float x0, float y0, float z0,
+                      float x1, float y1, float z1,
+                      float width, float thickness = 0.2f);
 
     Hole3();
     ~Hole3();
 
-    Hole3(const Hole3&)            = delete;
+    Hole3(const Hole3&) = delete;
     Hole3& operator=(const Hole3&) = delete;
 
     void draw(GLuint shaderProgram, bool wireframe = false);
