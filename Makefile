@@ -22,7 +22,7 @@ else
 LDFLAGS := -lglfw3 -lglew32 -lopengl32 -lgdi32
 endif
 # ─── Sources ─────────────────────────────────────────────────────────────────
-SRCS := $(shell find src/ -name "*.cpp")
+SRCS     := $(shell find src/ -name "*.cpp")
 MAIN     := src/scene/main.cpp
 DEV      := src/scene/dev.cpp
 LIB_SRCS := $(filter-out $(MAIN) $(DEV), $(SRCS))

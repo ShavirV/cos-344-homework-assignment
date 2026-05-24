@@ -21,7 +21,10 @@
 //  • All rocks, trees, flowers, bone: placed inside ±13 X, ±6.5 Z
 
 #include "../core/Mesh.h"
+<<<<<<< HEAD
 #include <glm/glm.hpp>
+=======
+>>>>>>> de2741eb2f83b83e3c4a500566631b94f92b8c00
 
 class Hole5
 {
@@ -33,10 +36,14 @@ public:
 
     void translate(float x, float y, float z);
     void rotate(float angle, float ax, float ay, float az);
+<<<<<<< HEAD
     void draw(GLuint shader, bool wireframe,
               const glm::vec3& lightDir   = glm::vec3(0.45f, 0.80f, 0.35f),
               const glm::vec3& lightColor = glm::vec3(1.00f, 0.97f, 0.90f),
               const glm::vec3& camPos     = glm::vec3(0.0f));
+=======
+    void draw(GLuint shader, bool wireframe);
+>>>>>>> de2741eb2f83b83e3c4a500566631b94f92b8c00
 
 private:
     Mesh* meshes[MAX_MESHES];
