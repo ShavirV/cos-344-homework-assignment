@@ -158,9 +158,9 @@ int main()
         // hole16.update(deltaTime);
 
         //ground.draw(shader, false);
-        hole9e.draw(shader, false);
-        hole9w.draw(shader, false);
-        //hole11.draw(shader,false);
+        // hole9e.draw(shader, false);
+        // hole9w.draw(shader, false);
+        hole11.draw(shader,false);
         //hole16.draw(shader, false);
 
         //hole12.draw(shader,false);

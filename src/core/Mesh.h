@@ -178,7 +178,7 @@ static void buildHoleMeshes(float rotY, Mesh** out, int& count, int maxCount)
     // The ramp is a cuboid rotated to slope between the two Y values; its
     // length is the 3-D distance between the two end-centres and its height
     // is 0.2 (same as a fairway) before rotation.
-    static Mesh makeRamp(float x0, float y0, float z0,
+    static Mesh makeRamp2(float x0, float y0, float z0,
                          float x1, float y1, float z1,
                          float width = 8.0f);
 

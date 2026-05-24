@@ -644,7 +644,7 @@ Mesh Mesh::makeConnector(float cx, float cy, float cz,
 // The ramp top surface normal will be tilted from vertical by the slope angle,
 // which looks correct.  Thickness is 0.2 (same as a fairway) before tilt.
 //
-Mesh Mesh::makeRamp(float x0, float y0, float z0,
+Mesh Mesh::makeRamp2(float x0, float y0, float z0,
                     float x1, float y1, float z1,
                     float width)
 {
