@@ -6,11 +6,12 @@
 // shared dynamic skybox driving the time-of-day lighting.
 //
 // Holes:
-//   1 / 2 / 3   - Ayush's Hole 13 / 14 / 15
-//   4           - Shav's   Hole 16
-//   5 / 6 / 7 / 8 - Diya's Hole 5 / 6 / 7 / 8
+//   1 / 2 / 3      - Ayush's Hole 13 / 14 / 15
+//   4              - Shav's   Hole 16
+//   5 / 6 / 7 / 8  - Diya's  Hole 5 / 6 / 7 / 8
+//   9 / 10 / 11    - Hole 10 / 11 / 12
 //
-// All Mesh-based holes (5/6/7/8/16) render through the SAME shader as the
+// All Mesh-based holes (5/6/7/8/10/11/12/16) render through the SAME shader as the
 // per-vertex-colour holes (13/14/15) — Mesh.cpp feeds the per-mesh r/g/b
 // to the shader via a constant vertex attribute, so the procedural turf/
 // kerb classifier in fragment.glsl picks the right look automatically.
@@ -27,7 +28,7 @@
 // Both controllers coexist; C toggles which one drives the view+input.
 //
 // Controls:
-//   1 / 2 / 3 / 4 / 5 / 6 / 7 / 8   switch hole (13/14/15/16/5/6/7/8 respectively)
+//   1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 0 / -   switch hole (13/14/15/16/5/6/7/8/10/11/12)
 //   C              toggle FLY-CAMERA <-> DRONE
 //   R              re-frame the active controller on the current hole
 //
@@ -86,6 +87,9 @@
 #include "../objects/Hole6.h"
 #include "../objects/Hole7.h"
 #include "../objects/Hole8.h"
+#include "../objects/Hole10.h"
+#include "../objects/Hole11.h"
+#include "../objects/Hole12.h"
 
 #include "../camera/Drone.h"
 
@@ -250,6 +254,10 @@ static Hole5*  g_h5  = NULL;
 static Hole6*  g_h6  = NULL;
 static Hole7*  g_h7  = NULL;
 static Hole8*  g_h8  = NULL;
+// Holes 10 / 11 / 12 — same Mesh-based pattern.
+static Hole10* g_h10 = NULL;
+static Hole11* g_h11 = NULL;
+static Hole12* g_h12 = NULL;
 static Skybox  g_skybox;
 
 static void frameCurrent() {
@@ -269,6 +277,13 @@ static void frameCurrent() {
     if (g_activeHole == 6  && g_h6)  { c = glm::vec3(-14.0f, 0.5f,  -7.5f); r = 22.0f; }
     if (g_activeHole == 7  && g_h7)  { c = glm::vec3( 14.0f, 0.5f,   7.5f); r = 22.0f; }
     if (g_activeHole == 8  && g_h8)  { c = glm::vec3( 42.0f, 0.5f,  22.5f); r = 22.0f; }
+    // Holes 10 / 11 / 12: centred at their world translation origin.
+    // Hole10 is 48 units long; framing radius 35 gives a comfortable overview.
+    if (g_activeHole == 10 && g_h10) { c = glm::vec3(  0.0f, 2.0f,   0.0f); r = 35.0f; }
+    // Hole11 L-shape spans ~28 along X then ~28 along Z; 30 covers the corner.
+    if (g_activeHole == 11 && g_h11) { c = glm::vec3(  0.0f, 1.0f,  14.0f); r = 30.0f; }
+    // Hole12 hourglass is 28 units long; 22 shows both wide ends.
+    if (g_activeHole == 12 && g_h12) { c = glm::vec3(  0.0f, 0.5f,   0.0f); r = 22.0f; }
     g_cam.frameOn(c, r);
     g_drone.frameOn(c, r);   // also reframe the drone so R works in either mode
 }
@@ -292,6 +307,10 @@ static void key_cb(GLFWwindow* w, int key, int /*sc*/, int action, int /*mods*/)
     if (key == GLFW_KEY_6) { g_activeHole = 6;  g_needFrame = true; }
     if (key == GLFW_KEY_7) { g_activeHole = 7;  g_needFrame = true; }
     if (key == GLFW_KEY_8) { g_activeHole = 8;  g_needFrame = true; }
+    // Holes 10 / 11 / 12 on keys 9 / 0 / minus.
+    if (key == GLFW_KEY_9)     { g_activeHole = 10; g_needFrame = true; }
+    if (key == GLFW_KEY_0)     { g_activeHole = 11; g_needFrame = true; }
+    if (key == GLFW_KEY_MINUS) { g_activeHole = 12; g_needFrame = true; }
     if (key == GLFW_KEY_R) g_needFrame = true;
     if (key == GLFW_KEY_TAB) {
         g_wireframe = !g_wireframe;
@@ -424,6 +443,12 @@ int main() {
     Hole7 hole7;  g_h7 = &hole7;  hole7.translate( 14.0f, 0.35f,   7.5f);
     Hole8 hole8;  g_h8 = &hole8;  hole8.translate( 42.0f, 0.35f,  22.5f);
 
+    // Holes 10 / 11 / 12 — same Mesh-based pattern as Diya's holes.
+    // Positioned at the world origin; the camera reframes onto them via R.
+    Hole10 hole10;  g_h10 = &hole10;
+    Hole11 hole11;  g_h11 = &hole11;
+    Hole12 hole12;  g_h12 = &hole12;
+
     // Drone shares the same shader program — it uses the same vertex layout
     // (pos / normal / colour) as the holes, so all uniforms line up.
     g_drone.init(program);
@@ -442,7 +467,7 @@ int main() {
     double prevTime = glfwGetTime();
     std::cout
         << "Controls:\n"
-        << "  1 / 2 / 3 / 4 / 5 / 6 / 7 / 8   select Hole 13/14/15/16/5/6/7/8\n"
+        << "  1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 0 / -   select Hole 13/14/15/16/5/6/7/8/10/11/12\n"
         << "  C              toggle FLY-CAMERA <-> DRONE mode\n"
         << "  R              reframe view on current hole\n"
         << "  Fly-camera (default):\n"
@@ -595,15 +620,19 @@ int main() {
                 break;
             }
 
-            // Diya's Mesh-based holes. No water animation, no setCameraData
-            // contract — just draw against the shared program. The program-
-            // wide uniforms (view/projection/uLightColor/uAmbient) were set
-            // above before this switch, so each Mesh::draw inside the hole
-            // picks them up automatically when it binds the program.
-            case 5: hole5.draw(program, g_wireframe); break;
-            case 6: hole6.draw(program, g_wireframe); break;
-            case 7: hole7.draw(program, g_wireframe); break;
-            case 8: hole8.draw(program, g_wireframe); break;
+            // Diya's Mesh-based holes. Forward the skybox-driven light direction,
+            // colour, and eye position so lighting tracks the time-of-day cycle.
+            case 5: hole5.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
+            case 6: hole6.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
+            case 7: hole7.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
+            case 8: hole8.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
+
+            // Holes 10 / 11 / 12 — identical Mesh-based pattern.
+            // Program-wide uniforms (view/projection/uLightColor/uAmbient/
+            // uLightDir) are already set above; Mesh::draw picks them up.
+            case 10: hole10.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
+            case 11: hole11.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
+            case 12: hole12.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
 
             default: hole13.draw(view, proj, lightDir, eyePos); break;
         }

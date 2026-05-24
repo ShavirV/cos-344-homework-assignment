@@ -1,42 +1,28 @@
 #pragma once
 #include "../core/Mesh.h"
+#include <glm/glm.hpp>
 
-// Hole 9 — East exit fairway
-//
-// All meshes are built at the origin. The caller is responsible for
-// positioning the hole via translate() and rotate() before drawing.
-// Both methods apply to every mesh in the hole so the whole thing
-// moves / rotates as one unit.
-//
-// MAX_MESHES controls how many mesh objects this hole can hold.
-// Increase it as more objects (flags, walls, etc.) are added.
 class Hole11
 {
 public:
     static const int MAX_MESHES = 12;
 
-    // rotY: optional Y-axis rotation in degrees (0 = length runs along X).
     Hole11(float s = 1.0f);
     ~Hole11();
 
-    // Non-copyable — meshes own GPU buffers.
     Hole11(const Hole11&)            = delete;
     Hole11& operator=(const Hole11&) = delete;
 
-    // Draw all meshes belonging to this hole.
-    void draw(GLuint shaderProgram, bool wireframe = false);
-
-    // Translate all meshes by (x, y, z).
+    void draw(GLuint shaderProgram, bool wireframe = false,
+              const glm::vec3& lightDir   = glm::vec3(0.45f, 0.80f, 0.35f),
+              const glm::vec3& lightColor = glm::vec3(1.00f, 0.97f, 0.90f),
+              const glm::vec3& camPos     = glm::vec3(0.0f));
     void translate(float x, float y, float z);
-
-    // Rotate all meshes around the world origin by angle degrees.
-    // Call before translate() to rotate in place about the hole centre.
     void rotate(float angle, float ax, float ay, float az);
 
 private:
-    Mesh* meshes[MAX_MESHES];   // owning pointers
+    Mesh* meshes[MAX_MESHES];
     int   meshCount;
 
-    // Add a heap-allocated mesh to the array.
     void addMesh(Mesh* m);
 };

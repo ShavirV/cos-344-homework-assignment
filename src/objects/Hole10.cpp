@@ -1,7 +1,9 @@
 #include "Hole10.h"
 #include <cmath>
+#include <GL/glew.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Height function — drives the entire surface as one continuous terrain.
@@ -113,6 +115,7 @@ Hole10::Hole10(float scale)
     // Terrain is centred at origin by makeHeightmapTerrain.
     // Shift so the left end starts at x=0 (caller translates to world pos).
     terrain->translate(0.0f, 0.0f, 0.0f);
+    terrain->setup();
     addMesh(terrain);
 
     // ── Left-section rocks — dense cluster on the far left ───────────────────
@@ -181,8 +184,19 @@ void Hole10::addRock(float x, float y, float z, float scale)
     addMesh(r);
 }
 
-void Hole10::draw(GLuint shaderProgram, bool wireframe)
+void Hole10::draw(GLuint shaderProgram, bool wireframe,
+                  const glm::vec3& lightDir,
+                  const glm::vec3& lightColor,
+                  const glm::vec3& camPos)
 {
+    glUseProgram(shaderProgram);
+    GLint locLD = glGetUniformLocation(shaderProgram, "uLightDir");
+    GLint locVP = glGetUniformLocation(shaderProgram, "uViewPos");
+    GLint locLC = glGetUniformLocation(shaderProgram, "uLightColor");
+    if (locLD != -1) glUniform3fv(locLD, 1, glm::value_ptr(glm::normalize(lightDir)));
+    if (locVP != -1) glUniform3fv(locVP, 1, glm::value_ptr(camPos));
+    if (locLC != -1) glUniform3fv(locLC, 1, glm::value_ptr(lightColor));
+
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shaderProgram, wireframe);
 }

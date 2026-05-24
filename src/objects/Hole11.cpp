@@ -1,4 +1,6 @@
 #include "Hole11.h"
+#include <GL/glew.h>
+#include <glm/gtc/type_ptr.hpp>
 
 Hole11::Hole11(float s)
     : meshCount(0)
@@ -77,8 +79,19 @@ void Hole11::addMesh(Mesh* m)
         meshes[meshCount++] = m;
 }
 
-void Hole11::draw(GLuint shaderProgram, bool wireframe)
+void Hole11::draw(GLuint shaderProgram, bool wireframe,
+                  const glm::vec3& lightDir,
+                  const glm::vec3& lightColor,
+                  const glm::vec3& camPos)
 {
+    glUseProgram(shaderProgram);
+    GLint locLD = glGetUniformLocation(shaderProgram, "uLightDir");
+    GLint locVP = glGetUniformLocation(shaderProgram, "uViewPos");
+    GLint locLC = glGetUniformLocation(shaderProgram, "uLightColor");
+    if (locLD != -1) glUniform3fv(locLD, 1, glm::value_ptr(glm::normalize(lightDir)));
+    if (locVP != -1) glUniform3fv(locVP, 1, glm::value_ptr(camPos));
+    if (locLC != -1) glUniform3fv(locLC, 1, glm::value_ptr(lightColor));
+
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shaderProgram, wireframe);
 }
