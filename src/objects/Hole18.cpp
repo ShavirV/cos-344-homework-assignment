@@ -62,6 +62,19 @@ static const float TEE_R         =  2.0f;
 static const float TEE_X         =  9.5f;
 static const float TEE_Z         =  0.0f;
 
+// ── Tee stairs ───────────────────────────────────────────────────────────────
+static const int   TEE_STAIR_COUNT        = 5;
+static const float TEE_STAIR_WIDTH        = 1.2f;
+static const float TEE_STAIR_HEIGHT       = TOP_TEE_Y / TEE_STAIR_COUNT;
+static const float TEE_STAIR_DEPTH        = 0.30f;
+static const float TEE_STAIR_TOTAL_WIDTH  = 5.0f;
+
+// Starts slightly before tee and climbs toward it
+static const float TEE_STAIR_START_X =
+    TEE_X - (TEE_STAIR_COUNT * TEE_STAIR_WIDTH);
+
+static const float TEE_STAIR_Z = TEE_Z;
+
 // ── Green ─────────────────────────────────────────────────────────────────────
 // Green is at the 360° (=0°) point of the bottom arc, mid-radius = 9.5
 // in world space that's (BOT_CX + 9.5, botArcHeight(1,0.5), BOT_CZ).
@@ -69,6 +82,15 @@ static const float GREEN_R       =  3.6f;
 static const float GREEN_X       =  -19.0f;   // relative to BOT_CX
 static const float GREEN_Z_REL   =  0.0f;   // relative to BOT_CZ (it's at 0° of bot arc)
 
+static const float FLAG_POLE_H = 2.2f;
+static const float FLAG_POLE_R = 0.05f;
+
+static const float FLAG_W      = 0.7f;
+static const float FLAG_H      = 0.4f;
+static const float FLAG_D      = 0.02f;
+
+static const float HOLE_CUP_R  = 0.12f;
+static const float HOLE_CUP_H  = 0.08f;
 // ── Stream ────────────────────────────────────────────────────────────────────
 // Flows diagonally across the waist of the S, roughly NE to SW.
 // Modelled as a single WaterMesh plane at the waist.
@@ -288,6 +310,99 @@ Hole18::Hole18() : meshCount(0)
         addMesh(gKerb);
     }
 
+        // ── [11] Tee stairs ──────────────────────────────────────────────────────────
+    {
+        std::vector<Mesh> stairMeshes;
+
+        Mesh::makeSteppedTerrain(
+            stairMeshes,
+            TEE_STAIR_START_X,          // x
+            TEE_STAIR_Z,                // z
+            TEE_STAIR_COUNT,            // stepsX
+            1,                          // stepsZ
+            TEE_STAIR_WIDTH,            // stepWidth
+            TEE_STAIR_HEIGHT,           // stepHeight
+            TEE_STAIR_DEPTH,            // riserDepth
+            0.45f, 0.43f, 0.40f, 1.0f  // stone colour
+        );
+
+        for (Mesh& s : stairMeshes)
+        {
+            s.translate(
+                0.0f,
+                0.0f,
+                -TEE_STAIR_TOTAL_WIDTH * 0.5f + TEE_STAIR_WIDTH * 0.5f
+            );
+
+            Mesh* stair = new Mesh(std::move(s));
+            addMesh(stair);
+        }
+    }
+
+    // ── [24] Flag pole ────────────────────────────────────────────────────────
+    {
+        // Match exact green centre from [10]
+        float gx = BOT_CX + (BOT_INNER_R + BOT_OUTER_R) * 0.5f + GREEN_X;
+        float gz = BOT_CZ + GREEN_Z_REL;
+        float gY = botArcHeight(1.0f, 0.5f) + 1.0f;
+
+        Mesh* pole = new Mesh(Mesh::makeCylinder(
+            FLAG_POLE_R, FLAG_POLE_H, 8,
+            0.85f, 0.85f, 0.85f, 1.0f));
+
+        // Cylinder origin is centered vertically
+        pole->translate(
+            gx,
+            gY + FLAG_POLE_H * 0.5f,
+            gz
+        );
+
+        pole->setup();
+        addMesh(pole);
+    }
+
+    // ── [25] Flag mesh ────────────────────────────────────────────────────────
+    {
+        float gx = BOT_CX + (BOT_INNER_R + BOT_OUTER_R) * 0.5f + GREEN_X;
+        float gz = BOT_CZ + GREEN_Z_REL;
+        float gY = botArcHeight(1.0f, 0.5f) + 1.0f;
+
+        Mesh* flag = new Mesh(Mesh::makeCuboid(
+            FLAG_W, FLAG_H, FLAG_D,
+            0.85f, 0.10f, 0.08f, 1.0f));
+
+        // Offset from pole so it hangs outward
+        flag->translate(
+            gx + FLAG_W * 0.5f,
+            gY + FLAG_POLE_H * 0.82f,
+            gz
+        );
+
+        flag->setup();
+        addMesh(flag);
+    }
+
+    // ── [26] Hole cup ─────────────────────────────────────────────────────────
+    {
+        float gx = BOT_CX + (BOT_INNER_R + BOT_OUTER_R) * 0.5f + GREEN_X;
+        float gz = BOT_CZ + GREEN_Z_REL;
+        float gY = botArcHeight(1.0f, 0.5f) + 1.0f;
+
+        Mesh* cup = new Mesh(Mesh::makeCylinder(
+            HOLE_CUP_R, HOLE_CUP_H, 16,
+            0.05f, 0.05f, 0.05f, 1.0f));
+
+        // Slightly above green to avoid z-fighting
+        cup->translate(
+            gx,
+            gY + 0.01f,
+            gz
+        );
+
+        cup->setup();
+        addMesh(cup);
+    }
+
     // ── [11] Bridge deck ─────────────────────────────────────────────────────
     // Wooden bridge spanning the stream. The deck sits just above stream Y.
     {
@@ -318,26 +433,6 @@ Hole18::Hole18() : meshCount(0)
                          BRIDGE_CZ + cosf(glm::radians(BRIDGE_ROT)) * (BRIDGE_W * 0.5f - 0.1f));
         railR->setup();
         addMesh(railR);
-    }
-
-    // ── [12–14] Hill bumps ────────────────────────────────────────────────────
-    {
-        for (int hi = 0; hi < 5; hi++)
-        {
-            const H18Hill& h = HILLS[hi];
-            float baseY = h.topArc
-                ? topArcHeight(h.arcT, h.radT)
-                : botArcHeight(h.arcT, h.radT);
-            float wz = h.topArc ? h.z : (h.z + 0.0f); // already world Z for bot
-
-            Mesh* bump = new Mesh(Mesh::makeHill(
-                2.0f, 1.8f, 4.5f, 4.0f, h.h,
-                0.10f, 0.45f, 0.08f, 1.0f));
-            bump->translate(h.x, baseY, wz);
-            bump->rotate((float)hi * 42.0f, 0.0f, 1.0f, 0.0f);
-            bump->setup();
-            addMesh(bump);
-        }
     }
 
     // ── [15–17] Rock obstacles ────────────────────────────────────────────────
@@ -433,6 +528,44 @@ Hole18::Hole18() : meshCount(0)
         bank->setup();
         addMesh(bank);
     }
+
+    {
+        waterLake2 = new WaterMesh();
+        waterLake2->planeWidth     = LAKE_W;
+        waterLake2->planeLength    = LAKE_L;
+        waterLake2->gridResolution = 48;
+
+        // Lake is calm — very gentle waves
+        waterLake2->waves[0] = { glm::vec2( 1.0f,  0.0f), 0.04f, 5.0f };
+        waterLake2->waves[1] = { glm::vec2( 0.0f,  1.0f), 0.03f, 4.0f };
+        waterLake2->waves[2] = { glm::vec2( 0.7f,  0.7f), 0.02f, 3.0f };
+        waterLake2->waves[3] = { glm::vec2(-0.5f,  0.5f), 0.015f,2.0f };
+
+        waterLake2->scrollSpeed0  = 0.03f;
+        waterLake2->scrollSpeed1  = 0.02f;
+        waterLake2->colorShallow  = glm::vec3(0.20f, 0.48f, 0.58f);
+        waterLake2->colorDeep     = glm::vec3(0.02f, 0.12f, 0.28f);
+        waterLake2->foamThreshold = 0.18f;   // almost no foam — still lake
+
+        waterLake2->modelMatrix =
+            glm::translate(glm::mat4(1.0f),
+                glm::vec3(LAKE_CX+17, LAKE_Y, LAKE_CZ));
+
+        waterLake2->init(
+            "src/shaders/water.vert",
+            "src/shaders/water.frag",
+            "src/assets/textures/water_normal.bmp",
+            "src/assets/textures/water_normal2.bmp",
+            "src/assets/textures/water_foam.bmp");
+
+        // Lake bank — low retaining wall around the lake pocket
+        Mesh* bank = new Mesh(Mesh::makeCylinder(
+            LAKE_W * 0.55f, 0.30f, 32,
+            0.58f, 0.52f, 0.42f, 1.0f));
+        bank->translate(LAKE_CX+17, LAKE_Y - 0.05f, LAKE_CZ);
+        bank->setup();
+        addMesh(bank);
+    }
 }
 
 // =============================================================================
@@ -446,6 +579,7 @@ Hole18::~Hole18()
     }
     delete waterStream;
     delete waterLake;
+    delete waterLake2;
 }
 
 void Hole18::addMesh(Mesh* m)
@@ -461,6 +595,7 @@ void Hole18::update(float deltaTime)
 {
     if (waterStream) waterStream->update(deltaTime);
     if (waterLake)   waterLake->update(deltaTime);
+    if (waterLake2)   waterLake2->update(deltaTime);
 }
 
 void Hole18::setCameraData(const glm::mat4& view,
@@ -483,6 +618,7 @@ void Hole18::draw(GLuint shaderProgram, bool wireframe)
     // Water last — alpha blended, depth mask off (handled inside WaterMesh)
     if (waterStream) waterStream->draw(camView, camProj, camPos);
     if (waterLake)   waterLake->draw(camView, camProj, camPos);
+    if (waterLake2)   waterLake2->draw(camView, camProj, camPos);
 }
 
 // =============================================================================

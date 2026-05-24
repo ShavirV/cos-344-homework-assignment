@@ -49,6 +49,7 @@ private:
 
     WaterMesh*  waterStream = nullptr;
     WaterMesh*  waterLake   = nullptr;
+    WaterMesh*  waterLake2   = nullptr;
 
     // Cached camera data for water draw
     glm::mat4 camView = glm::mat4(1.0f);
