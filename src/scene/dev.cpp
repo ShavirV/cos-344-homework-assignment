@@ -11,6 +11,7 @@
 
 #include "../objects/Hole9E.h"
 #include "../objects/Hole9W.h"
+#include "../objects/Hole10.h"
 #include "../objects/Hole11.h"
 #include "../objects/Hole12.h"
 #include "../objects/Hole16.h"
@@ -134,6 +135,11 @@ int main()
     Hole12 hole12;
     hole12.translate(0.0f, 0.35f, -8.0f);
 
+    Hole10 hole10;
+    hole10.translate(0.0f, 0.35f, -8.0f);
+
+
+
 
     while (!glfwWindowShouldClose(window))
     {
@@ -157,7 +163,8 @@ int main()
         //hole11.draw(shader,false);
         //hole16.draw(shader, false);
 
-        hole12.draw(shader,false);
+        //hole12.draw(shader,false);
+        hole10.draw(shader,false);
         
 
         glfwSwapBuffers(window);

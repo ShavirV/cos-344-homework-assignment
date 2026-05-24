@@ -1,0 +1,26 @@
+#pragma once
+#include "../core/Mesh.h"
+
+class Hole10
+{
+public:
+    static const int MAX_MESHES = 32;
+
+    Hole10(float scale = 1.0f);
+    ~Hole10();
+
+    Hole10(const Hole10&)            = delete;
+    Hole10& operator=(const Hole10&) = delete;
+
+    void draw(GLuint shaderProgram, bool wireframe = false);
+    void translate(float x, float y, float z);
+    void rotate(float angle, float ax, float ay, float az);
+
+private:
+    Mesh* meshes[MAX_MESHES];
+    int   meshCount;
+    float s;   // scale factor cached for helpers
+
+    void addMesh(Mesh* m);
+    void addRock(float x, float y, float z, float scale);
+};
