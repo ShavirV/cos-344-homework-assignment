@@ -520,8 +520,8 @@ Mesh Mesh::makeHill(float topWidth,    float topDepth,
         mesh.addVertex({tFR, n, {1.0f, 0.0f}});
         mesh.addVertex({tBR, n, {1.0f, 1.0f}});
         mesh.addVertex({tBL, n, {0.0f, 1.0f}});
-        mesh.addTriangle(base+0, base+1, base+2);
-        mesh.addTriangle(base+2, base+3, base+0);
+        mesh.addTriangle(base+0, base+2, base+1);
+        mesh.addTriangle(base+2, base+0, base+3);
     }
 
     // Bottom face
@@ -580,8 +580,8 @@ Mesh Mesh::makeHill(float topWidth,    float topDepth,
                 unsigned int bl = startIdx + (row + 1) * cols + col;
                 unsigned int br = startIdx + (row + 1) * cols + col + 1;
 
-                mesh.addTriangle(tl, bl, tr);
-                mesh.addTriangle(tr, bl, br);
+                mesh.addTriangle(tl, tr, bl);
+                mesh.addTriangle(tr, br, bl);
             }
         }
     };
@@ -749,16 +749,6 @@ static float h16_fairwayHeight(float arcT, float radialT)
     float crown = CROWN_AMP * (1.0f - fabsf(radialT * 2.0f - 1.0f));
     return h + crown;
 }
-
-// =============================================================================
-// ADD TO Mesh.cpp — paste after makeRock() (replacing the old arc stubs).
-//
-// All implementations match the winding / normal conventions of the existing
-// primitives: CCW triangles, normals pointing outward / upward.
-// setup() is called before return so the caller never needs to.
-// =============================================================================
-
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mesh::makeArcFairway
