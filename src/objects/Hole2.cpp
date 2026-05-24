@@ -81,7 +81,7 @@ Hole2::Hole2() : meshCount(0)
     // Sloping fairway (ramp from tee area down to ground level)
     // FLIPPED: Starts at x=-8, y=0.0; ends at x=8, y=0.8
     {
-        Mesh* ramp = new Mesh(Mesh::makeRamp(-8.0f, 0.0f, 0.0f, 8.0f, 0.8f, 0.0f, 6.0f));
+        Mesh* ramp = new Mesh(Mesh::makeRamp(-8.0f, -0.02f, 0.0f, 8.0f, 0.3f, 0.0f, 6.0f));
         ramp->setRGBA(C_FAIRWAY);
         ramp->setup();
         addMesh(ramp);

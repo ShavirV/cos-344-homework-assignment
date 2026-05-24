@@ -410,7 +410,9 @@ int main() {
     GLFWwindow* win = glfwCreateWindow(g_winW, g_winH,
         "COS344 - Holes 13/14/15 (1/2/3 select, C toggle drone, R reframe)", NULL, NULL);
     if (!win) {
-        std::cerr << "Window creation failed\n";
+        const char* desc;
+        glfwGetError(&desc);
+        std::cerr << "Window creation failed\n" << desc;
         glfwTerminate(); return 1;
     }
     glfwMakeContextCurrent(win);

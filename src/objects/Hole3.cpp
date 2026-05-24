@@ -158,8 +158,20 @@ void Hole3::draw(GLuint shaderProgram, bool wireframe,
 
 void Hole3::translate(float x, float y, float z)
 {
-    for (int i = 0; i < meshCount; i++)
+    for (int i = 0; i < meshCount; i++){
+
+        if (i == 3)
+        {
+            meshes[i]->rotate(90, 0.0f, 1.0f, 0.0f);
+        }
         meshes[i]->translate(x, y, z);
+        if (i == 3)
+        {
+            meshes[i]->rotate(-90, 0.0f, 1.0f, 0.0f);
+        }
+
+
+    }
 }
 
 void Hole3::rotate(float angle, float ax, float ay, float az)

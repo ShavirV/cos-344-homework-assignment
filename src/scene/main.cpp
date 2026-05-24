@@ -42,6 +42,27 @@
 #include "../core/shader.hpp"
 #include "../core/Mesh.h"
 
+#include "../objects/Hole1.h"
+#include "../objects/Hole2.h"
+#include "../objects/Hole3.h"
+#include "../objects/Hole4.h"
+#include "../objects/Hole5.h"
+#include "../objects/Hole6.h"
+#include "../objects/Hole7.h"
+#include "../objects/Hole8.h"
+#include "../objects/Hole9E.h"
+#include "../objects/Hole9W.h"
+#include "../objects/Hole10.h"
+#include "../objects/Hole11.h"
+#include "../objects/Hole12.h"
+#include "../objects/Hole13.h"
+#include "../objects/Hole14.h"
+#include "../objects/Hole15.h"
+#include "../objects/Hole16.h"
+#include "../objects/Hole17.h"
+#include "../objects/Hole18.h"
+
+
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
 
@@ -108,8 +129,11 @@ int main()
     glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
     GLuint shader = LoadShaders("src/shaders/vertex.glsl", "src/shaders/fragment.glsl");
 
+    GLint locLightColor = glGetUniformLocation(shader, "uLightColor");
+    GLint locAmbient    = glGetUniformLocation(shader, "uAmbient");
+
     // ── Ground ───────────────────────────────────────────────────────────────
-    Mesh ground = Mesh::makeCuboid(210.0f, 0.5f, 125.0f, 0.13f, 0.55f, 0.13f, 1.0f);
+    Mesh ground = Mesh::makeCuboid(400.0f, 0.5f, 150.0f, 0.35f, 0.20f, 0.08f, 1.0f);
     ground.setup();
 
     // ── Volcano ──────────────────────────────────────────────────────────────
@@ -117,83 +141,51 @@ int main()
     volcano.translate(0.0f, 20.0f, -10.0f);
     volcano.setup();
 
-    // ── Tunnel mouths (hole 9 passes through volcano base along X at z=-8) ──
-    Mesh tunnelW = Mesh::makeCylinder(3.5f, 5.5f, 32, 0.22f, 0.14f, 0.05f, 1.0f);
-    tunnelW.rotate(90.0f, 0.0f, 0.0f, 1.0f);
-    tunnelW.translate(-20.0f, 4.0f, -8.0f);
-    tunnelW.setup();
-
-    Mesh tunnelE = Mesh::makeCylinder(3.5f, 5.5f, 32, 0.22f, 0.14f, 0.05f, 1.0f);
-    tunnelE.rotate(90.0f, 0.0f, 0.0f, 1.0f);
-    tunnelE.translate( 20.0f, 4.0f, -8.0f);
-    tunnelE.setup();
-
     // ── Holes — using Mesh::makeHole(cx, cy, cz, rotY) ──────────────────────
     // cy = 0.35 places the fairway flush on top of the ground slab (0.5 tall).
     const float FY = 0.35f;
 
-const float FY = 0.35f;
+    Hole1 h1;
+    h1.translate(-180.0f, 0.35f, 60.0f); //cant rotate 
 
-    Mesh hole1 = Mesh::makeHole();
-    hole1.rotate(0.0f, 0.0f, 1.0f, 0.0f);
-    hole1.translate(-80.0f, FY, +40.0f);   // START
+    Hole2 h2;
+    h2.translate(-170.0f, 0.35f, 40.0f);
 
-    Mesh hole2 = Mesh::makeHole();
-    hole2.translate(-80.0f, FY, +15.0f);
+    Hole3 h3; 
+    h3.translate(-180.0f, 0.35, 20.0f);
 
-    Mesh hole3 = Mesh::makeHole();
-    hole3.translate(-48.0f, FY, +40.0f);
+    Hole4 h4;
+    h4.translate(-150.0f, 0.35f, 20.0f);
 
-    Mesh hole4 = Mesh::makeHole();
-    hole4.translate(-48.0f, FY, +15.0f);
+    Hole5 h5;
+    h5.translate(-175.0f, 0.35, -16.0);
 
-    Mesh hole5 = Mesh::makeHole();
-    hole5.translate(-80.0f, FY,  -8.0f);
+    Hole6 h6;
+    h6.translate(-175.0f, 0.35f, -50.0f);
 
-    Mesh hole6 = Mesh::makeHole();
-    hole6.rotate(90.0f, 0.0f, 1.0f, 0.0f);
-    hole6.translate(-20.0f, FY, +28.0f);
+    Hole7 h7;
+    h7.translate(-150.0f, 0.35f, -35.0f);
 
-    Mesh hole7 = Mesh::makeHole();
-    hole7.translate(-22.0f, FY, -35.0f);
+    Hole8 h8 ;
+    h8.translate(-110.0f, 0.35f, -10.0f);
 
-    Mesh hole8 = Mesh::makeHole();
-    hole8.rotate(90.0f, 0.0f, 1.0f, 0.0f);
-    hole8.translate(-19.0f, FY,  -8.0f);
+    Hole9E h9e;
+    h9e.translate(-55.0f, 0.35, -10.0f);
 
-    // Hole 9 — tunnel west and east use their own classes (with borders + rock)
-    Mesh hole9w = Mesh::makeHole();
-    hole9w.translate(-48.0f, FY, -8.0f);
+    Hole9W h9w;
+    h9w.translate(40.0f, 0.35, -10.0f);
 
-    Mesh hole9e = Mesh::makeHole();
-    hole9e.translate(+48.0f, FY, -8.0f);
+    
+    Hole10 h10; 
+    h10.translate(80.0f, 0.35f, -10.0f);
+    
 
-    Mesh hole10 = Mesh::makeHole();
-    hole10.translate(+22.0f, FY, -35.0f);
+    Hole13 h13;
+    h13.init(shader);
 
-    Mesh hole11 = Mesh::makeHole();
-    hole11.translate(+55.0f, FY, -35.0f);
-
-    Mesh hole12 = Mesh::makeHole();
-    hole12.translate(+80.0f, FY,  -8.0f);
-
-    Mesh hole13 = Mesh::makeHole();
-    hole13.translate(+80.0f, FY, +15.0f);
-
-    Mesh hole14 = Mesh::makeHole();
-    hole14.translate(+80.0f, FY, +40.0f);
-
-    Mesh hole15 = Mesh::makeHole();
-    hole15.translate(+48.0f, FY, +40.0f);
-
-    Mesh hole16 = Mesh::makeHole();
-    hole16.translate(+48.0f, FY, +15.0f);
-
-    Mesh hole17 = Mesh::makeHole();
-    hole17.translate(+16.0f, FY, +40.0f);
-
-    Mesh hole18 = Mesh::makeHole();
-    hole18.translate(+16.0f, FY, +15.0f);  // FINISH
+    Hole18 h18;
+    h18.translate(0.0f, 10.0f, 0.0f);
+    
 
     // ── Shader uniforms ──────────────────────────────────────────────────────
     glUseProgram(shader);
@@ -217,32 +209,80 @@ const float FY = 0.35f;
         glUseProgram(shader);
         glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
+        glUniform3f(locLightColor, 1.0f, 0.95f, 0.85f);   // warm sunlight
+        glUniform3f(locAmbient,    0.15f, 0.15f, 0.20f);   // soft sky bounce
 
         ground.draw(shader, false);
 
-        volcano.draw(shader, false);
-        tunnelW.draw(shader, false);
-        tunnelE.draw(shader, false);
+        h1.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                      // camera position
 
-        hole1.draw(shader,  false);
-        hole2.draw(shader,  false);
-        hole3.draw(shader,  false);
-        hole4.draw(shader,  false);
-        hole5.draw(shader,  false);
-        hole6.draw(shader,  false);
-        hole7.draw(shader,  false);
-        hole8.draw(shader,  false);
-        hole9w.draw(shader, false);
-        hole9e.draw(shader, false);
-        hole10.draw(shader, false);
-        hole11.draw(shader, false);
-        hole12.draw(shader, false);
-        hole13.draw(shader, false);
-        hole14.draw(shader, false);
-        hole15.draw(shader, false);
-        hole16.draw(shader, false);
-        hole17.draw(shader, false);
-        hole18.draw(shader, false);
+        h2.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+        h3.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+        h4.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+        h5.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+        h6.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+        h7.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+        h8.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+        h9e.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+        h9w.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+
+        h10.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
+
+
+        // h13.draw(view, projection,
+        //  glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
+        //  cameraPos);   
+
+         static double lastTime = glfwGetTime();
+        double now      = glfwGetTime();
+        float deltaTime = (float)(now - lastTime);
+        lastTime = now;
+
+        h18.update(deltaTime);
+        h18.setCameraData(view, projection, cameraPos);
+        //h18.draw(shader, false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

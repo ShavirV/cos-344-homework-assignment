@@ -80,85 +80,77 @@ Hole10::Hole10(float scale)
         meshes[i] = nullptr;
 
     // ── Main terrain surface ──────────────────────────────────────────────────
-    // One heightmap covering the full hole: 48 units long, 16 units wide.
-    // segsX=48, segsZ=16 gives sub-unit resolution — smooth ramp and crown.
-    //
-    // The width mask is baked into the height function: vertices outside the
-    // fairway half-width are pushed below ground (y = -2*s) so they are
-    // hidden by the ground plane and never visible to the player.
-
     const float TERRAIN_LEN = 48.0f * s;
     const float TERRAIN_WID = 18.0f * s;
     const int   SEGS_X      = 48;
     const int   SEGS_Z      = 18;
 
-    // Capture s for use inside the lambda (C++11 value capture).
     float sc = s;
 
-    auto heightFn = [sc](float nx, float nz) -> float
-    {
-        // Map nz [0,1] → centred half-width check.
-        float hw   = hole10HalfWidth(nx, sc);
-        float zPos = (nz - 0.5f) * 18.0f * sc;   // world Z relative to centre
+ auto heightFn = [sc](float nx, float nz) -> float
+{
+    float nxMirror = 1.0f - nx;   // flip X so ramp runs right-to-left
 
-        if (fabsf(zPos) > hw)
-            return -2.0f * sc;   // below ground — hidden
+    float hw   = hole10HalfWidth(nxMirror, sc);
+    float zPos = (nz - 0.5f) * 18.0f * sc;
 
-        return hole10Height(nx, nz, sc);
-    };
+    if (fabsf(zPos) > hw)
+        return -2.0f * sc;
+
+    return hole10Height(nxMirror, nz, sc);
+};
 
     Mesh* terrain = new Mesh(Mesh::makeHeightmapTerrain(
         TERRAIN_LEN, TERRAIN_WID,
         SEGS_X, SEGS_Z,
         heightFn,
-        0.2f, 0.62f, 0.22f, 1.0f));   // red fairway
-    // Terrain is centred at origin by makeHeightmapTerrain.
-    // Shift so the left end starts at x=0 (caller translates to world pos).
+        0.2f, 0.62f, 0.22f, 1.0f));
     terrain->translate(0.0f, 0.0f, 0.0f);
     terrain->setup();
     addMesh(terrain);
 
-    // ── Left-section rocks — dense cluster on the far left ───────────────────
-    addRock(-22.0f*s,  3.0f*s,  -9.0f*s, 1.5f*s);
-    addRock(-20.0f*s,  3.0f*s,   9.0f*s, 1.5f*s);
-    addRock(-18.0f*s,  3.0f*s,  -7.0f*s, 1.3f*s);
-    addRock(-16.0f*s,  3.0f*s,   7.5f*s, 1.2f*s);
-    addRock(-14.0f*s,  3.0f*s, -10.0f*s, 1.0f*s);
+    // ── Left-section rocks (mirrored) ────────────────────────────────────────
+    addRock( 22.0f*s,  3.0f*s,   9.0f*s, 1.5f*s);
+    addRock( 20.0f*s,  3.0f*s,  -9.0f*s, 1.5f*s);
+    addRock( 18.0f*s,  3.0f*s,   7.0f*s, 1.3f*s);
+    addRock( 16.0f*s,  3.0f*s,  -7.5f*s, 1.2f*s);
+    addRock( 14.0f*s,  3.0f*s,  10.0f*s, 1.0f*s);
 
-    // ── Ramp-side rocks ───────────────────────────────────────────────────────
-    addRock( -4.0f*s,  1.5f*s,  -6.0f*s, 1.0f*s);
-    addRock( -2.0f*s,  1.5f*s,   6.0f*s, 1.0f*s);
+    // ── Ramp-side rocks (mirrored) ────────────────────────────────────────────
+    addRock(  4.0f*s,  1.5f*s,   6.0f*s, 1.0f*s);
+    addRock(  2.0f*s,  1.5f*s,  -6.0f*s, 1.0f*s);
 
-    // ── Right-section rocks ───────────────────────────────────────────────────
-    addRock( 14.0f*s, -0.65f*s, -9.0f*s, 2.0f*s);
-    addRock( 18.0f*s, -0.65f*s,  8.5f*s, 2.0f*s);
+    // ── Right-section rocks (mirrored) ───────────────────────────────────────
+    addRock(-14.0f*s, -0.65f*s,  9.0f*s, 2.0f*s);
+    addRock(-18.0f*s, -0.65f*s, -8.5f*s, 2.0f*s);
 
-    // ── Cup — dark cylinder at flag position (right end, centre Z) ────────────
+    // ── Cup (mirrored) ────────────────────────────────────────────────────────
     Mesh* cup = new Mesh(Mesh::makeCylinder(
         0.8f*s, 0.15f*s, 32,
         0.08f, 0.08f, 0.08f, 1.0f));
-    cup->translate(-20.0f*s, 4.35f*s, -1.0f*s);
+    cup->translate( 20.0f*s, 4.35f*s,  1.0f*s);
     cup->setup();
     addMesh(cup);
 
-// ── Flag pole ─────────────────────────────────────────────────────────────
-Mesh* pole = new Mesh(Mesh::makeCylinder(
-    0.08f * s, 6.0f * s, 8,
-    0.9f, 0.9f, 0.9f, 1.0f));
-pole->translate(-20.0f * s, 7.35f * s, -1.0f * s);
-pole->setup();
-addMesh(pole);
+    // ── Flag pole (mirrored) ──────────────────────────────────────────────────
+    Mesh* pole = new Mesh(Mesh::makeCylinder(
+        0.08f * s, 6.0f * s, 8,
+        0.9f, 0.9f, 0.9f, 1.0f));
+    pole->translate( 20.0f*s, 7.35f*s,  1.0f*s);
+    pole->setup();
+    addMesh(pole);
 
-// ── Flag ──────────────────────────────────────────────────────────────────
-Mesh* flag1 = new Mesh(Mesh::makeCuboid(
-    1.5f * s, 0.8f * s, 0.3f * s,
-    1.0f, 0.1f, 0.1f, 1.0f));
-flag1->translate(-19.25f * s, 9.85f * s, -1.0f * s);
-flag1->setup();
-addMesh(flag1);
+    // ── Flag (mirrored) ───────────────────────────────────────────────────────
+    Mesh* flag1 = new Mesh(Mesh::makeCuboid(
+        1.5f * s, 0.8f * s, 0.3f * s,
+        1.0f, 0.1f, 0.1f, 1.0f));
+    flag1->translate( 19.25f*s, 9.85f*s,  1.0f*s);
+    flag1->setup();
+    addMesh(flag1);
 
-addRock(-17.0f*s, 4.35f*s, -1.0f*s, 1.8f*s);  // front rock
-addRock(-17.0f*s, 4.35f*s, -4.0f*s, 1.8f*s);
+    // ── Extra rocks (mirrored) ────────────────────────────────────────────────
+    addRock( 17.0f*s, 4.35f*s,  1.0f*s, 1.8f*s);
+    addRock( 17.0f*s, 4.35f*s,  4.0f*s, 1.8f*s);
 }
 
 Hole10::~Hole10()
