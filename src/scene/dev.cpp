@@ -13,6 +13,10 @@
 #include "../objects/Hole9W.h"
 #include "../objects/Hole16.h"
 #include "../objects/Skybox.h"
+#include "../objects/Hole5.h"
+#include "../objects/Hole6.h"
+#include "../objects/Hole7.h"
+#include "../objects/Hole8.h"
 
 const int WIDTH  = 1280;
 const int HEIGHT = 720;
@@ -135,6 +139,30 @@ int main()
             "src/assets/textures/sky_night.bmp"
         );
         skybox.dayLengthSecs = 60.0f;  // 2-minute full day cycle — adjust to taste
+    Hole9W hole9w;
+    hole9w.translate(-48.0f, 0.35f, -8.0f);
+//put mine, call hole7 and variable name
+    
+    // ── Hole 5: Waterfall entry ───────────────────────────────────────────────
+    Hole5 hole5;
+hole5.translate(-42.0f, 0.35f, -22.5f);
+
+    // ── Hole 6: Bridge crossing ───────────────────────────────────────────────
+    Hole6 hole6;
+hole6.translate(-14.0f, 0.35f,  -7.5f);
+ 
+    // ── Hole 7: Swamp hazard ──────────────────────────────────────────────────
+    Hole7 hole7;
+hole7.translate( 14.0f, 0.35f,   7.5f);
+
+ 
+    // ── Hole 8: Downhill drop ─────────────────────────────────────────────────
+    // Hole 8's staircase extends ~47 units in +X, so position accordingly.
+    Hole8 hole8;
+hole8.translate( 42.0f, 0.35f,  22.5f);
+
+
+
 
     while (!glfwWindowShouldClose(window))
     {
@@ -185,6 +213,19 @@ int main()
         // ── Sky (drawn first, depth write off) ───────────────────────────────────
         hole16.draw(shader, false);
         
+
+        ground.draw(shader, false);
+        // hole9e.draw(shader, false);
+        // hole9w.draw(shader, false);
+
+        
+    //put my hole
+        hole5.draw(shader, false);
+        hole6.draw(shader, false);
+        hole7.draw(shader, false);
+        hole8.draw(shader, false);
+ 
+
 
         glfwSwapBuffers(window);
         glfwPollEvents();
