@@ -101,6 +101,22 @@ private:
                    const glm::vec3& poleColour,
                    const glm::vec3& flagColour);
 
+    // Closing boundary wall at the cup end — a kerb-height slab that spans the
+    // full fairway width (plus kerb thickness on each side) so the hole doesn't
+    // just open into empty space.
+    //   centre   — centre of the fairway end-line (mCupEndCentre)
+    //   segDir   — unit vector pointing FROM bend TOWARD the cup end
+    //   halfW    — fairway half-width
+    //   kerbT    — kerb thickness (wall extends this far beyond each edge)
+    //   wallT    — wall thickness along segDir
+    //   wallH    — wall height above fairway top
+    void buildEndWall(const glm::vec3& centre,
+                      const glm::vec3& segDir,
+                      float halfW,
+                      float kerbT,
+                      float wallT,
+                      float wallH);
+
     // One quad (two triangles) with a flat per-quad normal.
     void pushQuad(const glm::vec3& a, const glm::vec3& b,
                   const glm::vec3& c, const glm::vec3& d,

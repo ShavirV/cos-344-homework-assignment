@@ -493,6 +493,57 @@ void Hole14::buildTeePlatform(const glm::vec3& centre,
 }
 
 // =============================================================================
+// End wall — closing boundary wall at the cup end of the ribbon
+// =============================================================================
+//
+// A short upright slab that caps the open end of the fairway + kerbs at s=1
+// so the hole reads as enclosed rather than cut off in mid-air. The wall
+// spans the full kerb-to-kerb width and matches the kerb height.
+
+void Hole14::buildEndWall(const glm::vec3& centre,
+                          const glm::vec3& segTan,
+                          float halfW,
+                          float kerbT,
+                          float wallT,
+                          float wallH)
+{
+    // Horizontal side vector (same derivation as in buildKerbRibbon).
+    glm::vec3 t    = glm::normalize(segTan);
+    glm::vec3 side = glm::cross(t, glm::vec3(0.0f, 1.0f, 0.0f));
+    float sLen = glm::length(side);
+    if (sLen < 1e-6f) side = glm::vec3(1.0f, 0.0f, 0.0f);
+    else              side /= sLen;
+
+    float span  = halfW + kerbT;   // half-span including kerbs
+    float baseY = centre.y;        // fairway surface height at s=1
+    float topY  = baseY + wallH;
+
+    // Near edge (at the cup end of the ribbon) and far edge (wallT beyond).
+    glm::vec3 BL  = centre + span * side;
+    glm::vec3 BR  = centre - span * side;
+    glm::vec3 BLf = BL + wallT * t;
+    glm::vec3 BRf = BR + wallT * t;
+
+    glm::vec3 TL  (BL.x,  topY, BL.z);
+    glm::vec3 TR  (BR.x,  topY, BR.z);
+    glm::vec3 TLf (BLf.x, topY, BLf.z);
+    glm::vec3 TRf (BRf.x, topY, BRf.z);
+
+    // Inner face (faces back up the fairway, normal = -t)
+    pushQuad(BR, BL, TL, TR, -t, COLOR_KERB);
+    // Outer face (back of wall, normal = +t)
+    pushQuad(BLf, BRf, TRf, TLf, t, COLOR_KERB);
+    // Top face
+    pushQuad(TL, TR, TRf, TLf, glm::vec3(0, 1, 0), COLOR_KERB);
+    // Left side (+side)
+    pushQuad(BLf, BL, TL, TLf, side, COLOR_KERB);
+    // Right side (-side)
+    pushQuad(BR, BRf, TRf, TR, -side, COLOR_KERB);
+    // Bottom (hidden)
+    pushQuad(BL, BLf, BRf, BR, glm::vec3(0, -1, 0), COLOR_KERB);
+}
+
+// =============================================================================
 // Cup + flag
 // =============================================================================
 
@@ -585,15 +636,36 @@ void Hole14::init(GLuint shaderProgram)
     }
 
     // ── 4. Cup + flag at s=1 ────────────────────────────────────────────────
+    // Pull the cup inward (away from the end wall) so it doesn't clip through.
+    // The wall's inner face sits at centreline(1.0); offset by CUP_RADIUS + a
+    // small clearance gap back along -tangent (toward the tee).
     {
-        glm::vec3 cupCentre = centreline(1.0f);
+        glm::vec3 cupEnd = centreline(1.0f);
+        glm::vec3 cupTan = tangent(1.0f);
+        const float CUP_WALL_CLEARANCE = 0.3f;
+        glm::vec3 cupCentre = cupEnd - (CUP_RADIUS + CUP_WALL_CLEARANCE) * cupTan;
+
         buildCup(cupCentre, COLOR_CUP);
         glm::vec3 poleBase(cupCentre.x, cupCentre.y, cupCentre.z);
         buildFlag(poleBase, POLE_HEIGHT, POLE_RADIUS,
                   COLOR_POLE, COLOR_FLAG);
     }
 
-    // ── 5. Upload to GPU ────────────────────────────────────────────────────
+    // ── 5. Closing boundary wall at the cup end ──────────────────────────────
+    // The wall spans the full kerb-to-kerb width at s=1, capping the open end
+    // of the fairway so the flag doesn't float at the boundary of nothing.
+    {
+        glm::vec3 cupCentre = centreline(1.0f);
+        glm::vec3 cupTan    = tangent(1.0f);
+        buildEndWall(cupCentre,
+                     cupTan,
+                     BASE_HALF_W,
+                     KERB_THICKNESS,
+                     /*wallT=*/KERB_THICKNESS,
+                     /*wallH=*/KERB_HEIGHT);
+    }
+
+    // ── 6. Upload to GPU ────────────────────────────────────────────────────
     if (mVertices.empty() || mIndices.empty())
     {
         std::cerr << "Hole14::init — no geometry was generated!" << std::endl;

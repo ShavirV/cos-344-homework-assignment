@@ -546,6 +546,57 @@ void Hole13::buildArcKerbs(const glm::vec3& arcCentre,
 }
 
 // =============================================================================
+// End wall — closing boundary at the cup end of the fairway
+// =============================================================================
+//
+// A flat slab standing upright across the full width of the hole (fairway +
+// both kerbs). It sits flush against the cup-end edge of the fairway slab,
+// is as tall as the kerbs, and thick enough to be clearly visible from above.
+
+void Hole13::buildEndWall(const glm::vec3& centre,
+                          const glm::vec3& segDir,
+                          float halfW,
+                          float kerbT,
+                          float wallT,
+                          float wallH)
+{
+    glm::vec3 perp = perpXZ(segDir);   // perpendicular to segDir in XZ
+
+    float span = halfW + kerbT;   // half-span including kerbs
+
+    // Near edge (flush with the end of the slab) and far edge (wallT behind it)
+    glm::vec3 botL  = centre + span * perp;
+    glm::vec3 botR  = centre - span * perp;
+    glm::vec3 botLf = botL + wallT * segDir;
+    glm::vec3 botRf = botR + wallT * segDir;
+
+    float baseY = FAIRWAY_TOP_Y;
+    float topY  = FAIRWAY_TOP_Y + wallH;
+
+    glm::vec3 TL  (botL.x,  topY,  botL.z);
+    glm::vec3 TR  (botR.x,  topY,  botR.z);
+    glm::vec3 TLf (botLf.x, topY,  botLf.z);
+    glm::vec3 TRf (botRf.x, topY,  botRf.z);
+    glm::vec3 BL  (botL.x,  baseY, botL.z);
+    glm::vec3 BR  (botR.x,  baseY, botR.z);
+    glm::vec3 BLf (botLf.x, baseY, botLf.z);
+    glm::vec3 BRf (botRf.x, baseY, botRf.z);
+
+    // Inner face (facing the tee, normal = -segDir)
+    pushQuad(BR, BL, TL, TR, -segDir, COLOR_KERB);
+    // Outer face (back of wall, normal = +segDir)
+    pushQuad(BLf, BRf, TRf, TLf, segDir, COLOR_KERB);
+    // Top face
+    pushQuad(TL, TR, TRf, TLf, glm::vec3(0, 1, 0), COLOR_KERB);
+    // Left side (+perp)
+    pushQuad(BLf, BL, TL, TLf, perp, COLOR_KERB);
+    // Right side (-perp)
+    pushQuad(BR, BRf, TRf, TR, -perp, COLOR_KERB);
+    // Bottom (hidden, faces down)
+    pushQuad(BL, BLf, BRf, BR, glm::vec3(0, -1, 0), COLOR_KERB);
+}
+
+// =============================================================================
 // Flag (pole + triangular pennant)
 // =============================================================================
 
@@ -665,8 +716,15 @@ void Hole13::init(GLuint shaderProgram)
     }
 
     // ── 4. Cup + flag at the cup end ────────────────────────────────────────
+    // Pull the cup inward (away from the end wall) so it doesn't clip through.
+    // The wall's inner face sits at mCupEndCentre; offset by CUP_RADIUS + a
+    // small clearance gap back along -dirB (toward the bend).
     {
-        glm::vec3 c = mCupEndCentre;
+        float halfInt = glm::radians(BEND_INTERIOR_DEG * 0.5f);
+        glm::vec3 dB(-std::sin(halfInt), 0.0f, std::cos(halfInt));
+        const float CUP_WALL_CLEARANCE = 0.3f;   // gap between cup edge and wall
+        glm::vec3 c = mCupEndCentre - (CUP_RADIUS + CUP_WALL_CLEARANCE) * dB;
+
         glm::vec3 cmn(c.x - CUP_RADIUS,
                       c.y - CUP_DEPTH,
                       c.z - CUP_RADIUS);
@@ -680,7 +738,22 @@ void Hole13::init(GLuint shaderProgram)
                   COLOR_POLE, COLOR_FLAG);
     }
 
-    // ── 5. Upload to GPU ────────────────────────────────────────────────────
+    // ── 5. Closing boundary wall at the cup end ──────────────────────────────
+    // dirB points from the bend toward the cup end — use the same value as
+    // computed above (segment B's direction, already in scope).
+    {
+        // Recompute dirB (same formula as above, no new state needed).
+        float halfInt = glm::radians(BEND_INTERIOR_DEG * 0.5f);
+        glm::vec3 dB(-std::sin(halfInt), 0.0f, std::cos(halfInt));
+        buildEndWall(mCupEndCentre,
+                     dB,
+                     FAIRWAY_HALF,
+                     KERB_THICKNESS,
+                     /*wallT=*/KERB_THICKNESS,
+                     /*wallH=*/KERB_HEIGHT);
+    }
+
+    // ── 6. Upload to GPU ────────────────────────────────────────────────────
     if (mVertices.empty() || mIndices.empty())
     {
         std::cerr << "Hole13::init — no geometry was generated!" << std::endl;

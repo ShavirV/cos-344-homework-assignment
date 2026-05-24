@@ -119,6 +119,21 @@ private:
                    const glm::vec3& poleColour,
                    const glm::vec3& flagColour);
 
+    // Closing boundary wall at the cup end of the ribbon — spans the full
+    // fairway + kerb width so the hole doesn't open into empty space.
+    //   centre   — cup centreline point (centreline(1.0))
+    //   segTan   — fairway tangent at s=1 (direction of travel at the cup end)
+    //   halfW    — base fairway half-width (before pinching)
+    //   kerbT    — kerb thickness
+    //   wallT    — wall thickness along tangent direction
+    //   wallH    — wall height above the local surface
+    void buildEndWall(const glm::vec3& centre,
+                      const glm::vec3& segTan,
+                      float halfW,
+                      float kerbT,
+                      float wallT,
+                      float wallH);
+
     // Convenience helpers
     void buildBox(const glm::vec3& mn, const glm::vec3& mx,
                   const glm::vec3& colour);
