@@ -419,26 +419,12 @@ Hole18::Hole18() : meshCount(0)
             40.0f, 164.0f,
             LAKE_RETAIN_SEGS, +1,
             [](float, float){ return 0.0f; },  // flat — lake surface is level
-            0.68f, 0.64f, 0.58f, 1.0f));       // warm sandstone colour
+            0.76f, 0.74f, 0.70f, 1.0f));       // warm sandstone colour
         retain1->translate(LAKE1_CX, LAKE_Y + 0.05f, LAKE1_CZ);
         retain1->setup();
         addMesh(retain1);
     }
 
-    // ── [17] Lake 1 retaining wall flat infill ────────────────────────────────
-    // Ground-level infill pavers flush with the surrounding terrain.
-    {
-        Mesh* retain1Flat = new Mesh(Mesh::makeArcBorder(
-            LAKE_RETAIN_R - PAVER_W,
-            PAVER_W, BORDER_H + 0.15f,
-            40.0f, 164.0f,
-            LAKE_RETAIN_SEGS, +1,
-            [](float, float){ return 0.0f; },
-            0.60f, 0.57f, 0.52f, 1.0f));
-        retain1Flat->translate(LAKE1_CX, -0.05f, LAKE1_CZ);
-        retain1Flat->setup();
-        addMesh(retain1Flat);
-    }
 
     // ── [18] Lake 2 retaining wall ────────────────────────────────────────────
     {
@@ -448,25 +434,12 @@ Hole18::Hole18() : meshCount(0)
             221.0f, 360.0f,
             LAKE_RETAIN_SEGS, +1,
             [](float, float){ return 0.0f; },
-            0.68f, 0.64f, 0.58f, 1.0f));
+           0.76f, 0.74f, 0.70f, 1.0f));
         retain2->translate(LAKE2_CX, LAKE_Y + 0.05f, LAKE2_CZ);
         retain2->setup();
         addMesh(retain2);
     }
 
-    // ── [19] Lake 2 retaining wall flat infill ────────────────────────────────
-    {
-        Mesh* retain2Flat = new Mesh(Mesh::makeArcBorder(
-            LAKE_RETAIN_R - PAVER_W,
-            PAVER_W, BORDER_H + 0.15f,
-            221.0f, 300.0f,
-            LAKE_RETAIN_SEGS, +1,
-            [](float, float){ return 0.0f; },
-            0.60f, 0.57f, 0.52f, 1.0f));
-        retain2Flat->translate(LAKE2_CX, -0.05f, LAKE2_CZ);
-        retain2Flat->setup();
-        addMesh(retain2Flat);
-    }
 
     //── [20] Lake 1 bank disc ─────────────────────────────────────────────────
     //Low cylinder giving the appearance of a bank or levee around the water.
