@@ -113,7 +113,7 @@ int main()
         glm::radians(45.0f), (float)WIDTH / HEIGHT, 0.1f, 500.0f);
     glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
 
-    Mesh ground = Mesh::makeCuboid(210.0f, 0.5f, 125.0f, 0.13f, 0.55f, 0.13f, 1.0f);
+    Mesh ground = Mesh::makeCuboid(2100.0f, 0.5f, 1250.0f, 0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
     // Hole9E hole9e;
@@ -131,7 +131,8 @@ int main()
         skybox.init(
             "src/shaders/skybox.vert",
             "src/shaders/skybox.frag",
-            "src/assets/textures/sky.bmp" 
+            "src/assets/textures/sky_day.bmp",
+            "src/assets/textures/sky_night.bmp"
         );
         skybox.dayLengthSecs = 120.0f;  // 2-minute full day cycle — adjust to taste
 

@@ -19,8 +19,11 @@ uniform float sunDiscCos;     // cos(half angular size) — dot threshold for di
 uniform float moonDiscCos;
 
 // Optional sky panorama texture
-uniform int       hasTexture;
-uniform sampler2D skyTex;
+uniform int       hasTexDay;
+uniform int       hasTexNight;
+uniform float     texBlend;      // 0.0 = full night, 1.0 = full day
+uniform sampler2D skyTexDay;
+uniform sampler2D skyTexNight;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -50,15 +53,24 @@ void main()
     vec3  skyColor   = mix(skyHorizColor, skyTopColor, horizBlend);
 
     // ── Texture (panorama) ────────────────────────────────────────────────────
-    if (hasTexture == 1) {
-        // localPos is the un-rotated direction — sample panorama in rest frame
-        vec3 ldir = normalize(localPos);
-        // Spherical UV: u = longitude [0,1], v = latitude [0,1]
-        float lon = atan(ldir.z, ldir.x) / (2.0 * 3.14159265) + 0.5;
-        float lat = asin(clamp(ldir.y, -1.0, 1.0)) / 3.14159265 + 0.5;
-        vec4 texColor = texture(skyTex, vec2(lon, lat));
-        // Blend texture with procedural gradient (texture on top)
-        skyColor = mix(skyColor, texColor.rgb, 0.85);
+    if (hasTexDay == 1 || hasTexNight == 1) {
+        vec3  ldir = normalize(localPos);
+        float lon  = atan(ldir.z, ldir.x) / (2.0 * 3.14159265) + 0.5;
+        float lat  = asin(clamp(ldir.y, -1.0, 1.0)) / 3.14159265 + 0.5;
+        vec2  suv  = vec2(lon, lat);
+
+        vec3 dayCol   = skyColor;   // fallback to gradient if texture missing
+        vec3 nightCol = skyColor;
+
+        if (hasTexDay   == 1) dayCol   = texture(skyTexDay,   suv).rgb;
+        if (hasTexNight == 1) nightCol = texture(skyTexNight, suv).rgb;
+
+        // Smooth transition zone — blend over a ~20% intensity window
+        // so the crossfade happens around sunrise/sunset, not abruptly.
+        float blend = smoothstep(0.1, 0.3, texBlend);
+        vec3 texColor = mix(nightCol, dayCol, blend);
+
+        skyColor = mix(skyColor, texColor, 0.85);
     }
 
     // ── Sun disc ──────────────────────────────────────────────────────────────

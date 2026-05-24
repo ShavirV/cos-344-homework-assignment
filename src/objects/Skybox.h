@@ -52,7 +52,8 @@ public:
     // If texturePath is nullptr or fails, falls back to a vertex-color gradient.
     bool init(const char* vertPath,
               const char* fragPath,
-              const char* texturePath = nullptr);
+              const char* dayTexturePath   = nullptr,
+              const char* nightTexturePath = nullptr);
 
     // dt: seconds since last frame
     void update(float dt);
@@ -86,8 +87,10 @@ private:
     GLuint vbo        = 0;
     GLuint ebo        = 0;
     GLuint shader     = 0;
-    GLuint texture    = 0;   // 0 = no texture, use gradient
-    bool   hasTexture = false;
+    GLuint texDay     = 0;
+    GLuint texNight   = 0;
+    bool   hasTexDay  = false;
+    bool   hasTexNight= false;
 
     // Sun/moon billboard VAO (two quads drawn as part of the sphere mesh)
     GLuint discVAO = 0;

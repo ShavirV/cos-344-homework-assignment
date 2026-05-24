@@ -18,19 +18,25 @@ Skybox::~Skybox()
     if (discVAO) glDeleteVertexArrays(1, &discVAO);
     if (discVBO) glDeleteBuffers(1, &discVBO);
     if (shader)  glDeleteProgram(shader);
-    if (texture) glDeleteTextures(1, &texture);
+    if (texDay)   glDeleteTextures(1, &texDay);
+    if (texNight) glDeleteTextures(1, &texNight);
 }
 
 // =============================================================================
 bool Skybox::init(const char* vertPath, const char* fragPath,
-                  const char* texturePath)
+                  const char* dayTexturePath, const char* nightTexturePath)
 {
     if (!buildShader(vertPath, fragPath)) return false;
 
-    if (texturePath) {
-        hasTexture = loadBMP(texturePath, texture);
-        if (!hasTexture)
-            std::cerr << "[Skybox] Texture load failed — using gradient fallback\n";
+    if (dayTexturePath) {
+        hasTexDay = loadBMP(dayTexturePath, texDay);
+        if (!hasTexDay)
+            std::cerr << "[Skybox] Day texture failed — using gradient\n";
+    }
+    if (nightTexturePath) {
+        hasTexNight = loadBMP(nightTexturePath, texNight);
+        if (!hasTexNight)
+            std::cerr << "[Skybox] Night texture failed — using gradient\n";
     }
 
     buildSphere();
@@ -111,12 +117,20 @@ void Skybox::draw(const glm::mat4& view, const glm::mat4& projection)
     glUniform3fv(loc("moonColor"),    1, glm::value_ptr(moon.color));
     glUniform1f (loc("sunDiscCos"),   cosf(glm::radians(sunDiscSize  * 0.5f)));
     glUniform1f (loc("moonDiscCos"),  cosf(glm::radians(moonDiscSize * 0.5f)));
-    glUniform1i (loc("hasTexture"),   hasTexture ? 1 : 0);
+    // dayBlend is already computed above (0=night, 1=day)
+    glUniform1f(loc("texBlend"),    dayBlend);
+    glUniform1i(loc("hasTexDay"),   hasTexDay   ? 1 : 0);
+    glUniform1i(loc("hasTexNight"), hasTexNight ? 1 : 0);
 
-    if (hasTexture) {
+    if (hasTexDay) {
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glUniform1i(loc("skyTex"), 0);
+        glBindTexture(GL_TEXTURE_2D, texDay);
+        glUniform1i(loc("skyTexDay"), 0);
+    }
+    if (hasTexNight) {
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, texNight);
+        glUniform1i(loc("skyTexNight"), 1);
     }
 
     // Skybox render state:
