@@ -14,6 +14,9 @@
 #include "../objects/Hole16.h"
 #include "../objects/Hole17.h"
 #include "../objects/Hole18.h"
+#include "../objects/Water.h"
+#include "../objects/Terrain.h"
+#include "../objects/TerrainExample.hpp"
 #include "../objects/Skybox.h"
 
 
@@ -122,7 +125,9 @@ int main()
         
        //Hole16 hole16;
        //Hole17 hole17;
-        Hole18 hole18;
+       //Hole18 hole18;
+       TerrainExample terrainExample;
+       terrainExample.init();
 
        Mesh hole16platform = Mesh::makeHole();
        float lastTime = (float)glfwGetTime();
@@ -180,10 +185,11 @@ int main()
         // hole16.setCameraData(view, projection, cameraPos);
         // hole16.update(deltaTime);
 
-        hole18.setCameraData(view, projection, cameraPos);
-        hole18.update(deltaTime);
+        // hole18.setCameraData(view, projection, cameraPos);
+        // hole18.update(deltaTime);
 
-        hole18.draw(shader, false);
+        //hole17.draw(shader, false);
+        terrainExample.draw(shader, false);
         
 
         glfwSwapBuffers(window);
