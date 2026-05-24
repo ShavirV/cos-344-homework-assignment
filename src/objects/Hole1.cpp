@@ -1,10 +1,7 @@
 #include "Hole1.h"
 #include <cmath>
-<<<<<<< HEAD
 #include <GL/glew.h>
 #include <glm/gtc/type_ptr.hpp>
-=======
->>>>>>> e1d69e93665d0f3fb5b714fcf89405de568fb9a6
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 #define C_GREEN         0.15f, 0.50f, 0.15f, 1.0f

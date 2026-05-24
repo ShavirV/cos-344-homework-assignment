@@ -1,9 +1,6 @@
 #pragma once
 #include "../core/Mesh.h"
-<<<<<<< HEAD
 #include <glm/glm.hpp>
-=======
->>>>>>> e1d69e93665d0f3fb5b714fcf89405de568fb9a6
 
 // Hole 4 — windmill obstacle on a raised hill-shaped green.
 // Build at local origin; caller does: hole4.translate(-48.0f, 0.35f, 15.0f)
@@ -18,14 +15,10 @@ public:
     Hole4();
     ~Hole4();
 
-<<<<<<< HEAD
     void draw(GLuint shaderProgram, bool wireframe = false,
               const glm::vec3& lightDir   = glm::vec3(0.45f, 0.80f, 0.35f),
               const glm::vec3& lightColor = glm::vec3(1.00f, 0.97f, 0.90f),
               const glm::vec3& camPos     = glm::vec3(0.0f));
-=======
-    void draw(GLuint shaderProgram, bool wireframe = false);
->>>>>>> e1d69e93665d0f3fb5b714fcf89405de568fb9a6
     void translate(float x, float y, float z);
     void rotate(float angle, float ax, float ay, float az);
 
