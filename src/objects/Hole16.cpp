@@ -674,16 +674,30 @@ void Hole16::addMesh(Mesh* m)
         meshes[meshCount++] = m;
 }
 
-void Hole16::draw(GLuint shaderProgram, bool wireframe)
+void Hole16::draw(GLuint shaderProgram, bool wireframe,
+                  const glm::vec3& lightDir,
+                  const glm::vec3& lightColor)
 {
+    // Push the directional-light uniforms that dev.cpp does not set program-wide.
+    glUseProgram(shaderProgram);
+    GLint locLD = glGetUniformLocation(shaderProgram, "uLightDir");
+    GLint locVP = glGetUniformLocation(shaderProgram, "uViewPos");
+    GLint locLC = glGetUniformLocation(shaderProgram, "uLightColor");
+    if (locLD != -1) glUniform3fv(locLD, 1, glm::value_ptr(glm::normalize(lightDir)));
+    if (locVP != -1) glUniform3fv(locVP, 1, glm::value_ptr(camPos));
+    if (locLC != -1) glUniform3fv(locLC, 1, glm::value_ptr(lightColor));
+
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shaderProgram, wireframe);
 
     // Water drawn last — alpha blended, must come after all opaque geometry.
+    // Pass the skybox-driven light so water shading tracks the day/night cycle.
     if (waterStream)
-        waterStream->draw(camView, camProj, camPos);
+        waterStream->draw(camView, camProj, camPos,
+                          glm::normalize(lightDir), lightColor);
     if (waterMoat)
-        waterMoat->draw(camView, camProj, camPos);
+        waterMoat->draw(camView, camProj, camPos,
+                        glm::normalize(lightDir), lightColor);
 }
 
 void Hole16::translate(float x, float y, float z)

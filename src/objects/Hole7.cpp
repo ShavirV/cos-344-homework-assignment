@@ -28,6 +28,7 @@
 
 #include "Hole7.h"
 #include <cmath>
+#include <glm/gtc/type_ptr.hpp>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dimension constants (local space)
@@ -499,8 +500,19 @@ void Hole7::rotate(float angle, float ax, float ay, float az)
         meshes[i]->rotate(angle, ax, ay, az);
 }
 
-void Hole7::draw(GLuint shader, bool wireframe)
+void Hole7::draw(GLuint shader, bool wireframe,
+                 const glm::vec3& lightDir,
+                 const glm::vec3& lightColor,
+                 const glm::vec3& camPos)
 {
+    glUseProgram(shader);
+    GLint locLD = glGetUniformLocation(shader, "uLightDir");
+    GLint locVP = glGetUniformLocation(shader, "uViewPos");
+    GLint locLC = glGetUniformLocation(shader, "uLightColor");
+    if (locLD != -1) glUniform3fv(locLD, 1, glm::value_ptr(glm::normalize(lightDir)));
+    if (locVP != -1) glUniform3fv(locVP, 1, glm::value_ptr(camPos));
+    if (locLC != -1) glUniform3fv(locLC, 1, glm::value_ptr(lightColor));
+
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shader, wireframe);
 }
