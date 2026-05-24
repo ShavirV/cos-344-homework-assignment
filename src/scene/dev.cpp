@@ -163,8 +163,8 @@ int main()
         //hole11.draw(shader,false);
         //hole16.draw(shader, false);
 
-        //hole12.draw(shader,false);
-        hole10.draw(shader,false);
+        hole12.draw(shader,false);
+        //hole10.draw(shader,false);
         
 
         glfwSwapBuffers(window);
