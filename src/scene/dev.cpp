@@ -163,7 +163,7 @@ int main()
         float sunWeight  = sun.intensity;
         float moonWeight = moon.intensity;
 
-        glm::vec3 lightPos   = sunWeight > moonWeight ? sun.pdosition  : moon.position;
+        glm::vec3 lightPos   = sunWeight > moonWeight ? sun.position  : moon.position;
         glm::vec3 lightColor = sunWeight > moonWeight ? sun.color     : moon.color;
         float     lightInt   = sunWeight > moonWeight ? sunWeight      : moonWeight;
 
@@ -179,6 +179,9 @@ int main()
         //for the water redraw
         // hole16.setCameraData(view, projection, cameraPos);
         // hole16.update(deltaTime);
+
+        hole18.setCameraData(view, projection, cameraPos);
+        hole18.update(deltaTime);
 
         hole18.draw(shader, false);
         

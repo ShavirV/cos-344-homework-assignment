@@ -17,7 +17,7 @@
 static const float TOP_INNER_R   =  6.0f;
 static const float TOP_OUTER_R   = 13.0f;
 static const float TOP_START_DEG =  0.0f;   // tee side (east, +X)
-static const float TOP_END_DEG   = 180.0f;  // waist side (west, −X)
+static const float TOP_END_DEG   = 170.0f;  // waist side (west, −X)
 static const int   TOP_RING_SEGS = 60;
 static const int   TOP_RAD_SEGS  = 8;
 
@@ -28,7 +28,7 @@ static const int   TOP_RAD_SEGS  = 8;
 static const float BOT_INNER_R   =  6.0f;
 static const float BOT_OUTER_R   = 13.0f;
 static const float BOT_START_DEG = 180.0f;  // waist side
-static const float BOT_END_DEG   = 360.0f;  // green side (east, +X)
+static const float BOT_END_DEG   = 350.0f;  // green side (east, +X)
 static const int   BOT_RING_SEGS = 60;
 static const int   BOT_RAD_SEGS  = 8;
 
@@ -36,8 +36,8 @@ static const int   BOT_RAD_SEGS  = 8;
 // Top arc: centre at (0,0,0), waist at (−TOP_INNER_R, 0, 0) inner edge.
 // Bot arc: we want its 180° point to also be at roughly (−BOT_OUTER_R, 0, BOT_CZ).
 // Choose BOT_CZ = 2*(BOT_INNER_R) so the two rings share the waist band.
-static const float BOT_CX        =  0.0f;
-static const float BOT_CZ        = 19.0f;   // Z offset of bottom arc centre
+static const float BOT_CX        = -19.0f;
+static const float BOT_CZ        = 0.0f;   // Z offset of bottom arc centre
 
 // ── Terrain heights ───────────────────────────────────────────────────────────
 // Top arc: tee (arcT=0) is +2.5 high, waist (arcT=1) is 0.
@@ -65,28 +65,28 @@ static const float TEE_Z         =  0.0f;
 // ── Green ─────────────────────────────────────────────────────────────────────
 // Green is at the 360° (=0°) point of the bottom arc, mid-radius = 9.5
 // in world space that's (BOT_CX + 9.5, botArcHeight(1,0.5), BOT_CZ).
-static const float GREEN_R       =  2.8f;
-static const float GREEN_X       =  9.5f;   // relative to BOT_CX
+static const float GREEN_R       =  3.6f;
+static const float GREEN_X       =  -19.0f;   // relative to BOT_CX
 static const float GREEN_Z_REL   =  0.0f;   // relative to BOT_CZ (it's at 0° of bot arc)
 
 // ── Stream ────────────────────────────────────────────────────────────────────
 // Flows diagonally across the waist of the S, roughly NE to SW.
 // Modelled as a single WaterMesh plane at the waist.
 static const float STREAM_Y      = -0.12f;
-static const float STREAM_W      =  3.2f;
-static const float STREAM_L      = 22.0f;
-static const float STREAM_CX     = -3.0f;   // world X of stream centre
-static const float STREAM_CZ     =  9.5f;   // world Z (midpoint of waist)
-static const float STREAM_ROT    = 35.0f;   // degrees CCW from +X
+static const float STREAM_W      =  5.2f;
+static const float STREAM_L      = 12.0f;
+static const float STREAM_CX     = -5.0f;   // world X of stream centre
+static const float STREAM_CZ     = -0.5f;   // world Z (midpoint of waist)
+static const float STREAM_ROT    = 275.0f;   // degrees CCW from +X
 
 // ── Lake ─────────────────────────────────────────────────────────────────────
 // Sits in the concave pocket of the bottom curve (the right/east side).
 // Modelled as a WaterMesh plane.
 static const float LAKE_Y        = -0.18f;
-static const float LAKE_W        =  9.0f;
-static const float LAKE_L        =  7.0f;
-static const float LAKE_CX       =  8.0f;   // world X (right side of bot arc)
-static const float LAKE_CZ       = 24.0f;   // world Z (inside bot arc pocket)
+static const float LAKE_W        =  15.0f;
+static const float LAKE_L        =  15.0f;
+static const float LAKE_CX       =  -18.0f;   // world X (right side of bot arc)
+static const float LAKE_CZ       = 0.0f;   // world Z (inside bot arc pocket)
 
 // ── Bridge ────────────────────────────────────────────────────────────────────
 // Wooden deck spanning the stream.  Positioned at stream centre, rotated to
@@ -94,9 +94,9 @@ static const float LAKE_CZ       = 24.0f;   // world Z (inside bot arc pocket)
 static const float BRIDGE_L      =  7.0f;
 static const float BRIDGE_W      =  3.8f;
 static const float BRIDGE_Y      =  0.10f;
-static const float BRIDGE_CX     = STREAM_CX;
-static const float BRIDGE_CZ     = STREAM_CZ;
-static const float BRIDGE_ROT    = STREAM_ROT + 90.0f; // perpendicular to stream
+static const float BRIDGE_CX     = STREAM_CX + 4.0f;
+static const float BRIDGE_CZ     = STREAM_CZ + 10.0f;
+static const float BRIDGE_ROT    = STREAM_ROT + 0.0f; // perpendicular to stream
 
 // ── Hill bumps ────────────────────────────────────────────────────────────────
 struct H18Hill { float x; float z; float arcT; float radT; float h; bool topArc; };
@@ -113,7 +113,6 @@ struct H18Rock { float x; float z; float arcT; float radT; float scale; bool top
 static const H18Rock ROCKS[] = {
     { -8.0f,  -3.0f, 0.50f, 0.3f, 0.9f, true  },
     { -5.0f,  -7.5f, 0.70f, 0.7f, 1.1f, true  },
-    {  6.0f,  27.0f, 0.55f, 0.6f, 0.8f, false },
 };
 
 // =============================================================================
@@ -217,7 +216,7 @@ Hole18::Hole18() : meshCount(0)
             [](float, float){ return 0.0f; },
             0.04f, 0.79f, 0.16f, 1.0f,
             4.0f, 2.0f));
-        botBase->translate(BOT_CX, 0.0f, BOT_CZ);
+        botBase->translate(BOT_CX, -0.0f, BOT_CZ);
         botBase->setup();
         addMesh(botBase);
     }
@@ -251,7 +250,7 @@ Hole18::Hole18() : meshCount(0)
         Mesh* gnd = new Mesh(Mesh::makeCylinder(
             TOP_OUTER_R + 4.0f, 0.15f, 64,
             0.22f, 0.16f, 0.09f, 1.0f));
-        gnd->translate(0.0f, -0.10f, BOT_CZ * 0.5f);
+        gnd->translate(0.0f, -1.10f, BOT_CZ * 0.5f);
         gnd->setup();
         addMesh(gnd);
     }
@@ -267,12 +266,12 @@ Hole18::Hole18() : meshCount(0)
         addMesh(tee);
     }
 
-    // ── [10] Green surface + kerb ring ───────────────────────────────────────
+    // ── [10] Green surface + kerb ring ───────────────────a────────────────────
     {
         // Green is at 360° of bottom arc, mid-radius = (BOT_INNER_R+BOT_OUTER_R)*0.5
-        float gx   = BOT_CX + (BOT_INNER_R + BOT_OUTER_R) * 0.5f;
+        float gx   = BOT_CX + (BOT_INNER_R + BOT_OUTER_R) * 0.5f + GREEN_X;
         float gz   = BOT_CZ + GREEN_Z_REL;
-        float gY   = botArcHeight(1.0f, 0.5f) + 0.12f;
+        float gY   = botArcHeight(1.0f, 0.5f) + 1.0f;
 
         Mesh* green = new Mesh(Mesh::makeCylinder(
             GREEN_R, 0.14f, 24,
@@ -284,7 +283,7 @@ Hole18::Hole18() : meshCount(0)
         Mesh* gKerb = new Mesh(Mesh::makeCylinder(
             GREEN_R + 0.45f, 0.22f, 24,
             0.76f, 0.72f, 0.66f, 1.0f));
-        gKerb->translate(gx, gY + 0.04f, gz);
+        gKerb->translate(gx, gY - 0.04f, gz);
         gKerb->setup();
         addMesh(gKerb);
     }
@@ -343,7 +342,7 @@ Hole18::Hole18() : meshCount(0)
 
     // ── [15–17] Rock obstacles ────────────────────────────────────────────────
     {
-        for (int ri = 0; ri < 3; ri++)
+        for (int ri = 0; ri < 2; ri++)
         {
             const H18Rock& r = ROCKS[ri];
             float baseY = r.topArc
@@ -351,7 +350,7 @@ Hole18::Hole18() : meshCount(0)
                 : botArcHeight(r.arcT, r.radT);
 
             Mesh* rock = new Mesh(Mesh::makeRock(r.scale));
-            rock->translate(r.x, baseY + r.scale * 0.5f, r.z);
+            rock->translate(r.x-9, baseY-1 + r.scale * 0.5f, r.z);
             rock->rotate((float)ri * 61.0f, 0.0f, 1.0f, 0.0f);
             rock->setup();
             addMesh(rock);
