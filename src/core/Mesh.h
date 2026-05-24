@@ -182,6 +182,10 @@ static void buildHoleMeshes(float rotY, Mesh** out, int& count, int maxCount)
                          float x1, float y1, float z1,
                          float width = 8.0f);
 
+    static Mesh makeRamp2(float x0, float y0, float z0,
+                         float x1, float y1, float z1,
+                         float width = 8.0f);
+
     // ── Tree ─────────────────────────────────────────────────────────────────
     // NEW — pushes a trunk cylinder and canopy cone into `out`.
     // Replaces the free addTree() that was in main.cpp.
