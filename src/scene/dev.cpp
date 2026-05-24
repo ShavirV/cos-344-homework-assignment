@@ -1,26 +1,55 @@
 // =============================================================================
 // dev.cpp
-// Standalone viewer for COS344 Practical Hole 13.
+// Standalone viewer for COS344 mini-golf course holes.
 //
-// Shows the current hole(s) framed in the viewport with a fly-camera for
-// free exploration. Right now only Hole 13 is wired in; Hole 14 / 15 will
-// be added the same way once they exist. Look for the "ADD HOLE 14/15"
-// markers below — adding a new hole is a five-line change in each spot.
+// Hosts the team's hole renderers in one viewer with two camera modes and a
+// shared dynamic skybox driving the time-of-day lighting.
+//
+// Holes:
+//   1 / 2 / 3   - Ayush's Hole 13 / 14 / 15   (uMVP/uModel/uNormalMat shader)
+//   4           - Shav's   Hole 16            (model/view/projection shader)
+//
+// Each hole's class sets its own uniforms in its draw() call, so the two
+// shader programs coexist without stepping on each other — the active hole
+// just calls glUseProgram(...) on its own program before drawing.
+//
+// The Skybox runs a slow day/night cycle (sphere rotating around the world
+// X axis). Its sun/moon position is fed into BOTH shader programs each frame
+// as the directional light direction, so the lighting on every hole tracks
+// the visible sky. The skybox itself is drawn once per frame after the
+// scene, using the depth-trick (gl_Position.xyww + GL_LEQUAL).
+//
+// Camera modes:
+//   1. FLY-CAMERA (default) — the original free-flight camera.
+//   2. DRONE (press C) — the quadcopter from Report §8.
+// Both controllers coexist; C toggles which one drives the view+input.
 //
 // Controls:
-//   1           - switch to Hole 13   (2 / 3 will switch to 14 / 15 later)
-//   R           - re-frame camera on current hole
-//   W / S       - fly forward / back
-//   A / D       - strafe left / right
-//   SPACE / LSHIFT - ascend / descend
-//   Mouse       - look around (cursor is captured)
-//   M           - release / re-capture the cursor
-//   TAB         - toggle wireframe
-//   ESC         - quit
+//   1 / 2 / 3 / 4  switch to Hole 13 / 14 / 15 / 16
+//   C              toggle FLY-CAMERA <-> DRONE
+//   R              re-frame the active controller on the current hole
 //
-// Only spec-allowed libraries are used. Shaders are written inline (the
-// spec allows "additional code to the shaders to improve the efficiency of
-// your rendering" and shader compilation is a normal OpenGL workflow).
+//   Fly-camera (default):
+//     W / S        fly forward / back
+//     A / D        strafe left / right
+//     SPACE/LSHIFT ascend / descend
+//     Mouse        look around
+//
+//   Drone (after pressing C):
+//     W / S        pitch + translate forward / back (Report §8.2)
+//     A / D        yaw left / right
+//     Q / E        roll left / right
+//     SPACE/LSHIFT ascend / descend
+//     V            toggle 1st-person <-> 3rd-person view
+//     Z (hold)     zoom in (FoV 60° → 20°)
+//     Mouse        camera look (1st-person only; locked in 3rd-person)
+//
+//   TAB            toggle wireframe
+//   M              release / re-capture the mouse cursor
+//   ESC            quit
+//
+// Only spec-allowed libraries are used. All shaders live under src/shaders/
+// as .glsl files and are loaded from disk at startup.
 // =============================================================================
 
 #include <stdio.h>
@@ -42,194 +71,73 @@
 // ADD HOLE 15: when that class exists, add its #include here.
 #include "../objects/Hole15.h"
 
+// Shav's contributions — Hole 16 + the dynamic skybox + the Mesh class his
+// holes are built from. These live in the same src/ tree as our holes, so
+// the relative includes match the existing pattern.
+#include "../core/Mesh.h"
+#include "../objects/Hole16.h"
+#include "../objects/Skybox.h"
+
+#include "../camera/Drone.h"
+
 
 // -----------------------------------------------------------------------------
-// Inline Blinn-Phong shader. The hole classes expect these exact uniform
-// names: uMVP, uModel, uNormalMat, uLightDir, uLightColor, uAmbient, uViewPos.
+// Shader source paths. Two shader programs are needed because the two halves
+// of the project use different shader designs:
+//
+//   • Ayush's program — src/shaders/vertex.glsl + fragment.glsl
+//     Holes 13/14/15 + Drone. Uses uMVP/uModel/uNormalMat + procedural
+//     turf/kerb noise + hemisphere ambient.
+//
+//   • Shav's program — src/shaders/mesh_vertex.glsl + mesh_fragment.glsl
+//     Hole 16 (via Mesh.cpp). Uses model/view/projection + a flat 'colour'
+//     uniform set per-mesh in Mesh::draw().
+//
+// They can't share a single program because:
+//   - Different uniform names and matrix-construction conventions
+//   - Different vertex attribute layout in slot 2 (vec3 colour vs vec2 texCoord)
+// So each hole's class binds its own program before drawing.
+//
+// Paths are relative to the working directory the program is launched from.
+// Run from the repo root so "src/shaders/..." resolves correctly.
 // -----------------------------------------------------------------------------
-static const char* VERTEX_SRC =
-    "#version 330 core\n"
-    "layout(location = 0) in vec3 aPos;\n"
-    "layout(location = 1) in vec3 aNormal;\n"
-    "layout(location = 2) in vec3 aColor;\n"
-    "uniform mat4 uMVP;\n"
-    "uniform mat4 uModel;\n"
-    "uniform mat3 uNormalMat;\n"
-    "out vec3 vWorldPos;\n"
-    "out vec3 vNormal;\n"
-    "out vec3 vColor;\n"
-    "void main() {\n"
-    "    vec4 wp = uModel * vec4(aPos, 1.0);\n"
-    "    vWorldPos = wp.xyz;\n"
-    "    vNormal = normalize(uNormalMat * aNormal);\n"
-    "    vColor = aColor;\n"
-    "    gl_Position = uMVP * vec4(aPos, 1.0);\n"
-    "}\n";
+static const char* VERTEX_PATH       = "src/shaders/vertex.glsl";
+static const char* FRAGMENT_PATH     = "src/shaders/fragment.glsl";
+static const char* MESH_VERTEX_PATH  = "src/shaders/mesh_vertex.glsl";
+static const char* MESH_FRAGMENT_PATH= "src/shaders/mesh_fragment.glsl";
+static const char* SKYBOX_VERT_PATH  = "src/shaders/skybox.vert";
+static const char* SKYBOX_FRAG_PATH  = "src/shaders/skybox.frag";
 
-// Fragment shader.
-//
-// Adds procedural-noise "textures" for the turf and kerb materials, and a
-// hemisphere ambient term so shadows pick up a hint of sky-blue while lit
-// surfaces tilt warm. The shader identifies the material from the base
-// vertex colour (no extra attribute or uniform required), so Hole13's
-// geometry code does not need to change to opt in.
-//
-// All noise is computed in code via integer-coord hashing — no texture
-// uploads, in line with the spec's no-prebuilt-textures rule.
-static const char* FRAGMENT_SRC = R"GLSL(
-#version 330 core
-
-in vec3 vWorldPos;
-in vec3 vNormal;
-in vec3 vColor;
-
-uniform vec3 uLightDir;     // direction TO the sun
-uniform vec3 uLightColor;   // sun colour
-uniform vec3 uAmbient;      // base ambient term (used as the "ground bounce" colour)
-uniform vec3 uViewPos;      // camera position in world space
-
-out vec4 FragColor;
-
-// ── Hash + value noise ──────────────────────────────────────────────────────
-// Cheap deterministic 2D hash. Not cryptographic — just stable per-coordinate
-// pseudo-random values to drive the noise.
-float hash21(vec2 p) {
-    p = fract(p * vec2(123.34, 456.21));
-    p += dot(p, p + 45.32);
-    return fract(p.x * p.y);
-}
-
-// Single-octave value noise: sample the four integer-corner hash values and
-// smooth-interpolate between them.
-float vnoise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    // Smoothstep weights (Hermite) to soften the bilinear blend.
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    float a = hash21(i);
-    float b = hash21(i + vec2(1.0, 0.0));
-    float c = hash21(i + vec2(0.0, 1.0));
-    float d = hash21(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
-
-// Fractal Brownian Motion — three octaves of value noise. Gives the
-// multi-scale look real materials have: small detail + bigger blotches.
-float fbm(vec2 p) {
-    float v = 0.0;
-    float amp = 0.5;
-    for (int i = 0; i < 3; ++i) {
-        v += amp * vnoise(p);
-        p *= 2.07;        // non-integer ratio avoids alignment artefacts
-        amp *= 0.5;
+// Read an entire file into a std::string. Uses C stdio so we only depend on
+// headers the assignment spec explicitly allows (<stdio.h>, <sstream>).
+// Returns an empty string on failure and logs the reason to stderr.
+static std::string readFile(const char* path)
+{
+    FILE* f = std::fopen(path, "rb");
+    if (!f) {
+        std::cerr << "Failed to open shader file: " << path << std::endl;
+        return std::string();
     }
-    return v;
+    std::fseek(f, 0, SEEK_END);
+    long len = std::ftell(f);
+    std::fseek(f, 0, SEEK_SET);
+    if (len <= 0) {
+        std::fclose(f);
+        std::cerr << "Shader file is empty: " << path << std::endl;
+        return std::string();
+    }
+    std::string out;
+    out.resize((size_t)len);
+    size_t got = std::fread(&out[0], 1, (size_t)len, f);
+    std::fclose(f);
+    if (got != (size_t)len) {
+        std::cerr << "Short read on shader file: " << path << std::endl;
+        return std::string();
+    }
+    return out;
 }
 
-// ── Material-specific shading ───────────────────────────────────────────────
-
-// Turf: per-blade colour variation + larger wear patches.
-// World-space XZ is used so the noise "sticks" to the ground as the camera
-// moves (it would crawl with view-space coords).
-vec3 shadeTurf(vec3 baseGreen, vec3 worldPos) {
-    vec2 uv = worldPos.xz;
-
-    // High-frequency variation — individual blade-clump tints.
-    float n1 = vnoise(uv * 8.0);
-    // Medium variation — patchy wear, slightly drier areas.
-    float n2 = fbm(uv * 0.6);
-
-    // Tint between a slightly bluer-green and a slightly yellower-green.
-    vec3 coolGreen = baseGreen * vec3(0.85, 1.00, 0.70);  // healthy / shaded
-    vec3 warmGreen = baseGreen * vec3(1.15, 1.00, 0.55);  // sun-bleached / dry
-    vec3 tinted    = mix(coolGreen, warmGreen, n1);
-
-    // Darker wear patches around 30% of the surface.
-    float wear = smoothstep(0.45, 0.65, n2);
-    tinted *= mix(1.0, 0.70, wear);
-
-    // A touch of fine "blade speckle" — small brightness jitter.
-    float speckle = vnoise(uv * 35.0) * 0.10 - 0.05;
-    tinted += vec3(speckle * 0.5, speckle, speckle * 0.3);
-
-    return tinted;
-}
-
-// Concrete kerb: aggregate speckle (fine) + weathering blotches (coarse).
-vec3 shadeKerb(vec3 baseGrey, vec3 worldPos) {
-    vec2 uv = worldPos.xz;
-
-    // Fine aggregate — high-frequency noise, ±10% brightness jitter.
-    float aggregate = vnoise(uv * 25.0) * 0.20 - 0.10;
-    // Larger weathering — slow stains and water marks.
-    float weather   = fbm(uv * 0.8);
-    // Slightly cool weathered patches, slightly warm fresh patches.
-    vec3 fresh   = baseGrey * 1.05;
-    vec3 stained = baseGrey * vec3(0.85, 0.88, 0.92);  // cooler grey
-    vec3 tinted  = mix(stained, fresh, smoothstep(0.35, 0.65, weather));
-
-    tinted += vec3(aggregate);
-    return tinted;
-}
-
-// ── Material identification from the base colour ────────────────────────────
-// Green-dominant high-saturation → turf. Roughly grey (R≈G≈B and bright) → kerb.
-// Anything else falls through to "use the colour as-is" — covers the tee
-// patch, cup, flag, pole.
-bool looksLikeTurf(vec3 c) {
-    return c.g > c.r + 0.15 && c.g > c.b + 0.15 && c.g > 0.30;
-}
-bool looksLikeKerb(vec3 c) {
-    float maxc = max(c.r, max(c.g, c.b));
-    float minc = min(c.r, min(c.g, c.b));
-    return (maxc - minc) < 0.10 && maxc > 0.50;
-}
-
-void main() {
-    // Material-specific base colour with procedural variation.
-    vec3 base;
-    if (looksLikeTurf(vColor))      base = shadeTurf(vColor, vWorldPos);
-    else if (looksLikeKerb(vColor)) base = shadeKerb(vColor, vWorldPos);
-    else                            base = vColor;
-
-    vec3 N = normalize(vNormal);
-    vec3 L = normalize(uLightDir);
-    vec3 V = normalize(uViewPos - vWorldPos);
-    vec3 H = normalize(L + V);
-
-    // ── Hemisphere ambient ───────────────────────────────────────────────────
-    // Surfaces facing up pick up sky-blue; surfaces facing down pick up the
-    // ground-bounce colour passed in via uAmbient. Reads as outdoor light
-    // without needing a full GI solution.
-    vec3 skyColor    = vec3(0.55, 0.70, 0.95);            // hardcoded noon sky
-    vec3 groundBounce = uAmbient * 1.20;                  // tint from uAmbient
-    float hemi = 0.5 + 0.5 * N.y;                          // 1 facing up, 0 down
-    vec3 ambient = mix(groundBounce, skyColor, hemi) * 0.75;
-
-    // ── Diffuse (Lambert) ────────────────────────────────────────────────────
-    float diff = max(dot(N, L), 0.0);
-
-    // ── Specular (Blinn-Phong) ───────────────────────────────────────────────
-    // Turf is matte → very low spec power, almost no contribution.
-    // Kerb is slightly glossy concrete → moderate.
-    // Other materials (cup, flag) → default.
-    float specStrength = 0.10;
-    float specPower    = 24.0;
-    if (looksLikeTurf(vColor)) { specStrength = 0.02; specPower = 8.0;  }
-    if (looksLikeKerb(vColor)) { specStrength = 0.18; specPower = 32.0; }
-    float spec = pow(max(dot(N, H), 0.0), specPower) * specStrength;
-
-    // Combine, then gently roll off highlights so the noon sun on bright
-    // turf doesn't blow to pure white. Identity for shadowed pixels,
-    // compressive only at the top.
-    vec3 lit = base * (ambient + diff * uLightColor) + spec * uLightColor;
-    lit = lit / (1.0 + 0.4 * lit);
-
-    FragColor = vec4(lit, 1.0);
-}
-)GLSL";
-
-static GLuint compileShader(GLenum type, const char* src) {
+static GLuint compileShader(GLenum type, const char* src, const char* label) {
     GLuint s = glCreateShader(type);
     glShaderSource(s, 1, &src, NULL);
     glCompileShader(s);
@@ -238,14 +146,25 @@ static GLuint compileShader(GLenum type, const char* src) {
     if (!ok) {
         char log[2048];
         glGetShaderInfoLog(s, 2048, NULL, log);
-        std::cerr << "Shader compile error:\n" << log << std::endl;
+        std::cerr << "Shader compile error in " << label << ":\n"
+                  << log << std::endl;
     }
     return s;
 }
 
-static GLuint buildProgram() {
-    GLuint vs = compileShader(GL_VERTEX_SHADER,   VERTEX_SRC);
-    GLuint fs = compileShader(GL_FRAGMENT_SHADER, FRAGMENT_SRC);
+// Build one shader program from a vertex + fragment GLSL file pair.
+// Returns 0 on failure (with diagnostics already logged to stderr).
+static GLuint buildProgramFromFiles(const char* vertPath, const char* fragPath)
+{
+    std::string vsSrc = readFile(vertPath);
+    std::string fsSrc = readFile(fragPath);
+    if (vsSrc.empty() || fsSrc.empty()) {
+        std::cerr << "Cannot build shader program — source files missing ("
+                  << vertPath << ", " << fragPath << ")." << std::endl;
+        return 0;
+    }
+    GLuint vs = compileShader(GL_VERTEX_SHADER,   vsSrc.c_str(), vertPath);
+    GLuint fs = compileShader(GL_FRAGMENT_SHADER, fsSrc.c_str(), fragPath);
     GLuint p = glCreateProgram();
     glAttachShader(p, vs);
     glAttachShader(p, fs);
@@ -255,7 +174,8 @@ static GLuint buildProgram() {
     if (!ok) {
         char log[2048];
         glGetProgramInfoLog(p, 2048, NULL, log);
-        std::cerr << "Program link error:\n" << log << std::endl;
+        std::cerr << "Program link error (" << vertPath << " + "
+                  << fragPath << "):\n" << log << std::endl;
     }
     glDeleteShader(vs);
     glDeleteShader(fs);
@@ -306,11 +226,34 @@ static int    g_winW = 1280;
 static int    g_winH = 720;
 static bool   g_needFrame = true;  // request a camera reframe on hole switch
 
+// ── Drone (added alongside the fly-camera, not replacing it) ─────────────────
+// g_useDrone toggles which one drives the view + input. False = the original
+// fly-camera; true = the quadcopter drone from Report §8. Toggle with C.
+// Mouse deltas are accumulated by cursor_cb each time the OS reports cursor
+// movement, then consumed once per frame by either the camera (subtracted
+// directly from g_cam.yaw/pitch — the legacy path) or the drone (consumed
+// via g_drone.update()'s mouseDx/Dy parameters). Tracking deltas in one
+// place keeps the two input paths from fighting over the cursor.
+static Drone  g_drone;
+static bool   g_useDrone     = false;
+static float  g_mouseAccumDx = 0.0f;
+static float  g_mouseAccumDy = 0.0f;
+
 // Forward declarations of the hole instances so callbacks can reference them.
 static Hole13* g_h13 = NULL;
 static Hole14* g_h14 = NULL;
 // ADD HOLE 15: declare g_h15 pointer here when that class exists.
 static Hole15* g_h15 = NULL;
+
+// Shav's Hole 16 + the dynamic skybox. The skybox is shared by ALL holes —
+// its current sun/moon direction is fed into both shader programs each frame
+// as the directional light, so 13/14/15/16 all track the same time of day.
+static Hole16* g_h16     = NULL;
+static Skybox  g_skybox;
+// Second shader program for friend's Mesh-based holes (16). The main program
+// (yours) is built later in main() and stored as a local `program`; this
+// pointer-free static is just a separate GL handle.
+static GLuint  g_meshProgram = 0;
 
 static void frameCurrent() {
     glm::vec3 c(0.0f); float r = 50.0f;
@@ -318,16 +261,27 @@ static void frameCurrent() {
     if (g_activeHole == 14 && g_h14) { c = g_h14->sceneCenter(); r = g_h14->sceneRadius(); }
     // ADD HOLE 15: add the matching `if` line here.
     if (g_activeHole == 15 && g_h15) { c = g_h15->sceneCenter(); r = g_h15->sceneRadius(); }
+    // Hole 16 doesn't expose sceneCenter/sceneRadius — its arc fairway is
+    // centred at the origin with outer radius ~19 m and ground disc ~21 m,
+    // so a 30 m framing radius gives a comfortable view of everything.
+    if (g_activeHole == 16 && g_h16) { c = glm::vec3(0.0f, 0.5f, 0.0f); r = 30.0f; }
     g_cam.frameOn(c, r);
+    g_drone.frameOn(c, r);   // also reframe the drone so R works in either mode
 }
 
 static void key_cb(GLFWwindow* w, int key, int /*sc*/, int action, int /*mods*/) {
+    // Forward keys to the drone so it can pick up V (third-person toggle)
+    // and any other one-off keys it cares about. The drone's onKey ignores
+    // anything it doesn't recognise, so this is safe regardless of mode.
+    g_drone.onKey(key, action);
+
     if (action != GLFW_PRESS) return;
     if (key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(w, GLFW_TRUE);
     if (key == GLFW_KEY_1) { g_activeHole = 13; g_needFrame = true; }
     if (key == GLFW_KEY_2) { g_activeHole = 14; g_needFrame = true; }
     // ADD HOLE 15: bind key 3 here.
     if (key == GLFW_KEY_3) { g_activeHole = 15; g_needFrame = true; }
+    if (key == GLFW_KEY_4) { g_activeHole = 16; g_needFrame = true; }
     if (key == GLFW_KEY_R) g_needFrame = true;
     if (key == GLFW_KEY_TAB) {
         g_wireframe = !g_wireframe;
@@ -339,6 +293,15 @@ static void key_cb(GLFWwindow* w, int key, int /*sc*/, int action, int /*mods*/)
                          g_mouseLook ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
         g_firstMouse = true;
     }
+    // ── C: toggle fly-camera ↔ drone mode ────────────────────────────────────
+    if (key == GLFW_KEY_C) {
+        g_useDrone = !g_useDrone;
+        // Reset the mouse delta accumulator so a big jump from the previous
+        // mode's cursor position doesn't suddenly fling the new view.
+        g_mouseAccumDx = 0.0f;
+        g_mouseAccumDy = 0.0f;
+        g_firstMouse = true;
+    }
 }
 
 static void cursor_cb(GLFWwindow* /*w*/, double x, double y) {
@@ -346,11 +309,21 @@ static void cursor_cb(GLFWwindow* /*w*/, double x, double y) {
     if (g_firstMouse) { g_lastX = x; g_lastY = y; g_firstMouse = false; return; }
     double dx = x - g_lastX, dy = y - g_lastY;
     g_lastX = x; g_lastY = y;
-    const float sens = 0.0025f;
-    g_cam.yaw   += (float)dx * sens;
-    g_cam.pitch -= (float)dy * sens;
-    if (g_cam.pitch >  1.5f) g_cam.pitch =  1.5f;
-    if (g_cam.pitch < -1.5f) g_cam.pitch = -1.5f;
+
+    // Accumulate raw pixel deltas for the drone (consumed once per frame
+    // by g_drone.update()). This is independent of the camera path below
+    // so neither mode ever drops mouse input.
+    g_mouseAccumDx += (float)dx;
+    g_mouseAccumDy += (float)dy;
+
+    // Original fly-camera path — only active when the camera is driving.
+    if (!g_useDrone) {
+        const float sens = 0.0025f;
+        g_cam.yaw   += (float)dx * sens;
+        g_cam.pitch -= (float)dy * sens;
+        if (g_cam.pitch >  1.5f) g_cam.pitch =  1.5f;
+        if (g_cam.pitch < -1.5f) g_cam.pitch = -1.5f;
+    }
 }
 
 static void size_cb(GLFWwindow* /*w*/, int width, int height) {
@@ -383,7 +356,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // for macOS
 
     GLFWwindow* win = glfwCreateWindow(g_winW, g_winH,
-        "COS344 - Holes 13 & 14 (press 1/2 to select, R to reframe)", NULL, NULL);
+        "COS344 - Holes 13/14/15 (1/2/3 select, C toggle drone, R reframe)", NULL, NULL);
     if (!win) {
         std::cerr << "Window creation failed\n";
         glfwTerminate(); return 1;
@@ -410,7 +383,10 @@ int main() {
     glDisable(GL_CULL_FACE);
     glEnable(GL_MULTISAMPLE);
 
-    GLuint program = buildProgram();
+    GLuint program = buildProgramFromFiles(VERTEX_PATH, FRAGMENT_PATH);
+    // Friend's shader (Mesh + Hole16). Stored in a global so the render loop
+    // can switch to it before drawing Hole16 without a parameter shuffle.
+    g_meshProgram = buildProgramFromFiles(MESH_VERTEX_PATH, MESH_FRAGMENT_PATH);
 
     Hole13 hole13;  g_h13 = &hole13;
     hole13.init(program);
@@ -420,9 +396,48 @@ int main() {
     Hole15 hole15;  g_h15 = &hole15;
     hole15.init(program);
 
+    // Hole 16 is built via Shav's Mesh class. Its constructor does all the
+    // geometry generation and water-mesh allocation; no explicit init(program)
+    // call is needed because each Mesh inside Hole16 grabs the shader handle
+    // at draw time via glGetUniformLocation. We just need to keep a pointer.
+    Hole16 hole16;  g_h16 = &hole16;
+
+    // Drone shares the same shader program — it uses the same vertex layout
+    // (pos / normal / colour) as the holes, so all uniforms line up.
+    g_drone.init(program);
+
+    // Dynamic skybox. Day texture / night texture are looked up by relative
+    // path; if either BMP is missing, the Skybox falls back to a gradient and
+    // just logs a warning rather than crashing.
+    g_skybox.dayLengthSecs = 120.0f;   // 2 minutes per full cycle
+    g_skybox.init(
+        SKYBOX_VERT_PATH,
+        SKYBOX_FRAG_PATH,
+        "src/assets/textures/sky_day.bmp",
+        "src/assets/textures/sky_night.bmp"
+    );
+
     double prevTime = glfwGetTime();
-    std::cout << "Controls: 1/2 select Hole 13/14; R reframe; WASD + Space/Shift fly; "
-                 "mouse look; TAB wireframe; M release mouse; ESC quit.\n";
+    std::cout
+        << "Controls:\n"
+        << "  1 / 2 / 3 / 4  select Hole 13 / 14 / 15 / 16\n"
+        << "  C              toggle FLY-CAMERA <-> DRONE mode\n"
+        << "  R              reframe view on current hole\n"
+        << "  Fly-camera (default):\n"
+        << "    W/S/A/D      forward / back / strafe left / right\n"
+        << "    Space/LShift ascend / descend\n"
+        << "    Mouse        look around\n"
+        << "  Drone (after pressing C):\n"
+        << "    W/S          pitch + translate forward / backward\n"
+        << "    A/D          yaw left / right\n"
+        << "    Q/E          roll left / right\n"
+        << "    Space/LShift ascend / descend\n"
+        << "    V            toggle 1st-person <-> 3rd-person\n"
+        << "    Z (hold)     zoom in (FoV 60 -> 20)\n"
+        << "    Mouse        camera look (1st-person only)\n"
+        << "  TAB            toggle wireframe\n"
+        << "  M              release / re-capture the mouse cursor\n"
+        << "  ESC            quit\n";
 
     while (!glfwWindowShouldClose(win)) {
         double now = glfwGetTime();
@@ -431,33 +446,121 @@ int main() {
 
         if (g_needFrame) { frameCurrent(); g_needFrame = false; }
 
-        processMovement(win, dt);
+        // Route input to whichever controller is active. The other one's
+        // state stays frozen so toggling back via C resumes where it was.
+        if (g_useDrone) {
+            g_drone.update(win, dt, g_mouseAccumDx, g_mouseAccumDy);
+        } else {
+            processMovement(win, dt);
+        }
+        // Consume the accumulator regardless of mode so a long pause in one
+        // mode doesn't dump a giant delta into the other on the next toggle.
+        g_mouseAccumDx = 0.0f;
+        g_mouseAccumDy = 0.0f;
 
-        // Light sky-blue background (so the holes read as outdoor scenes)
+        // Light sky-blue background (so the holes read as outdoor scenes when
+        // the skybox falls back to a gradient — the actual skybox sphere will
+        // cover this on every frame the skybox texture/gradient draws).
         glClearColor(0.55f, 0.75f, 0.92f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 proj = glm::perspective(glm::radians(60.0f),
-                                          (float)g_winW / (float)g_winH,
-                                          0.1f, 500.0f);
-        glm::mat4 view = g_cam.view();
+        // View / projection / eye come from whichever controller is driving.
+        // The drone's projection() honours its Z-zoom; the fly-camera uses
+        // the same fixed 60° FoV as before.
+        float aspect = (float)g_winW / (float)g_winH;
+        glm::mat4 proj;
+        glm::mat4 view;
+        glm::vec3 eyePos;
+        if (g_useDrone) {
+            proj   = g_drone.projection(aspect);
+            view   = g_drone.view();
+            eyePos = g_drone.eyePos();
+        } else {
+            proj   = glm::perspective(glm::radians(60.0f), aspect, 0.1f, 500.0f);
+            view   = g_cam.view();
+            eyePos = g_cam.pos;
+        }
 
-        // Sun direction: tilted enough that vertical faces (kerb walls, corridor
-        // sides) receive meaningful diffuse light, but still reads as "overhead".
-        glm::vec3 sunDir = glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f));
+        // ── Skybox update + sun/moon read ────────────────────────────────────
+        // The skybox rotates a sun + moon around the world X axis. Whichever
+        // one is currently above the horizon (higher intensity) drives the
+        // directional light for every hole's shading. The actual sky sphere
+        // is drawn at the END of the frame so it sits behind all geometry.
+        g_skybox.update(dt);
+        SkyLight sun  = g_skybox.getSun();
+        SkyLight moon = g_skybox.getMoon();
+        SkyLight active = (sun.intensity > moon.intensity) ? sun : moon;
+
+        // Direction TO the light (sun.position is in world space at the sphere
+        // radius from origin; the hole shader expects a direction, so just
+        // normalise the position vector). Fall back to a steep overhead light
+        // if both sun and moon are exactly at the horizon at the same instant.
+        glm::vec3 sunDir;
+        if (glm::length(active.position) > 1e-3f) {
+            sunDir = glm::normalize(active.position);
+        } else {
+            sunDir = glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f));
+        }
 
         switch (g_activeHole) {
-            case 13: hole13.draw(view, proj, sunDir, g_cam.pos); break;
-            case 14: hole14.draw(view, proj, sunDir, g_cam.pos); break;
+            case 13: hole13.draw(view, proj, sunDir, eyePos); break;
+            case 14: hole14.draw(view, proj, sunDir, eyePos); break;
             // ADD HOLE 15: add the matching case branch here.
-            case 15: hole15.draw(view, proj, sunDir, g_cam.pos); break;
-            default: hole13.draw(view, proj, sunDir, g_cam.pos); break;
+            case 15: hole15.draw(view, proj, sunDir, eyePos); break;
+
+            case 16: {
+                // Friend's Hole16 uses Shav's Mesh class which renders against
+                // a different shader program (uniforms: model/view/projection
+                // + flat 'colour'). We bind that program, set the per-frame
+                // view + projection uniforms once, then call hole16.draw().
+                // Inside, each Mesh sets its OWN model + colour uniforms.
+                glUseProgram(g_meshProgram);
+                GLint vLoc = glGetUniformLocation(g_meshProgram, "view");
+                GLint pLoc = glGetUniformLocation(g_meshProgram, "projection");
+                if (vLoc != -1) glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(view));
+                if (pLoc != -1) glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(proj));
+
+                // Hole16 has an animated water mesh. Hand it the camera +
+                // time so it can render correctly this frame.
+                g_h16->setCameraData(view, proj, eyePos);
+                g_h16->update(dt);
+                g_h16->draw(g_meshProgram, g_wireframe);
+                break;
+            }
+
+            default: hole13.draw(view, proj, sunDir, eyePos); break;
         }
+
+        // Draw the drone body LAST so it overlays the hole correctly. It
+        // internally no-ops in 1st-person mode, and we also gate it on
+        // drone mode being active (you don't want to see the drone hovering
+        // in front of you while flying the legacy free camera).
+        if (g_useDrone) {
+            g_drone.draw(view, proj, sunDir, eyePos);
+        }
+
+        // ── Skybox draw (after scene) ────────────────────────────────────────
+        // Skybox.cpp handles the depth tricks (disables depth writes,
+        // disables culling) internally so we don't need to touch state here.
+        // It uses gl_Position.xyww in its vertex shader, so it'll draw at the
+        // far plane behind everything when depth-test is on.
+        glDepthFunc(GL_LEQUAL);
+        g_skybox.draw(view, proj);
+        glDepthFunc(GL_LESS);
 
         std::ostringstream oss;
         oss << "COS344 - Hole " << g_activeHole
-            << "  |  cam (" << std::fixed << std::setprecision(1)
-            << g_cam.pos.x << ", " << g_cam.pos.y << ", " << g_cam.pos.z << ")";
+            << "  |  ";
+        if (g_useDrone) {
+            oss << "drone (" << std::fixed << std::setprecision(1)
+                << g_drone.position().x << ", " << g_drone.position().y << ", "
+                << g_drone.position().z << ")"
+                << " [" << (g_drone.thirdPerson() ? "3rd" : "1st") << "-person]";
+        } else {
+            oss << "cam (" << std::fixed << std::setprecision(1)
+                << g_cam.pos.x << ", " << g_cam.pos.y << ", " << g_cam.pos.z << ")"
+                << " [fly]";
+        }
         glfwSetWindowTitle(win, oss.str().c_str());
 
         glfwSwapBuffers(win);
@@ -468,7 +571,11 @@ int main() {
     hole14.cleanup();
     // ADD HOLE 15: clean up the new instance here.
     hole15.cleanup();
+    // Hole16 cleans itself up in its destructor (Mesh* meshes are deleted
+    // there). No explicit cleanup() call needed.
+    g_drone.cleanup();
     glDeleteProgram(program);
+    if (g_meshProgram) glDeleteProgram(g_meshProgram);
     glfwTerminate();
     return 0;
 }
