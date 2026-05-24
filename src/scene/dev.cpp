@@ -124,13 +124,13 @@ int main()
         glUseProgram(shader);
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
 
-        ground.draw(shader, false);
-        hole9e.draw(shader, false);
-        hole9w.draw(shader, false);
-        hole1.draw(shader, false);
-        hole2.draw(shader, false);
-        hole3.draw(shader, false);
-        hole4.draw(shader, false);
+        // ground.draw(shader, false);
+        // hole9e.draw(shader, false);
+        // hole9w.draw(shader, false);
+        // hole1.draw(shader, false);
+        // hole2.draw(shader, false);
+         hole3.draw(shader, false);
+        //hole4.draw(shader, false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

@@ -50,10 +50,11 @@ Hole3::Hole3() : meshCount(0)
     //     travelling in the -X direction (dx < 0).  So we pass the HIGH end
     //     first (x=+6) and the LOW end second (x=-2) so dx is negative.
     {
-        Mesh* m = new Mesh(Mesh::makeRamp(
+        Mesh* m = new Mesh(Mesh::makeRamp2(
         -2.0f, 0.1f, 0.0f,   // top of lower fairway
          6.0f, 1.6f, 0.0f,   // top of upper fairway
         10.0f));
+        m->rotate(-90,0.0f, 1.0f, 0.0f);
         m->setup();
         addMesh(m);
     }
@@ -62,7 +63,7 @@ Hole3::Hole3() : meshCount(0)
     {
         Mesh* m = new Mesh(Mesh::makeCuboid(12.0f, 0.2f, 10.0f,
                                             0.28f, 0.60f, 0.20f, 1.0f));
-        m->translate(10.0f, 1.5f, 0.0f);
+        m->translate(12.0f, 1.5f, 0.0f);
         m->setup();
         addMesh(m);
     }

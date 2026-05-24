@@ -84,7 +84,7 @@ Hole1::Hole1()
     addMesh(flagPole);
 
     Mesh flagBanner = Mesh::makeTriangularPrism(0.5f, 0.05f, 0.3f, 0.90f, 0.10f, 0.10f, 1.0f);
-    flagBanner.rotate(90.0f, 0.0f, 0.0f, 1.0f);
+    flagBanner.rotate(90.0f, 1.0f, 0.0f, 0.0f);
     flagBanner.translate(8.0f, pathY + 1.4f, 4.0f);
     flagBanner.setup();
     addMesh(new Mesh(std::move(flagBanner)));
@@ -92,8 +92,8 @@ Hole1::Hole1()
     // ─── RAMP CONNECTOR ───────────────────────────────────────────────────────
     const float horizTopY = pathY + FH * 0.5f;
     const float hillTopY  = pathY + FH * 0.5f + slopeH;
-    Mesh ramp = Mesh::makeRamp(-5.0f, horizTopY, 2.0f, -5.0f, hillTopY, -1.0f, FW);
-    addMesh(new Mesh(std::move(ramp)));
+    // Mesh ramp = Mesh::makeRamp(-5.0f, horizTopY, 2.0f, -5.0f, hillTopY, -1.0f, FW);
+    // addMesh(new Mesh(std::move(ramp)));
 
     // ─── ROCK ON THE FAIRWAY ──────────────────────────────────────────────────
     // Placed mid-fairway as an obstacle — centre of horizontal section
