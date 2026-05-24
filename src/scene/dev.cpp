@@ -118,11 +118,11 @@ int main()
     Mesh ground = Mesh::makeCuboid(210.0f, 0.5f, 125.0f, 0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
-    Hole9E hole9e(2.0);
+    Hole9E hole9e;
     hole9e.translate(48.0f, 0.35f, -8.0f);
 
-    // Hole9W hole9w;
-    // hole9w.translate(-48.0f, 0.35f, -8.0f);
+    Hole9W hole9w;
+    hole9w.translate(-48.0f, 0.35f, -8.0f);
         
        Hole16 hole16;
 
@@ -158,12 +158,12 @@ int main()
         // hole16.update(deltaTime);
 
         //ground.draw(shader, false);
-        // //hole9e.draw(shader, false);
-        // //hole9w.draw(shader, false);
+        hole9e.draw(shader, false);
+        hole9w.draw(shader, false);
         //hole11.draw(shader,false);
         //hole16.draw(shader, false);
 
-        hole12.draw(shader,false);
+        //hole12.draw(shader,false);
         //hole10.draw(shader,false);
         
 
