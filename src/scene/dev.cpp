@@ -97,6 +97,11 @@
 #include "../objects/Hole2.h"
 #include "../objects/Hole3.h"
 #include "../objects/Hole4.h"
+// Holes 17 / 18 — same Mesh-based pattern. Hole17 is the cave; Hole18 is
+// the S-shaped river hole with animated water (uses WaterMesh internally,
+// like Hole16).
+#include "../objects/Hole17.h"
+#include "../objects/Hole18.h"
 
 #include "../camera/Drone.h"
 
@@ -270,6 +275,9 @@ static Hole1*  g_h1  = NULL;
 static Hole2*  g_h2  = NULL;
 static Hole3*  g_h3  = NULL;
 static Hole4*  g_h4  = NULL;
+// Holes 17 / 18 — same Mesh-based pattern. Hole18 has water like Hole16.
+static Hole17* g_h17 = NULL;
+static Hole18* g_h18 = NULL;
 static Skybox  g_skybox;
 
 static void frameCurrent() {
@@ -302,6 +310,14 @@ static void frameCurrent() {
     if (g_activeHole == 3  && g_h3)  { c = glm::vec3(  0.0f, 2.0f,   0.0f); r = 22.0f; }
     // Hole4 (windmill) is on a raised hill; frame a bit higher and wider.
     if (g_activeHole == 4  && g_h4)  { c = glm::vec3(  0.0f, 3.0f,   0.0f); r = 26.0f; }
+    // Hole 17 — cave hole running along +X. Geometry sits between x≈0
+    // (tee) and x≈28 (green). Centre at the cave's midpoint with enough
+    // radius to fit the rock dome on top.
+    if (g_activeHole == 17 && g_h17) { c = glm::vec3( 14.0f, 1.0f,   0.0f); r = 24.0f; }
+    // Hole 18 — S-shaped river hole. Tee at (13, ?, 0), green at (12, ?, 40)
+    // so the bounding box centre is roughly (12, 0, 20); a 28 m radius
+    // shows both curves and the lake on the right.
+    if (g_activeHole == 18 && g_h18) { c = glm::vec3( 12.0f, 1.0f,  20.0f); r = 28.0f; }
     g_cam.frameOn(c, r);
     g_drone.frameOn(c, r);   // also reframe the drone so R works in either mode
 }
@@ -334,6 +350,10 @@ static void key_cb(GLFWwindow* w, int key, int /*sc*/, int action, int /*mods*/)
     if (key == GLFW_KEY_F2) { g_activeHole = 2; g_needFrame = true; }
     if (key == GLFW_KEY_F3) { g_activeHole = 3; g_needFrame = true; }
     if (key == GLFW_KEY_F4) { g_activeHole = 4; g_needFrame = true; }
+    // Holes 17 / 18 on the bracket keys [ and ] — physically adjacent on
+    // the keyboard so they're easy to remember as "the last two".
+    if (key == GLFW_KEY_LEFT_BRACKET)  { g_activeHole = 17; g_needFrame = true; }
+    if (key == GLFW_KEY_RIGHT_BRACKET) { g_activeHole = 18; g_needFrame = true; }
     if (key == GLFW_KEY_R) g_needFrame = true;
     if (key == GLFW_KEY_TAB) {
         g_wireframe = !g_wireframe;
@@ -478,6 +498,12 @@ int main() {
     Hole3 hole3;  g_h3 = &hole3;
     Hole4 hole4;  g_h4 = &hole4;
 
+    // Holes 17 / 18 — same Mesh-based pattern. Hole17 (cave) lives at the
+    // origin per its local coords (tee x=0, green x=28). Hole18 (S-river)
+    // also at origin (tee at x=13, z=0; green at x=12, z=40).
+    Hole17 hole17;  g_h17 = &hole17;
+    Hole18 hole18;  g_h18 = &hole18;
+
     // Drone shares the same shader program — it uses the same vertex layout
     // (pos / normal / colour) as the holes, so all uniforms line up.
     g_drone.init(program);
@@ -497,6 +523,8 @@ int main() {
     std::cout
         << "Controls:\n"
         << "  1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 0 / -   select Hole 13/14/15/16/5/6/7/8/10/11/12\n"
+        << "  F1 / F2 / F3 / F4                          select Hole 1/2/3/4\n"
+        << "  [  / ]                                     select Hole 17 / 18\n"
         << "  C              toggle FLY-CAMERA <-> DRONE mode\n"
         << "  R              reframe view on current hole\n"
         << "  Fly-camera (default):\n"
@@ -668,6 +696,18 @@ int main() {
             case 2: hole2.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
             case 3: hole3.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
             case 4: hole4.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
+
+            // Hole 17 — cave hole. Plain Mesh-based draw (no water).
+            case 17: hole17.draw(program, g_wireframe); break;
+
+            // Hole 18 — S-river hole. Has an animated WaterMesh just like
+            // Hole 16, so hand it the camera + dt before drawing.
+            case 18: {
+                g_h18->setCameraData(view, proj, eyePos);
+                g_h18->update(dt);
+                g_h18->draw(program, g_wireframe);
+                break;
+            }
 
             default: hole13.draw(view, proj, lightDir, eyePos); break;
         }
