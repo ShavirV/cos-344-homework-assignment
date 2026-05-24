@@ -12,7 +12,9 @@
 #include "../objects/Hole9E.h"
 #include "../objects/Hole9W.h"
 #include "../objects/Hole16.h"
+#include "../objects/Hole17.h"
 #include "../objects/Skybox.h"
+
 
 const int WIDTH  = 1280;
 const int HEIGHT = 720;
@@ -122,7 +124,8 @@ int main()
     // Hole9W hole9w;
     // hole9w.translate(-48.0f, 0.35f, -8.0f);
         
-       Hole16 hole16;
+       //Hole16 hole16;
+       Hole17 Hole17;
 
        Mesh hole16platform = Mesh::makeHole();
        float lastTime = (float)glfwGetTime();
@@ -176,14 +179,15 @@ int main()
         if (locLightColor >= 0) glUniform3fv(locLightColor, 1, glm::value_ptr(lightColor));
         if (locLightInt   >= 0) glUniform1f (locLightInt,   lightInt);
 
-        hole16.setCameraData(view, projection, cameraPos);
-        hole16.update(deltaTime);
+        //for the water redraw
+        // hole16.setCameraData(view, projection, cameraPos);
+        // hole16.update(deltaTime);
 
         //ground.draw(shader, false);
         //hole9e.draw(shader, false);
         //hole9w.draw(shader, false);
         // ── Sky (drawn first, depth write off) ───────────────────────────────────
-        hole16.draw(shader, false);
+        Hole17.draw(shader, false);
         
 
         glfwSwapBuffers(window);
