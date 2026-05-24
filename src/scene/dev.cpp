@@ -12,6 +12,7 @@
 #include "../objects/Hole9E.h"
 #include "../objects/Hole9W.h"
 #include "../objects/Hole16.h"
+#include "../objects/Skybox.h"
 
 const int WIDTH  = 1280;
 const int HEIGHT = 720;
@@ -112,7 +113,7 @@ int main()
         glm::radians(45.0f), (float)WIDTH / HEIGHT, 0.1f, 500.0f);
     glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
 
-    Mesh ground = Mesh::makeCuboid(210.0f, 0.5f, 125.0f, 0.13f, 0.55f, 0.13f, 1.0f);
+    Mesh ground = Mesh::makeCuboid(2100.0f, 0.5f, 1250.0f, 0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
     // Hole9E hole9e;
@@ -126,6 +127,15 @@ int main()
        Mesh hole16platform = Mesh::makeHole();
        float lastTime = (float)glfwGetTime();
 
+        Skybox skybox;
+        skybox.init(
+            "src/shaders/skybox.vert",
+            "src/shaders/skybox.frag",
+            "src/assets/textures/sky_day.bmp",
+            "src/assets/textures/sky_night.bmp"
+        );
+        skybox.dayLengthSecs = 60.0f;  // 2-minute full day cycle — adjust to taste
+
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
@@ -138,6 +148,33 @@ int main()
         glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         glUseProgram(shader);
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
+
+
+        skybox.update(deltaTime);
+        glDepthFunc(GL_LEQUAL);   // ← sky depth trick requires this
+        skybox.draw(view, projection);
+        glDepthFunc(GL_LESS);   // uses view/projection already computed above
+
+        SkyLight sun  = skybox.getSun();
+        SkyLight moon = skybox.getMoon();
+
+        // Active light = whichever is above the horizon
+        float sunWeight  = sun.intensity;
+        float moonWeight = moon.intensity;
+
+        glm::vec3 lightPos   = sunWeight > moonWeight ? sun.position  : moon.position;
+        glm::vec3 lightColor = sunWeight > moonWeight ? sun.color     : moon.color;
+        float     lightInt   = sunWeight > moonWeight ? sunWeight      : moonWeight;
+
+        // Upload to your vertex/fragment shader (check your uniform names in
+        // vertex.glsl / fragment.glsl and match them here):
+        GLint locLightPos   = glGetUniformLocation(shader, "lightPos");
+        GLint locLightColor = glGetUniformLocation(shader, "lightColor");
+        GLint locLightInt   = glGetUniformLocation(shader, "lightIntensity");
+        if (locLightPos   >= 0) glUniform3fv(locLightPos,   1, glm::value_ptr(lightPos));
+        if (locLightColor >= 0) glUniform3fv(locLightColor, 1, glm::value_ptr(lightColor));
+        if (locLightInt   >= 0) glUniform1f (locLightInt,   lightInt);
 
         hole16.setCameraData(view, projection, cameraPos);
         hole16.update(deltaTime);
@@ -145,6 +182,7 @@ int main()
         //ground.draw(shader, false);
         //hole9e.draw(shader, false);
         //hole9w.draw(shader, false);
+        // ── Sky (drawn first, depth write off) ───────────────────────────────────
         hole16.draw(shader, false);
         
 

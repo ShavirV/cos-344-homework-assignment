@@ -42,7 +42,7 @@ static const float PAVER_W      = 0.45f;
 // ── Green (raised, at arc end tip ~330°) ─────────────────────────────────────
 // Arc mid-radius at 330°: (10+19)/2 = 14.5  cos(330°)=0.866  sin(330°)=-0.5
 static const float GREEN_R      = 5.5f;
-static const float GREEN_Y      = 2.0f;
+static const float GREEN_Y      = 2.1f;
 static const float GREEN_WALL_H = 2.2f;   // tall enough to reach ground from GREEN_Y
 static const float GREEN_X      = 12.56f; // (ARC_INNER+ARC_OUTER)/2 * cos(330°)
 static const float GREEN_Z      = -7.25f; // (ARC_INNER+ARC_OUTER)/2 * sin(330°)
@@ -57,7 +57,7 @@ static const float ISLAND_Z      = 0.0f;
 // ── Water placeholder Y ───────────────────────────────────────────────────────
 // TODO: Replace with animated Water mesh between ISLAND_R and (ARC_INNER_R-0.5)
 // centred at (ISLAND_X, WATER_Y, ISLAND_Z) when water system is implemented.
-static const float WATER_Y       = 0.10f;
+static const float WATER_Y       = -0.15f;
 
 // ── Stream ────────────────────────────────────────────────────────────────────
 // Crosses the 30° gap between the tee (0°) and green (330°) arc ends.
@@ -68,7 +68,7 @@ static const float WATER_Y       = 0.10f;
 // P2: handle on the green side        (+X, pulled toward green tip)
 // P3: just past the green-side end    (green approach)
 //
-static const float    STREAM_Y  = 0.10f;
+static const float    STREAM_Y  = -0.10f;
 static const float    STREAM_W  =  3.5f;
 static const int      STREAM_SEGS = 6;
 static const glm::vec2 STREAM_P0 = { 14.5f,  2.0f  };
@@ -388,7 +388,7 @@ Hole16::Hole16()
             ARC_INNER_R, ARC_OUTER_R,
             ARC_START_DEG, ARC_END_DEG,
             ARC_RING_SEGS, ARC_RAD_SEGS,
-            [](float, float){ return 0.0f; }));    // flat at Y=0, no hack needed
+            [](float, float){ return 0.05f; }));    // flat at Y=0, no hack needed
         base->setRGBA(0.04f, 0.79f, 0.16f, 1.0f); // geeen
         addMesh(base);
     }
@@ -486,10 +486,10 @@ Hole16::Hole16()
     {
         waterMoat = new WaterMesh();
 
-        float moatDiam             = (ARC_INNER_R - 0.5f) * 2.0f;
+        float moatDiam             = (ARC_INNER_R - 0.5f) * 3.0f;
         waterMoat->planeWidth      = moatDiam;
         waterMoat->planeLength     = moatDiam;
-        waterMoat->gridResolution  = 32;
+        waterMoat->gridResolution  = 64;
 
         // Calm standing water — very small waves, slow scroll.
         waterMoat->waves[0] = { glm::vec2( 1.0f,  0.0f), 0.05f, 5.0f };
@@ -518,14 +518,14 @@ Hole16::Hole16()
 
     // ── [11] Large ground disc ────────────────────────────────────────────────
     // Fills under the entire hole so no gaps appear when viewed from any angle.
-    {
-        Mesh* ground = new Mesh(Mesh::makeCylinder(
-            ARC_OUTER_R + PAVER_W + 2.0f, 0.15f, 64,
-            0.24f, 0.17f, 0.10f, 1.0f));
-        ground->translate(0.0f, -0.08f, 0.0f);
-        ground->setup();
-        addMesh(ground);
-    }
+    // {
+    //     Mesh* ground = new Mesh(Mesh::makeCylinder(
+    //         ARC_OUTER_R + PAVER_W + 2.0f, 0.15f, 64,
+    //         0.24f, 0.17f, 0.10f, 1.0f));
+    //     ground->translate(0.0f, -0.08f, 0.0f);
+    //     ground->setup();
+    //     addMesh(ground);
+    // }
 
     // ── [12] Tee marker ───────────────────────────────────────────────────────
     {
