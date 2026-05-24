@@ -64,7 +64,7 @@ static const float TEE_Z         =  0.0f;
 
 // ── Tee stairs ───────────────────────────────────────────────────────────────
 static const int   TEE_STAIR_COUNT  = 5;
-static const float TEE_STAIR_WIDTH  = 1.2f;
+static const float TEE_STAIR_WIDTH  = 1.4f;
 static const float TEE_STAIR_DEPTH  = 3.0f;
 static const float TEE_STAIR_RISE   = TOP_TEE_Y / TEE_STAIR_COUNT;
 
@@ -106,6 +106,12 @@ static const float LAKE_W        =  15.0f;
 static const float LAKE_L        =  15.0f;
 static const float LAKE_CX       =  -18.0f;   // world X (right side of bot arc)
 static const float LAKE_CZ       = 0.0f;   // world Z (inside bot arc pocket)
+static const float LAKE_RETAIN_R    = LAKE_W * 0.5f;   // 7.5 — paver inner face
+static const int   LAKE_RETAIN_SEGS = 48;
+static const float LAKE1_CX         = LAKE_CX;          // -18.0
+static const float LAKE1_CZ         = LAKE_CZ;           //   0.0
+static const float LAKE2_CX         = LAKE_CX + 17.0f;  //  -1.0
+static const float LAKE2_CZ         = LAKE_CZ;           //   0.0
 
 // ── Bridge ────────────────────────────────────────────────────────────────────
 // Wooden deck spanning the stream.  Positioned at stream centre, rotated to
@@ -280,7 +286,7 @@ Hole18::Hole18() : meshCount(0)
         Mesh* tee = new Mesh(Mesh::makeCylinder(
             TEE_R, 0.10f, 20,
             0.85f, 0.82f, 0.18f, 1.0f));
-        tee->translate(TEE_X, teeY, TEE_Z);
+        tee->translate(TEE_X, teeY+0.13f, TEE_Z+2);
         tee->setup();
         addMesh(tee);
     }
@@ -309,40 +315,32 @@ Hole18::Hole18() : meshCount(0)
 
         // ── [11] Tee stairs ──────────────────────────────────────────────────────────
 {
-    float baseY = topArcHeight(0.0f, 0.5f); // ground at start of stairs
-
     for (int i = 0; i < TEE_STAIR_COUNT; i++)
     {
-        float x = TEE_STAIR_START_X + i * TEE_STAIR_WIDTH + TEE_STAIR_WIDTH * 0.5f;
-        float y = baseY + (i + 0.5f) * TEE_STAIR_RISE;
+        float xc = TEE_X + (i + 0.5f) * TEE_STAIR_WIDTH;
+        float yc = TOP_TEE_Y - (i + 0.5f) * TEE_STAIR_RISE;
 
         Mesh* step = new Mesh(Mesh::makeCuboid(
             TEE_STAIR_WIDTH,
             TEE_STAIR_RISE,
             TEE_STAIR_DEPTH,
-            0.45f, 0.43f, 0.40f, 1.0f));
+            0.76f, 0.74f, 0.70f, 1.0f));
 
-        step->translate(x, y, TEE_Z);
+        step->translate(xc-3, yc, TEE_Z-1.6);
         step->setup();
         addMesh(step);
-
-        // optional riser face reinforcement (prevents lighting artifacts)
-        Mesh* riser = new Mesh(Mesh::makeCuboid(
-            TEE_STAIR_WIDTH,
-            TEE_STAIR_RISE,
-            0.15f,
-            0.35f, 0.33f, 0.30f, 1.0f));
-
-        riser->translate(
-            x,
-            baseY + i * TEE_STAIR_RISE + TEE_STAIR_RISE * 0.5f,
-            TEE_Z - (TEE_STAIR_DEPTH * 0.5f)
-        );
-
-        riser->setup();
-        addMesh(riser);
     }
-}
+    {
+        Mesh* stairWall = new Mesh(Mesh::makeCuboid(
+             BOT_INNER_R+1.9,
+             2*TOP_TEE_Y-2,
+             0.10f,
+             0.76f, 0.74f, 0.70f, 1.0f));
+
+        stairWall->translate(TEE_X, TEE_Z+1, TEE_Z);
+        stairWall->setup();
+        addMesh(stairWall);
+    }
 
     // ── [24] Flag pole ────────────────────────────────────────────────────────
     {
@@ -408,6 +406,80 @@ Hole18::Hole18() : meshCount(0)
         addMesh(cup);
     }
 
+     // ── [16] Lake 1 retaining wall ────────────────────────────────────────────
+    // A full 360° arc-border ring sitting just outside the lake edge.
+    // makeArcBorder with a flat heightFn produces a uniform-height ring of
+    // 3-D paver slabs — the same quality as the fairway kerbs.
+    // side=+1 means pavers extrude OUTWARD (away from the lake centre),
+    // so the inner face of each paver lines up with the lake edge.
+    {
+        Mesh* retain1 = new Mesh(Mesh::makeArcBorder(
+            LAKE_RETAIN_R - PAVER_W, // edge radius (inside face of paver)
+            PAVER_W, BORDER_H + 0.15f,   // slightly taller than fairway kerbs
+            40.0f, 164.0f,
+            LAKE_RETAIN_SEGS, +1,
+            [](float, float){ return 0.0f; },  // flat — lake surface is level
+            0.68f, 0.64f, 0.58f, 1.0f));       // warm sandstone colour
+        retain1->translate(LAKE1_CX, LAKE_Y + 0.05f, LAKE1_CZ);
+        retain1->setup();
+        addMesh(retain1);
+    }
+
+    // ── [17] Lake 1 retaining wall flat infill ────────────────────────────────
+    // Ground-level infill pavers flush with the surrounding terrain.
+    {
+        Mesh* retain1Flat = new Mesh(Mesh::makeArcBorder(
+            LAKE_RETAIN_R - PAVER_W,
+            PAVER_W, BORDER_H + 0.15f,
+            40.0f, 164.0f,
+            LAKE_RETAIN_SEGS, +1,
+            [](float, float){ return 0.0f; },
+            0.60f, 0.57f, 0.52f, 1.0f));
+        retain1Flat->translate(LAKE1_CX, -0.05f, LAKE1_CZ);
+        retain1Flat->setup();
+        addMesh(retain1Flat);
+    }
+
+    // ── [18] Lake 2 retaining wall ────────────────────────────────────────────
+    {
+        Mesh* retain2 = new Mesh(Mesh::makeArcBorder(
+            LAKE_RETAIN_R - PAVER_W,
+            PAVER_W, BORDER_H + 0.15f,
+            221.0f, 360.0f,
+            LAKE_RETAIN_SEGS, +1,
+            [](float, float){ return 0.0f; },
+            0.68f, 0.64f, 0.58f, 1.0f));
+        retain2->translate(LAKE2_CX, LAKE_Y + 0.05f, LAKE2_CZ);
+        retain2->setup();
+        addMesh(retain2);
+    }
+
+    // ── [19] Lake 2 retaining wall flat infill ────────────────────────────────
+    {
+        Mesh* retain2Flat = new Mesh(Mesh::makeArcBorder(
+            LAKE_RETAIN_R - PAVER_W,
+            PAVER_W, BORDER_H + 0.15f,
+            221.0f, 300.0f,
+            LAKE_RETAIN_SEGS, +1,
+            [](float, float){ return 0.0f; },
+            0.60f, 0.57f, 0.52f, 1.0f));
+        retain2Flat->translate(LAKE2_CX, -0.05f, LAKE2_CZ);
+        retain2Flat->setup();
+        addMesh(retain2Flat);
+    }
+
+    //── [20] Lake 1 bank disc ─────────────────────────────────────────────────
+    //Low cylinder giving the appearance of a bank or levee around the water.
+    //Sits just outside the retaining wall.
+    {
+        Mesh* bank1 = new Mesh(Mesh::makeCylinder(
+            LAKE_RETAIN_R + 1.2f, 0.25f, 40,
+            0.30f, 0.22f, 0.12f, 1.0f));
+        bank1->translate(LAKE1_CX, LAKE_Y - 0.02f, LAKE1_CZ);
+        bank1->setup();
+        addMesh(bank1);
+    }
+
     // ── [11] Bridge deck ─────────────────────────────────────────────────────
     // Wooden bridge spanning the stream. The deck sits just above stream Y.
     {
@@ -456,44 +528,7 @@ Hole18::Hole18() : meshCount(0)
             addMesh(rock);
         }
     }
-
-    // ── [18] Stream water ────────────────────────────────────────────────────
-    {
-        waterStream = new WaterMesh();
-        waterStream->planeWidth     = STREAM_W;
-        waterStream->planeLength    = STREAM_L;
-        waterStream->gridResolution = 32;
-
-        // Stream flows diagonally — wave directions aligned with flow
-        float flowRad = glm::radians(STREAM_ROT);
-        glm::vec2 flowDir = glm::vec2(cosf(flowRad), sinf(flowRad));
-        glm::vec2 offDir  = glm::vec2(-sinf(flowRad), cosf(flowRad)); // perpendicular
-
-        waterStream->waves[0] = { flowDir,                   0.10f, 4.0f };
-        waterStream->waves[1] = { flowDir + offDir * 0.2f,  0.06f, 2.5f };
-        waterStream->waves[2] = { flowDir - offDir * 0.15f, 0.04f, 1.8f };
-        waterStream->waves[3] = { flowDir * 0.8f,           0.03f, 1.2f };
-
-        waterStream->scrollSpeed0  = 0.20f;
-        waterStream->scrollSpeed1  = 0.13f;
-        waterStream->colorShallow  = glm::vec3(0.28f, 0.58f, 0.55f);
-        waterStream->colorDeep     = glm::vec3(0.04f, 0.18f, 0.28f);
-        waterStream->foamThreshold = 0.07f;
-
-        waterStream->modelMatrix =
-            glm::rotate(
-                glm::translate(glm::mat4(1.0f),
-                    glm::vec3(STREAM_CX, STREAM_Y, STREAM_CZ)),
-                glm::radians(STREAM_ROT),
-                glm::vec3(0.0f, 1.0f, 0.0f));
-
-        waterStream->init(
-            "src/shaders/water.vert",
-            "src/shaders/water.frag",
-            "src/assets/textures/water_normal.bmp",
-            "src/assets/textures/water_normal2.bmp",
-            "src/assets/textures/water_foam.bmp");
-    }
+}
 
     // ── [19] Lake water ───────────────────────────────────────────────────────
     {
@@ -582,7 +617,6 @@ Hole18::~Hole18()
         delete meshes[i];
         meshes[i] = nullptr;
     }
-    delete waterStream;
     delete waterLake;
     delete waterLake2;
 }
@@ -598,7 +632,6 @@ void Hole18::addMesh(Mesh* m)
 // =============================================================================
 void Hole18::update(float deltaTime)
 {
-    if (waterStream) waterStream->update(deltaTime);
     if (waterLake)   waterLake->update(deltaTime);
     if (waterLake2)   waterLake2->update(deltaTime);
 }
@@ -621,7 +654,6 @@ void Hole18::draw(GLuint shaderProgram, bool wireframe)
         meshes[i]->draw(shaderProgram, wireframe);
 
     // Water last — alpha blended, depth mask off (handled inside WaterMesh)
-    if (waterStream) waterStream->draw(camView, camProj, camPos);
     if (waterLake)   waterLake->draw(camView, camProj, camPos);
     if (waterLake2)   waterLake2->draw(camView, camProj, camPos);
 }

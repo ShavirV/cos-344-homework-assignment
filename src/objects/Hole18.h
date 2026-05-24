@@ -47,7 +47,6 @@ private:
     Mesh*       meshes[MAX_MESHES];
     int         meshCount;
 
-    WaterMesh*  waterStream = nullptr;
     WaterMesh*  waterLake   = nullptr;
     WaterMesh*  waterLake2   = nullptr;
 
