@@ -11,14 +11,16 @@
 
 #include "../objects/Hole9E.h"
 #include "../objects/Hole9W.h"
-//put mine
+#include "../objects/Hole16.h"
+#include "../objects/Skybox.h"
 #include "../objects/Hole5.h"
 #include "../objects/Hole6.h"
 #include "../objects/Hole7.h"
 #include "../objects/Hole8.h"
 
-const int WIDTH  = 1000;
-const int HEIGHT = 1000;
+const int WIDTH  = 1280;
+const int HEIGHT = 720;
+bool wireframeMode = false;
 
 // ── Camera ────────────────────────────────────────────────────────────────────
 glm::vec3 cameraPos   = glm::vec3(0.0f, 90.0f, 160.0f);
@@ -69,8 +71,27 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) cameraPos -= SPEED * flat;
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) cameraPos -= SPEED * right;
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) cameraPos += SPEED * right;
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) cameraPos.y += SPEED;
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) cameraPos.y -= SPEED;
     if (glfwGetKey(window, GLFW_KEY_SPACE)      == GLFW_PRESS) cameraPos += SPEED * cameraUp;
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) cameraPos -= SPEED * cameraUp;
+
+    static bool enterPressed = false;
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS) {
+        if (!enterPressed) {
+            wireframeMode = !wireframeMode;
+            if (wireframeMode) {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                std::cout << "Wireframe mode ON" << std::endl;
+            } else {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                std::cout << "Wireframe mode OFF" << std::endl;
+            }
+            enterPressed = true;
+        }
+    } else {
+        enterPressed = false;
+    }
 }
 
 int main()
@@ -96,12 +117,28 @@ int main()
         glm::radians(45.0f), (float)WIDTH / HEIGHT, 0.1f, 500.0f);
     glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
 
-    Mesh ground = Mesh::makeCuboid(210.0f, 0.5f, 125.0f, 0.13f, 0.55f, 0.13f, 1.0f);
+    Mesh ground = Mesh::makeCuboid(2100.0f, 0.5f, 1250.0f, 0.13f, 0.55f, 0.13f, 1.0f);
     ground.setup();
 
-    Hole9E hole9e;
-    hole9e.translate(48.0f, 0.35f, -8.0f);
+    // Hole9E hole9e;
+    // hole9e.translate(48.0f, 0.35f, -8.0f);
 
+    // Hole9W hole9w;
+    // hole9w.translate(-48.0f, 0.35f, -8.0f);
+        
+       Hole16 hole16;
+
+       Mesh hole16platform = Mesh::makeHole();
+       float lastTime = (float)glfwGetTime();
+
+        Skybox skybox;
+        skybox.init(
+            "src/shaders/skybox.vert",
+            "src/shaders/skybox.frag",
+            "src/assets/textures/sky_day.bmp",
+            "src/assets/textures/sky_night.bmp"
+        );
+        skybox.dayLengthSecs = 60.0f;  // 2-minute full day cycle — adjust to taste
     Hole9W hole9w;
     hole9w.translate(-48.0f, 0.35f, -8.0f);
 //put mine, call hole7 and variable name
@@ -132,10 +169,50 @@ hole8.translate( 42.0f, 0.35f,  22.5f);
         processInput(window);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // ── Fix 2: update view matrix every frame ─────────────────────────────
+        float currentTime = (float)glfwGetTime();
+        float deltaTime   = currentTime - lastTime;
+        lastTime          = currentTime;
+
         glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         glUseProgram(shader);
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
+
+
+        skybox.update(deltaTime);
+        glDepthFunc(GL_LEQUAL);   // ← sky depth trick requires this
+        skybox.draw(view, projection);
+        glDepthFunc(GL_LESS);   // uses view/projection already computed above
+
+        SkyLight sun  = skybox.getSun();
+        SkyLight moon = skybox.getMoon();
+
+        // Active light = whichever is above the horizon
+        float sunWeight  = sun.intensity;
+        float moonWeight = moon.intensity;
+
+        glm::vec3 lightPos   = sunWeight > moonWeight ? sun.position  : moon.position;
+        glm::vec3 lightColor = sunWeight > moonWeight ? sun.color     : moon.color;
+        float     lightInt   = sunWeight > moonWeight ? sunWeight      : moonWeight;
+
+        // Upload to your vertex/fragment shader (check your uniform names in
+        // vertex.glsl / fragment.glsl and match them here):
+        GLint locLightPos   = glGetUniformLocation(shader, "lightPos");
+        GLint locLightColor = glGetUniformLocation(shader, "lightColor");
+        GLint locLightInt   = glGetUniformLocation(shader, "lightIntensity");
+        if (locLightPos   >= 0) glUniform3fv(locLightPos,   1, glm::value_ptr(lightPos));
+        if (locLightColor >= 0) glUniform3fv(locLightColor, 1, glm::value_ptr(lightColor));
+        if (locLightInt   >= 0) glUniform1f (locLightInt,   lightInt);
+
+        hole16.setCameraData(view, projection, cameraPos);
+        hole16.update(deltaTime);
+
+        //ground.draw(shader, false);
+        //hole9e.draw(shader, false);
+        //hole9w.draw(shader, false);
+        // ── Sky (drawn first, depth write off) ───────────────────────────────────
+        hole16.draw(shader, false);
+        
 
         ground.draw(shader, false);
         // hole9e.draw(shader, false);
