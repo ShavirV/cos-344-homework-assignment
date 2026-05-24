@@ -1256,3 +1256,108 @@ void Mesh::makeSteppedTerrain(std::vector<Mesh>& out,
         out.push_back(std::move(riser));
     }
 }
+
+Mesh Mesh::makeTunnel(float outerRadius, float innerRadius,
+                               float height, int sectors,
+                               float r, float g, float b, float a)
+{
+    Mesh mesh(r, g, b, a);
+    float h = height / 2.0f;
+
+    for (int i = 0; i < sectors; i++)
+    {
+        float a1 = (float)i       / sectors * 2.0f * (float)M_PI;
+        float a2 = (float)(i + 1) / sectors * 2.0f * (float)M_PI;
+
+        float ox1 = outerRadius * cosf(a1), oz1 = outerRadius * sinf(a1);
+        float ox2 = outerRadius * cosf(a2), oz2 = outerRadius * sinf(a2);
+        float ix1 = innerRadius * cosf(a1), iz1 = innerRadius * sinf(a1);
+        float ix2 = innerRadius * cosf(a2), iz2 = innerRadius * sinf(a2);
+
+        glm::vec3 nOut1 = glm::normalize(glm::vec3(cosf(a1), 0, sinf(a1)));
+        glm::vec3 nOut2 = glm::normalize(glm::vec3(cosf(a2), 0, sinf(a2)));
+        glm::vec3 nIn1  = -nOut1;
+        glm::vec3 nIn2  = -nOut2;
+
+        // ── Outer wall ────────────────────────────────────────────────────────
+        unsigned int base = mesh.vertexCount;
+        mesh.addVertex({{ox1, -h, oz1}, nOut1, {(float)i/sectors,     0}});
+        mesh.addVertex({{ox2, -h, oz2}, nOut2, {(float)(i+1)/sectors, 0}});
+        mesh.addVertex({{ox2,  h, oz2}, nOut2, {(float)(i+1)/sectors, 1}});
+        mesh.addVertex({{ox1,  h, oz1}, nOut1, {(float)i/sectors,     1}});
+        mesh.addTriangle(base+0, base+1, base+2);
+        mesh.addTriangle(base+2, base+3, base+0);
+
+        // ── Inner wall ────────────────────────────────────────────────────────
+        base = mesh.vertexCount;
+        mesh.addVertex({{ix2, -h, iz2}, nIn2, {(float)(i+1)/sectors, 0}});
+        mesh.addVertex({{ix1, -h, iz1}, nIn1, {(float)i/sectors,     0}});
+        mesh.addVertex({{ix1,  h, iz1}, nIn1, {(float)i/sectors,     1}});
+        mesh.addVertex({{ix2,  h, iz2}, nIn2, {(float)(i+1)/sectors, 1}});
+        mesh.addTriangle(base+0, base+1, base+2);
+        mesh.addTriangle(base+2, base+3, base+0);
+
+        // ── Top annulus ring ──────────────────────────────────────────────────
+        glm::vec3 nUp = {0, 1, 0};
+        base = mesh.vertexCount;
+        mesh.addVertex({{ox1,  h, oz1}, nUp, {0, 0}});
+        mesh.addVertex({{ox2,  h, oz2}, nUp, {1, 0}});
+        mesh.addVertex({{ix2,  h, iz2}, nUp, {1, 1}});
+        mesh.addVertex({{ix1,  h, iz1}, nUp, {0, 1}});
+        mesh.addTriangle(base+0, base+1, base+2);
+        mesh.addTriangle(base+2, base+3, base+0);
+
+        // ── Bottom annulus ring ───────────────────────────────────────────────
+        glm::vec3 nDn = {0, -1, 0};
+        base = mesh.vertexCount;
+        mesh.addVertex({{ox2, -h, oz2}, nDn, {1, 0}});
+        mesh.addVertex({{ox1, -h, oz1}, nDn, {0, 0}});
+        mesh.addVertex({{ix1, -h, iz1}, nDn, {0, 1}});
+        mesh.addVertex({{ix2, -h, iz2}, nDn, {1, 1}});
+        mesh.addTriangle(base+0, base+1, base+2);
+        mesh.addTriangle(base+2, base+3, base+0);
+    }
+
+    return mesh;
+}
+
+Mesh Mesh::makeCylinderNoTop(float radius, float height, int sectors,
+                              float r, float g, float b, float a)
+{
+    Mesh mesh(r, g, b, a);
+
+    float h = height / 2.0f;
+    glm::vec3 botC = {0, -h, 0};
+
+    for (int i = 0; i < sectors; i++)
+    {
+        float a1 = (float)i       / sectors * 2.0f * (float)M_PI;
+        float a2 = (float)(i + 1) / sectors * 2.0f * (float)M_PI;
+
+        float x1 = radius*cosf(a1), z1 = radius*sinf(a1);
+        float x2 = radius*cosf(a2), z2 = radius*sinf(a2);
+        float u1 = (float)i/sectors, u2 = (float)(i+1)/sectors;
+
+        glm::vec3 n1 = glm::normalize(glm::vec3(cosf(a1), 0, sinf(a1)));
+        glm::vec3 n2 = glm::normalize(glm::vec3(cosf(a2), 0, sinf(a2)));
+
+        // ── Side wall only ────────────────────────────────────────────────────
+        int baseIdx = mesh.vertexCount;
+        mesh.addVertex({{x1,-h,z1}, n1, {u1,0}});
+        mesh.addVertex({{x2,-h,z2}, n2, {u2,0}});
+        mesh.addVertex({{x2, h,z2}, n2, {u2,1}});
+        mesh.addVertex({{x1, h,z1}, n1, {u1,1}});
+        mesh.addTriangle(baseIdx,   baseIdx+1, baseIdx+2);
+        mesh.addTriangle(baseIdx+2, baseIdx+3, baseIdx);
+
+        // ── Bottom cap only ───────────────────────────────────────────────────
+        glm::vec3 nDn = {0,-1,0};
+        int bBaseIdx = mesh.vertexCount;
+        mesh.addVertex({botC,         nDn, {0.5f, 0.5f}});
+        mesh.addVertex({{x2,-h, z2},  nDn, {0.5f+0.5f*cosf(a2), 0.5f+0.5f*sinf(a2)}});
+        mesh.addVertex({{x1,-h, z1},  nDn, {0.5f+0.5f*cosf(a1), 0.5f+0.5f*sinf(a1)}});
+        mesh.addTriangle(bBaseIdx, bBaseIdx+1, bBaseIdx+2);
+    }
+
+    return mesh;
+}

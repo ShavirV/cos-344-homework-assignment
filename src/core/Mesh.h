@@ -349,4 +349,12 @@ static void makeSteppedTerrain(std::vector<Mesh>& out,
                                float stepWidth, float stepHeight,
                                float riserDepth,
                                float r, float g, float b, float a = 1.0f);
+
+                               
+    static Mesh makeTunnel(float outerRadius, float innerRadius,
+                               float height, int sectors,
+                               float r, float g, float b, float a);
+
+    static Mesh makeCylinderNoTop(float radius, float height, int sectors,
+                               float r, float g, float b, float a);
 };
