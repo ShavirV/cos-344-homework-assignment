@@ -357,4 +357,8 @@ static void makeSteppedTerrain(std::vector<Mesh>& out,
 
     static Mesh makeCylinderNoTop(float radius, float height, int sectors,
                                float r, float g, float b, float a);
+
+    static Mesh makeRamp2(float x0, float y0, float z0,
+                      float x1, float y1, float z1,
+                      float width);
 };
