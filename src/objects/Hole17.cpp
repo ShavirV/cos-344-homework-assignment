@@ -16,12 +16,12 @@ static const glm::vec2 BEZ_P3 = { 28.0f,  0.0f };
 
 static const float FAIRWAY_W     = 6.0f;   // total width (±3 from centreline)
 static const float FAIRWAY_HALF  = FAIRWAY_W * 0.5f;
-static const int   FAIRWAY_SEGS  = 60;     // longitudinal subdivisions
+static const int   FAIRWAY_SEGS  = 30;     // longitudinal subdivisions
 
 // ── Fairway bump height function parameters ───────────────────────────────────
 // Light undulation — amplitude is intentionally low so the cave remains
 // the visual centrepiece, not topographic drama.
-static const float BUMP_AMP_A   = 0.28f;  // primary wave
+static const float BUMP_AMP_A   = 0.38f;  // primary wave
 static const float BUMP_FREQ_A  = 3.0f;   // cycles over full length
 static const float BUMP_AMP_B   = 0.12f;  // secondary ripple
 static const float BUMP_FREQ_B  = 7.0f;
@@ -37,8 +37,8 @@ static const float CAVE_EXIT_X  = 22.0f;
 static const float CAVE_LEN     = CAVE_EXIT_X - CAVE_ENTRY_X;   // 14.0
 static const float CAVE_HALF_W  =  3.0f;   // half the interior width
 static const float CAVE_FULL_W  =  CAVE_HALF_W * 2.0f;          //  6.0
-static const float CAVE_CEIL_Y  =  5.5f;   // interior ceiling height
-static const float CAVE_WALL_T  =  0.5f;   // wall slab thickness
+static const float CAVE_CEIL_Y  =  3.5f;   // interior ceiling height
+static const float CAVE_WALL_T  =  1.5f;   // wall slab thickness
 // The cave centreline follows the Bezier, so at x=15 (midpoint) the Z offset
 // from the Bezier is ≈0. We place the cave symmetrically about the Bezier.
 // The entry/exit arch face centreline Z is evaluated from the Bezier.
@@ -47,17 +47,17 @@ static const float CAVE_WALL_T  =  0.5f;   // wall slab thickness
 static const float CAVE_Z_CENTRE = 0.0f;  // interior centred on Z=0
 
 // ── Arch face geometry ────────────────────────────────────────────────────────
-static const float ARCH_R       = 3.0f;   // inner radius of semicircle opening
-static const float ARCH_FRAME_W = 0.55f;  // stone frame ring thickness
+static const float ARCH_R       = 4.0f;   // inner radius of semicircle opening
+static const float ARCH_FRAME_W = 0.85f;  // stone frame ring thickness
 static const float ARCH_WALL_H  = CAVE_CEIL_Y; // total wall height at arch face
 static const int   ARCH_SEGS    = 16;     // semicircle subdivisions
 
 // ── Rock dome (exterior hill over cave) ───────────────────────────────────────
 static const float DOME_CX      = 15.0f;  // centre X (midpoint of cave)
 static const float DOME_CZ      =  0.0f;
-static const float DOME_W       = 24.0f;  // dome terrain width (X direction)
-static const float DOME_D       = 16.0f;  // dome terrain depth (Z direction)
-static const float DOME_PEAK    =  7.0f;  // peak height above ground
+static const float DOME_W       = 16.0f;  // dome terrain width (X direction)
+static const float DOME_D       = 6.80f;  // dome terrain depth (Z direction)
+static const float DOME_PEAK    =  4.0f;  // peak height above ground
 static const float DOME_OFFSET_X = DOME_CX - DOME_W * 0.5f;  // 3.0
 static const float DOME_OFFSET_Z = DOME_CZ - DOME_D * 0.5f;  // -8.0
 static const int   DOME_SEGS_X  = 28;
@@ -434,14 +434,14 @@ Mesh Hole17::makeArchFace(float faceX, float faceCentreZ,
     // Arch crown is at y = archR (+ outer makes oR). Panel goes from y=rOuter to y=wallH
     // spanning the full wall width.
     if (rOuter < wallH)
-    {
-        glm::vec3 bl = { faceX, rOuter, faceCentreZ - halfW };
-        glm::vec3 br = { faceX, rOuter, faceCentreZ + halfW };
-        glm::vec3 tr = { faceX, wallH,  faceCentreZ + halfW };
-        glm::vec3 tl = { faceX, wallH,  faceCentreZ - halfW };
-        if (facingPositiveX) emitQuad(bl, br, tr, tl, norm);
-        else                 emitQuad(tl, tr, br, bl, norm);
-    }
+    // {
+    //     glm::vec3 bl = { faceX, rOuter, faceCentreZ - halfW };
+    //     glm::vec3 br = { faceX, rOuter, faceCentreZ + halfW };
+    //     glm::vec3 tr = { faceX, wallH,  faceCentreZ + halfW };
+    //     glm::vec3 tl = { faceX, wallH,  faceCentreZ - halfW };
+    //     if (facingPositiveX) emitQuad(bl, br, tr, tl, norm);
+    //     else                 emitQuad(tl, tr, br, bl, norm);
+    // }
 
     mesh.setup();
     return mesh;
@@ -599,17 +599,17 @@ Hole17::Hole17()
 
     // ── [8] Cave ceiling ──────────────────────────────────────────────────────
     // A flat slab: slightly wider than the interior to cover wall tops.
-    {
-        Mesh* ceil = new Mesh(Mesh::makeCuboid(
-            CAVE_LEN, 0.4f, CAVE_FULL_W + CAVE_WALL_T * 2.0f + 0.2f,
-            0.25f, 0.23f, 0.22f, 1.0f));
-        ceil->translate(
-            CAVE_ENTRY_X + CAVE_LEN * 0.5f,
-            CAVE_CEIL_Y + 0.2f,
-            CAVE_Z_CENTRE);
-        ceil->setup();
-        addMesh(ceil);
-    }
+    // {
+    //     Mesh* ceil = new Mesh(Mesh::makeCuboid(
+    //         CAVE_LEN, 0.4f, CAVE_FULL_W + CAVE_WALL_T * 2.0f + 0.2f,
+    //         0.25f, 0.23f, 0.22f, 1.0f));
+    //     ceil->translate(
+    //         CAVE_ENTRY_X + CAVE_LEN * 0.5f,
+    //         CAVE_CEIL_Y + 0.2f,
+    //         CAVE_Z_CENTRE);
+    //     ceil->setup();
+    //     addMesh(ceil);
+    // }
 
     // ── [9] Cave entry arch face ──────────────────────────────────────────────
     // Stone frame ring at the entry mouth. The arch opening is a semicircle
@@ -700,12 +700,12 @@ Hole17::Hole17()
             DOME_SEGS_X, DOME_SEGS_Z,
             domeHeight,
             0.32f, 0.30f, 0.28f, 1.0f));   // rocky grey-brown
-        dome->translate(DOME_CX, 0.0f, DOME_CZ);
+        dome->translate(DOME_CX, 3.5f, DOME_CZ);
         dome->setup();
         addMesh(dome);
     }
 
-    // ── [16] Rock dome left skirt ─────────────────────────────────────────────
+    // // ── [16] Rock dome left skirt ─────────────────────────────────────────────
     // Thin vertical slab to close the gap between the dome edge and the ground
     // on the left side, preventing a visible seam at the dome perimeter.
     {

@@ -59,6 +59,9 @@ clean:
 run:
 	./$(TARGET)
 
+dev-fast: $(DEV_BIN)
+	./$(DEV_BIN)
+
 rebuild: clean $(TARGET) run
 
 .PHONY: all dev clean run rebuild
