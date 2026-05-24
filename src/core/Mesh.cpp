@@ -169,10 +169,15 @@ void Mesh::setup()
         (void*)(sizeof(glm::vec3)));
     glEnableVertexAttribArray(1);
 
-    // texCoord  — attribute 2
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-        (void*)(sizeof(glm::vec3) * 2));
-    glEnableVertexAttribArray(2);
+    // Slot 2 is the per-vertex colour input in the shared vertex shader
+    // (aColor). Mesh doesn't carry per-vertex colours — each mesh has a
+    // single RGBA tint stored in r/g/b/a. We therefore leave slot 2
+    // DISABLED here; before each draw, the draw() method calls
+    // glVertexAttrib3f(2, r, g, b) which sets a CONSTANT value that the
+    // vertex shader reads for every vertex of this mesh. (The texCoord
+    // field is still in the Vertex struct so older code that fills it in
+    // doesn't break; it's just not bound to a GL attribute.)
+    glDisableVertexAttribArray(2);
 
     glBindVertexArray(0);
 
@@ -234,20 +239,42 @@ void Mesh::draw(GLuint shaderProgram, bool wireframe)
     // and silently does nothing.
     glUseProgram(shaderProgram);
 
-    GLint colourLocation = glGetUniformLocation(shaderProgram, "colour");
-    GLint modelLocation  = glGetUniformLocation(shaderProgram, "model");
+    // ── Uniforms ───────────────────────────────────────────────────────────
+    // The shared shader (src/shaders/vertex.glsl + fragment.glsl) expects:
+    //   uModel       — per-mesh model matrix
+    //   uNormalMat   — inverse-transpose of the 3x3 of uModel
+    //   view/projection/uLightDir/uLightColor/uAmbient/uViewPos — set ONCE
+    //                  per frame by dev.cpp before any draw() runs
+    // The legacy 'colour' and 'model' uniforms (from the old flat shader)
+    // are queried below as a fallback so this code still works if someone
+    // links against the old shader without rebuilding.
+    GLint loc_uModel     = glGetUniformLocation(shaderProgram, "uModel");
+    GLint loc_uNormalMat = glGetUniformLocation(shaderProgram, "uNormalMat");
+    GLint loc_legacyModel  = glGetUniformLocation(shaderProgram, "model");
+    GLint loc_legacyColour = glGetUniformLocation(shaderProgram, "colour");
 
-    if (colourLocation != -1)
-    {
-        if (select)
-            glUniform4f(colourLocation, r * 0.7f + 0.3f, g * 0.7f + 0.3f,
-                                        b * 0.7f + 0.3f, a);
-        else
-            glUniform4f(colourLocation, r, g, b, a);
+    glm::mat3 nrmM = glm::mat3(glm::transpose(glm::inverse(modelMatrix)));
+
+    if (loc_uModel     != -1) glUniformMatrix4fv(loc_uModel,     1, GL_FALSE, glm::value_ptr(modelMatrix));
+    if (loc_uNormalMat != -1) glUniformMatrix3fv(loc_uNormalMat, 1, GL_FALSE, glm::value_ptr(nrmM));
+
+    // Legacy fallback for old flat shader (harmless when both shaders see this).
+    if (loc_legacyModel != -1)
+        glUniformMatrix4fv(loc_legacyModel, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+    if (loc_legacyColour != -1) {
+        if (select) glUniform4f(loc_legacyColour, r * 0.7f + 0.3f, g * 0.7f + 0.3f, b * 0.7f + 0.3f, a);
+        else        glUniform4f(loc_legacyColour, r, g, b, a);
     }
 
-    if (modelLocation != -1)
-        glUniformMatrix4fv(modelLocation, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+    // ── Per-vertex colour as a CONSTANT vertex attribute ───────────────────
+    // setup() disabled slot 2 deliberately so that this glVertexAttrib3f
+    // call supplies a single colour for every vertex of this mesh — the
+    // vertex shader reads it via `aColor` and the fragment shader's
+    // turf/kerb material classifier picks the right procedural shading
+    // based on the colour.
+    float cr = r, cg = g, cb = b;
+    if (select) { cr = cr * 0.7f + 0.3f; cg = cg * 0.7f + 0.3f; cb = cb * 0.7f + 0.3f; }
+    glVertexAttrib3f(2, cr, cg, cb);
 
     if (wireframe)
     {

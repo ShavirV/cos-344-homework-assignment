@@ -519,13 +519,13 @@ void Drone::init(GLuint shaderProgram)
 
     mProgram = shaderProgram;
 
-    // Cache uniform locations (names must match dev.cpp's inline shader).
-    mLocMVP        = glGetUniformLocation(mProgram, "uMVP");
+    // Cache uniform locations. uMVP / uLightColor / uAmbient are not
+    // cached here anymore — dev.cpp sets view/projection/lightColor/ambient
+    // once per frame as program-wide uniforms, before any of the hole or
+    // drone draw() calls.
     mLocModel      = glGetUniformLocation(mProgram, "uModel");
     mLocNormalMat  = glGetUniformLocation(mProgram, "uNormalMat");
     mLocLightDir   = glGetUniformLocation(mProgram, "uLightDir");
-    mLocLightColor = glGetUniformLocation(mProgram, "uLightColor");
-    mLocAmbient    = glGetUniformLocation(mProgram, "uAmbient");
     mLocViewPos    = glGetUniformLocation(mProgram, "uViewPos");
 
     mVertices.clear();
@@ -839,15 +839,19 @@ void Drone::draw(const glm::mat4& view,
 
     if (mLocLightDir   != -1) glUniform3fv(mLocLightDir, 1, glm::value_ptr(sunDir));
     if (mLocViewPos    != -1) glUniform3fv(mLocViewPos,  1, glm::value_ptr(camPos));
-    if (mLocLightColor != -1) glUniform3f(mLocLightColor, 1.00f, 0.98f, 0.92f);
-    if (mLocAmbient    != -1) glUniform3f(mLocAmbient,    0.32f, 0.30f, 0.26f);
+
+    // view + proj are program-wide; uLightColor + uAmbient are owned by
+    // dev.cpp now and set on the program each frame. Suppress unused-param
+    // warnings.
+    (void)view; (void)proj;
 
     glBindVertexArray(mVAO);
 
     auto pushModel = [&](const glm::mat4& M) {
-        glm::mat4 mvp  = proj * view * M;
+        // No MVP precompute — the vertex shader builds gl_Position from
+        // projection * view * uModel itself. We only need uModel and the
+        // matching normal matrix here.
         glm::mat3 nrmM = glm::mat3(glm::transpose(glm::inverse(M)));
-        if (mLocMVP       != -1) glUniformMatrix4fv(mLocMVP,       1, GL_FALSE, glm::value_ptr(mvp));
         if (mLocModel     != -1) glUniformMatrix4fv(mLocModel,     1, GL_FALSE, glm::value_ptr(M));
         if (mLocNormalMat != -1) glUniformMatrix3fv(mLocNormalMat, 1, GL_FALSE, glm::value_ptr(nrmM));
     };

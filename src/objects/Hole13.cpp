@@ -648,13 +648,16 @@ void Hole13::init(GLuint shaderProgram)
 
     mProgram = shaderProgram;
 
-    // Cache uniform locations (names from dev.cpp's inline shader).
-    mLocMVP        = glGetUniformLocation(mProgram, "uMVP");
+    // Cache uniform locations (names from src/shaders/vertex.glsl +
+    // fragment.glsl).
+    // NOTE: uMVP was removed when we moved view + projection to be
+    // per-frame uniforms set by dev.cpp. uLightColor / uAmbient are also
+    // set by dev.cpp now (from the Skybox), so this hole no longer caches
+    // them either — the only per-frame thing left here is sunDir + camPos +
+    // the per-hole model + normal matrix.
     mLocModel      = glGetUniformLocation(mProgram, "uModel");
     mLocNormalMat  = glGetUniformLocation(mProgram, "uNormalMat");
     mLocLightDir   = glGetUniformLocation(mProgram, "uLightDir");
-    mLocLightColor = glGetUniformLocation(mProgram, "uLightColor");
-    mLocAmbient    = glGetUniformLocation(mProgram, "uAmbient");
     mLocViewPos    = glGetUniformLocation(mProgram, "uViewPos");
 
     mVertices.clear();
@@ -816,22 +819,24 @@ void Hole13::draw(const glm::mat4& view,
 
     glUseProgram(mProgram);
 
+    // Per-hole transform — model is identity for Hole13 (geometry is already
+    // in world space). uModel + uNormalMat are the only matrices THIS hole
+    // owns; view and projection are program-wide uniforms set by dev.cpp
+    // once per frame, before any hole's draw() is called.
     glm::mat4 model(1.0f);
-    glm::mat4 mvp   = proj * view * model;
     glm::mat3 nrmM  = glm::mat3(glm::transpose(glm::inverse(model)));
 
-    if (mLocMVP        != -1) glUniformMatrix4fv(mLocMVP,       1, GL_FALSE, glm::value_ptr(mvp));
     if (mLocModel      != -1) glUniformMatrix4fv(mLocModel,     1, GL_FALSE, glm::value_ptr(model));
     if (mLocNormalMat  != -1) glUniformMatrix3fv(mLocNormalMat, 1, GL_FALSE, glm::value_ptr(nrmM));
+
+    // Sun direction + camera position still come from the caller. uLightColor
+    // and uAmbient are NOT set here anymore — dev.cpp computes them from the
+    // Skybox each frame and sets them on the program for all holes to share.
     if (mLocLightDir   != -1) glUniform3fv(mLocLightDir,        1, glm::value_ptr(sunDir));
     if (mLocViewPos    != -1) glUniform3fv(mLocViewPos,         1, glm::value_ptr(camPos));
-    // Noon sun: very white, slight warmth so it doesn't look fluorescent.
-    if (mLocLightColor != -1) glUniform3f(mLocLightColor, 1.00f, 0.98f, 0.92f);
-    // Ambient term: this is reused by the fragment shader as the
-    // "ground-bounce" colour in the hemisphere ambient model. Cool earthy grey
-    // works as a generic ground tint; the shader blends it with sky-blue
-    // depending on the surface's facing direction.
-    if (mLocAmbient    != -1) glUniform3f(mLocAmbient,    0.32f, 0.30f, 0.26f);
+
+    // view + proj are program-wide (set by dev.cpp); suppress unused-param warnings.
+    (void)view; (void)proj;
 
     glBindVertexArray(mVAO);
     glDrawElements(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, 0);

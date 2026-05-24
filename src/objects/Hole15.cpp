@@ -539,12 +539,11 @@ void Hole15::init(GLuint shaderProgram)
     // =========================================================================
     // 6. CACHE UNIFORM LOCATIONS
     // =========================================================================
-    mLocMVP        = glGetUniformLocation(mProgram, "uMVP");
+    // uMVP / uLightColor / uAmbient have moved out of per-hole control —
+    // dev.cpp owns them now. See Hole13.cpp for the full explanation.
     mLocModel      = glGetUniformLocation(mProgram, "uModel");
     mLocNormalMat  = glGetUniformLocation(mProgram, "uNormalMat");
     mLocLightDir   = glGetUniformLocation(mProgram, "uLightDir");
-    mLocLightColor = glGetUniformLocation(mProgram, "uLightColor");
-    mLocAmbient    = glGetUniformLocation(mProgram, "uAmbient");
     mLocViewPos    = glGetUniformLocation(mProgram, "uViewPos");
 
     mInitialised = true;
@@ -562,19 +561,18 @@ void Hole15::draw(const glm::mat4& view,
     if (!mInitialised) return;
 
     glm::mat4 model     = glm::mat4(1.0f);
-    glm::mat4 mvp       = proj * view * model;
     glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
 
     glUseProgram(mProgram);
 
-    glUniformMatrix4fv(mLocMVP,       1, GL_FALSE, glm::value_ptr(mvp));
     glUniformMatrix4fv(mLocModel,     1, GL_FALSE, glm::value_ptr(model));
     glUniformMatrix3fv(mLocNormalMat, 1, GL_FALSE, glm::value_ptr(normalMat));
 
-    glUniform3fv(mLocLightDir,   1, glm::value_ptr(glm::normalize(sunDir)));
-    glUniform3f (mLocLightColor, 1.0f, 0.97f, 0.90f);
-    glUniform3f (mLocAmbient,    0.22f, 0.22f, 0.25f);
-    glUniform3fv(mLocViewPos,    1, glm::value_ptr(camPos));
+    glUniform3fv(mLocLightDir, 1, glm::value_ptr(glm::normalize(sunDir)));
+    glUniform3fv(mLocViewPos,  1, glm::value_ptr(camPos));
+
+    // view + proj are program-wide; suppress unused-param warnings.
+    (void)view; (void)proj;
 
     glBindVertexArray(mVAO);
     glDrawElements(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, nullptr);

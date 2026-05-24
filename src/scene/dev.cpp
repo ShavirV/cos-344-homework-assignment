@@ -6,12 +6,14 @@
 // shared dynamic skybox driving the time-of-day lighting.
 //
 // Holes:
-//   1 / 2 / 3   - Ayush's Hole 13 / 14 / 15   (uMVP/uModel/uNormalMat shader)
-//   4           - Shav's   Hole 16            (model/view/projection shader)
+//   1 / 2 / 3   - Ayush's Hole 13 / 14 / 15
+//   4           - Shav's   Hole 16
+//   5 / 6 / 7 / 8 - Diya's Hole 5 / 6 / 7 / 8
 //
-// Each hole's class sets its own uniforms in its draw() call, so the two
-// shader programs coexist without stepping on each other — the active hole
-// just calls glUseProgram(...) on its own program before drawing.
+// All Mesh-based holes (5/6/7/8/16) render through the SAME shader as the
+// per-vertex-colour holes (13/14/15) — Mesh.cpp feeds the per-mesh r/g/b
+// to the shader via a constant vertex attribute, so the procedural turf/
+// kerb classifier in fragment.glsl picks the right look automatically.
 //
 // The Skybox runs a slow day/night cycle (sphere rotating around the world
 // X axis). Its sun/moon position is fed into BOTH shader programs each frame
@@ -25,7 +27,7 @@
 // Both controllers coexist; C toggles which one drives the view+input.
 //
 // Controls:
-//   1 / 2 / 3 / 4  switch to Hole 13 / 14 / 15 / 16
+//   1 / 2 / 3 / 4 / 5 / 6 / 7 / 8   switch hole (13/14/15/16/5/6/7/8 respectively)
 //   C              toggle FLY-CAMERA <-> DRONE
 //   R              re-frame the active controller on the current hole
 //
@@ -77,34 +79,28 @@
 #include "../core/Mesh.h"
 #include "../objects/Hole16.h"
 #include "../objects/Skybox.h"
+// Diya's holes — same Mesh-based pattern as Hole16 (raw Mesh* array,
+// translate / draw API). They get wired in via the dev.cpp render switch
+// the same way Hole16 does.
+#include "../objects/Hole5.h"
+#include "../objects/Hole6.h"
+#include "../objects/Hole7.h"
+#include "../objects/Hole8.h"
 
 #include "../camera/Drone.h"
 
 
 // -----------------------------------------------------------------------------
-// Shader source paths. Two shader programs are needed because the two halves
-// of the project use different shader designs:
-//
-//   • Ayush's program — src/shaders/vertex.glsl + fragment.glsl
-//     Holes 13/14/15 + Drone. Uses uMVP/uModel/uNormalMat + procedural
-//     turf/kerb noise + hemisphere ambient.
-//
-//   • Shav's program — src/shaders/mesh_vertex.glsl + mesh_fragment.glsl
-//     Hole 16 (via Mesh.cpp). Uses model/view/projection + a flat 'colour'
-//     uniform set per-mesh in Mesh::draw().
-//
-// They can't share a single program because:
-//   - Different uniform names and matrix-construction conventions
-//   - Different vertex attribute layout in slot 2 (vec3 colour vs vec2 texCoord)
-// So each hole's class binds its own program before drawing.
+// Shader source paths. ONE shader program drives every renderable in the
+// scene (Holes 13/14/15/16 + Drone), so a uniform set by dev.cpp on this
+// program is visible to all of them. The Skybox has its own shader pair —
+// it draws with a completely separate program created by Skybox::init().
 //
 // Paths are relative to the working directory the program is launched from.
 // Run from the repo root so "src/shaders/..." resolves correctly.
 // -----------------------------------------------------------------------------
 static const char* VERTEX_PATH       = "src/shaders/vertex.glsl";
 static const char* FRAGMENT_PATH     = "src/shaders/fragment.glsl";
-static const char* MESH_VERTEX_PATH  = "src/shaders/mesh_vertex.glsl";
-static const char* MESH_FRAGMENT_PATH= "src/shaders/mesh_fragment.glsl";
 static const char* SKYBOX_VERT_PATH  = "src/shaders/skybox.vert";
 static const char* SKYBOX_FRAG_PATH  = "src/shaders/skybox.frag";
 
@@ -246,14 +242,15 @@ static Hole14* g_h14 = NULL;
 static Hole15* g_h15 = NULL;
 
 // Shav's Hole 16 + the dynamic skybox. The skybox is shared by ALL holes —
-// its current sun/moon direction is fed into both shader programs each frame
-// as the directional light, so 13/14/15/16 all track the same time of day.
+// its current sun/moon direction is fed into the shader each frame as the
+// directional light, so 13/14/15/16 all track the same time of day.
 static Hole16* g_h16     = NULL;
+// Diya's Mesh-based holes. Same pattern as Hole16.
+static Hole5*  g_h5  = NULL;
+static Hole6*  g_h6  = NULL;
+static Hole7*  g_h7  = NULL;
+static Hole8*  g_h8  = NULL;
 static Skybox  g_skybox;
-// Second shader program for friend's Mesh-based holes (16). The main program
-// (yours) is built later in main() and stored as a local `program`; this
-// pointer-free static is just a separate GL handle.
-static GLuint  g_meshProgram = 0;
 
 static void frameCurrent() {
     glm::vec3 c(0.0f); float r = 50.0f;
@@ -265,6 +262,13 @@ static void frameCurrent() {
     // centred at the origin with outer radius ~19 m and ground disc ~21 m,
     // so a 30 m framing radius gives a comfortable view of everything.
     if (g_activeHole == 16 && g_h16) { c = glm::vec3(0.0f, 0.5f, 0.0f); r = 30.0f; }
+    // Diya's holes: each is 28 (X) × 15 (Z) and was translated to a specific
+    // world position in friend's dev.cpp. Match those positions here so R
+    // reframes onto the visible hole rather than back to the origin.
+    if (g_activeHole == 5  && g_h5)  { c = glm::vec3(-42.0f, 0.5f, -22.5f); r = 22.0f; }
+    if (g_activeHole == 6  && g_h6)  { c = glm::vec3(-14.0f, 0.5f,  -7.5f); r = 22.0f; }
+    if (g_activeHole == 7  && g_h7)  { c = glm::vec3( 14.0f, 0.5f,   7.5f); r = 22.0f; }
+    if (g_activeHole == 8  && g_h8)  { c = glm::vec3( 42.0f, 0.5f,  22.5f); r = 22.0f; }
     g_cam.frameOn(c, r);
     g_drone.frameOn(c, r);   // also reframe the drone so R works in either mode
 }
@@ -282,6 +286,12 @@ static void key_cb(GLFWwindow* w, int key, int /*sc*/, int action, int /*mods*/)
     // ADD HOLE 15: bind key 3 here.
     if (key == GLFW_KEY_3) { g_activeHole = 15; g_needFrame = true; }
     if (key == GLFW_KEY_4) { g_activeHole = 16; g_needFrame = true; }
+    // Diya's holes 5–8 take the number keys that match their hole number,
+    // for memorability. Drone-toggle, wireframe etc. stay on letter keys.
+    if (key == GLFW_KEY_5) { g_activeHole = 5;  g_needFrame = true; }
+    if (key == GLFW_KEY_6) { g_activeHole = 6;  g_needFrame = true; }
+    if (key == GLFW_KEY_7) { g_activeHole = 7;  g_needFrame = true; }
+    if (key == GLFW_KEY_8) { g_activeHole = 8;  g_needFrame = true; }
     if (key == GLFW_KEY_R) g_needFrame = true;
     if (key == GLFW_KEY_TAB) {
         g_wireframe = !g_wireframe;
@@ -384,9 +394,13 @@ int main() {
     glEnable(GL_MULTISAMPLE);
 
     GLuint program = buildProgramFromFiles(VERTEX_PATH, FRAGMENT_PATH);
-    // Friend's shader (Mesh + Hole16). Stored in a global so the render loop
-    // can switch to it before drawing Hole16 without a parameter shuffle.
-    g_meshProgram = buildProgramFromFiles(MESH_VERTEX_PATH, MESH_FRAGMENT_PATH);
+    // (Removed g_meshProgram — Hole16's Mesh class now binds the SAME shader
+    // as Hole13/14/15 and the Drone. The Mesh::draw method sets uModel +
+    // uNormalMat directly, and feeds the per-mesh r/g/b through a constant
+    // vertex attribute at slot 2 so the shader's turf/kerb material
+    // classifier picks the right procedural shading. This means every
+    // hole gets the same look-and-feel: green-dominant colours get the
+    // turf treatment, grey colours get concrete-kerb, etc.)
 
     Hole13 hole13;  g_h13 = &hole13;
     hole13.init(program);
@@ -401,6 +415,14 @@ int main() {
     // call is needed because each Mesh inside Hole16 grabs the shader handle
     // at draw time via glGetUniformLocation. We just need to keep a pointer.
     Hole16 hole16;  g_h16 = &hole16;
+
+    // Diya's holes — same Mesh-based pattern. Constructors build geometry,
+    // translate() positions the whole hole in world space. No init(program)
+    // needed; Mesh::draw picks up uniforms at draw time.
+    Hole5 hole5;  g_h5 = &hole5;  hole5.translate(-42.0f, 0.35f, -22.5f);
+    Hole6 hole6;  g_h6 = &hole6;  hole6.translate(-14.0f, 0.35f,  -7.5f);
+    Hole7 hole7;  g_h7 = &hole7;  hole7.translate( 14.0f, 0.35f,   7.5f);
+    Hole8 hole8;  g_h8 = &hole8;  hole8.translate( 42.0f, 0.35f,  22.5f);
 
     // Drone shares the same shader program — it uses the same vertex layout
     // (pos / normal / colour) as the holes, so all uniforms line up.
@@ -420,7 +442,7 @@ int main() {
     double prevTime = glfwGetTime();
     std::cout
         << "Controls:\n"
-        << "  1 / 2 / 3 / 4  select Hole 13 / 14 / 15 / 16\n"
+        << "  1 / 2 / 3 / 4 / 5 / 6 / 7 / 8   select Hole 13/14/15/16/5/6/7/8\n"
         << "  C              toggle FLY-CAMERA <-> DRONE mode\n"
         << "  R              reframe view on current hole\n"
         << "  Fly-camera (default):\n"
@@ -483,52 +505,107 @@ int main() {
 
         // ── Skybox update + sun/moon read ────────────────────────────────────
         // The skybox rotates a sun + moon around the world X axis. Whichever
-        // one is currently above the horizon (higher intensity) drives the
-        // directional light for every hole's shading. The actual sky sphere
-        // is drawn at the END of the frame so it sits behind all geometry.
+        // is currently above the horizon drives the directional light for
+        // every hole. The actual sky sphere is drawn at the END of the frame
+        // so it sits behind the geometry.
         g_skybox.update(dt);
         SkyLight sun  = g_skybox.getSun();
         SkyLight moon = g_skybox.getMoon();
-        SkyLight active = (sun.intensity > moon.intensity) ? sun : moon;
 
-        // Direction TO the light (sun.position is in world space at the sphere
-        // radius from origin; the hole shader expects a direction, so just
-        // normalise the position vector). Fall back to a steep overhead light
-        // if both sun and moon are exactly at the horizon at the same instant.
-        glm::vec3 sunDir;
-        if (glm::length(active.position) > 1e-3f) {
-            sunDir = glm::normalize(active.position);
+        // Pick whichever of sun/moon is above the horizon AND has the higher
+        // intensity. Both are antipodes on the rotating sphere, so when the
+        // sun dips below the horizon (intensity → 0) the moon rises above.
+        // Use the active one's direction. Fall back to a steep overhead light
+        // if both intensities are zero (only happens for an instant at the
+        // horizon).
+        glm::vec3 lightDir;
+        if (sun.intensity >= moon.intensity * 4.0f && glm::length(sun.position) > 1e-3f) {
+            // Daytime — sun dominates (moon is 0.25x scaled in Skybox.cpp,
+            // so the 4x factor compensates and picks the sun for the full
+            // daylight half of the cycle).
+            lightDir = glm::normalize(sun.position);
+        } else if (glm::length(moon.position) > 1e-3f) {
+            // Night — use the moon's direction so light comes from above.
+            lightDir = glm::normalize(moon.position);
         } else {
-            sunDir = glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f));
+            lightDir = glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f));
+        }
+        // Safety net: NEVER let the light direction point below the horizon.
+        // Without this clamp, all top-facing surfaces would receive zero
+        // diffuse contribution and look pitch-dark whenever both sun and
+        // moon are exactly at the horizon. A floor of 0.10 means the
+        // steepest grazing angle is ~6° above horizontal — bright enough
+        // to read shape, dim enough to feel like dusk.
+        if (lightDir.y < 0.10f) {
+            lightDir.y = 0.10f;
+            lightDir = glm::normalize(lightDir);
         }
 
+        // ── Light colour + ambient driven by time-of-day ─────────────────────
+        // Blend factor: 1 = full day (warm white sun, bright fill); 0 = full
+        // night (cool blue moon, dim fill). The skybox-Sun's intensity is
+        // 0..1 already, so we use it directly.
+        float dayBlend = glm::clamp(sun.intensity, 0.0f, 1.0f);
+
+        glm::vec3 dayLight   (1.00f, 0.97f, 0.90f);   // warm noon sun
+        glm::vec3 nightLight (0.45f, 0.55f, 0.75f);   // cool moonlight
+        glm::vec3 lightColor = glm::mix(nightLight, dayLight, dayBlend);
+
+        // uAmbient is used by the fragment shader as the "ground bounce" tint
+        // in the hemisphere ambient model. Slightly brighter during the day,
+        // notably dimmer + cooler at night, but NEVER zero — we want every
+        // surface to remain readable.
+        glm::vec3 dayAmbient   (0.32f, 0.30f, 0.26f);
+        glm::vec3 nightAmbient (0.08f, 0.10f, 0.16f);
+        glm::vec3 ambient = glm::mix(nightAmbient, dayAmbient, dayBlend);
+
+        // ── Set program-wide uniforms ─────────────────────────────────────────
+        // These uniforms used to be set per-hole inside Hole13/14/15::draw().
+        // Now they live here so the values stay consistent across all holes
+        // and so the Skybox can drive them dynamically. Also uploads
+        // view/projection so the hole/mesh draw() methods don't have to.
+        glUseProgram(program);
+        GLint locView  = glGetUniformLocation(program, "view");
+        GLint locProj  = glGetUniformLocation(program, "projection");
+        GLint locLC    = glGetUniformLocation(program, "uLightColor");
+        GLint locAm    = glGetUniformLocation(program, "uAmbient");
+        if (locView != -1) glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
+        if (locProj != -1) glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(proj));
+        if (locLC   != -1) glUniform3fv(locLC, 1, glm::value_ptr(lightColor));
+        if (locAm   != -1) glUniform3fv(locAm, 1, glm::value_ptr(ambient));
+
         switch (g_activeHole) {
-            case 13: hole13.draw(view, proj, sunDir, eyePos); break;
-            case 14: hole14.draw(view, proj, sunDir, eyePos); break;
+            case 13: hole13.draw(view, proj, lightDir, eyePos); break;
+            case 14: hole14.draw(view, proj, lightDir, eyePos); break;
             // ADD HOLE 15: add the matching case branch here.
-            case 15: hole15.draw(view, proj, sunDir, eyePos); break;
+            case 15: hole15.draw(view, proj, lightDir, eyePos); break;
 
             case 16: {
-                // Friend's Hole16 uses Shav's Mesh class which renders against
-                // a different shader program (uniforms: model/view/projection
-                // + flat 'colour'). We bind that program, set the per-frame
-                // view + projection uniforms once, then call hole16.draw().
-                // Inside, each Mesh sets its OWN model + colour uniforms.
-                glUseProgram(g_meshProgram);
-                GLint vLoc = glGetUniformLocation(g_meshProgram, "view");
-                GLint pLoc = glGetUniformLocation(g_meshProgram, "projection");
-                if (vLoc != -1) glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(view));
-                if (pLoc != -1) glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(proj));
-
-                // Hole16 has an animated water mesh. Hand it the camera +
-                // time so it can render correctly this frame.
+                // Hole16 uses Shav's Mesh class — now wired up to the SAME
+                // shader as the other holes (Mesh::draw sets uModel +
+                // uNormalMat and feeds the per-mesh colour via constant
+                // attribute slot 2). Just hand it the program and let it
+                // render.
+                //
+                // Hole16 also has an animated water mesh. Hand it the camera
+                // + time so the water shader can advance its scrolling.
                 g_h16->setCameraData(view, proj, eyePos);
                 g_h16->update(dt);
-                g_h16->draw(g_meshProgram, g_wireframe);
+                g_h16->draw(program, g_wireframe);
                 break;
             }
 
-            default: hole13.draw(view, proj, sunDir, eyePos); break;
+            // Diya's Mesh-based holes. No water animation, no setCameraData
+            // contract — just draw against the shared program. The program-
+            // wide uniforms (view/projection/uLightColor/uAmbient) were set
+            // above before this switch, so each Mesh::draw inside the hole
+            // picks them up automatically when it binds the program.
+            case 5: hole5.draw(program, g_wireframe); break;
+            case 6: hole6.draw(program, g_wireframe); break;
+            case 7: hole7.draw(program, g_wireframe); break;
+            case 8: hole8.draw(program, g_wireframe); break;
+
+            default: hole13.draw(view, proj, lightDir, eyePos); break;
         }
 
         // Draw the drone body LAST so it overlays the hole correctly. It
@@ -536,7 +613,7 @@ int main() {
         // drone mode being active (you don't want to see the drone hovering
         // in front of you while flying the legacy free camera).
         if (g_useDrone) {
-            g_drone.draw(view, proj, sunDir, eyePos);
+            g_drone.draw(view, proj, lightDir, eyePos);
         }
 
         // ── Skybox draw (after scene) ────────────────────────────────────────
@@ -575,7 +652,6 @@ int main() {
     // there). No explicit cleanup() call needed.
     g_drone.cleanup();
     glDeleteProgram(program);
-    if (g_meshProgram) glDeleteProgram(g_meshProgram);
     glfwTerminate();
     return 0;
 }
