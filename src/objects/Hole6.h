@@ -8,16 +8,17 @@
 //
 //  Tee at -X end, cup/flag at +X end. Flat fairway at Y=0 throughout.
 //  A wooden bridge spans the central stream channel that cuts across Z.
-//  The waterfall wall is visible along the -X border (shared backdrop).
 //
 //  KEY FEATURES:
 //    • Flat fairway surface (no elevation change — bridge hole)
 //    • Stream channel: narrow water strip running along Z at X ≈ 0
-//    • Wooden bridge: crosses the stream, planks + railing posts + handrail
+//    • Wooden bridge: deck + planks + railing posts (WITH SPHERE CAPS) + handrail
+//    • Dinosaur skeleton obstacle: spine, 7-pair rib arches, neck, skull,
+//      tail, 4 legs with knees, hip & shoulder bones, joint spheres
 //    • Rock formations along both Z borders
 //    • Directional sign post near tee
 //    • Trees and flowers scattered inside bounds
-//    • Cup + flag on lower pad (+X end)
+//    • Cup (black disk) + flag on right pad (+X end)
 
 #pragma once
 #include "../core/Mesh.h"
@@ -25,7 +26,14 @@
 class Hole6
 {
 public:
-    static const int MAX_MESHES = 140;
+    // MAX_MESHES breakdown (approx):
+    //   Fairway+borders: 6, Stream: 4, Bridge: 6+4(sphere caps)+2+2 = 14
+    //   Dino skeleton:   1 spine + 7×3 ribs = 22 + hips 4 + shoulders 4
+    //                  + neck 5×2 = 10 + skull 3 + tail 4×2 = 8
+    //                  + legs 4×4 = 16  → ~70 dino meshes
+    //   SignPost: 3, Rocks: 13, Flag: 3, Trees: 7×3 = 21, Flowers: 11×3 = 33
+    //   Total ≈ 170 — set to 200 for headroom.
+    static const int MAX_MESHES = 200;
 
     Hole6();
     ~Hole6();
@@ -43,6 +51,7 @@ private:
     void buildFairway();
     void buildStream();
     void buildBridge();
+    void buildDinoSkeleton();
     void buildSignPost();
     void buildRocks();
     void buildFlag();

@@ -108,20 +108,23 @@ int main()
     
     // ── Hole 5: Waterfall entry ───────────────────────────────────────────────
     Hole5 hole5;
-    hole5.translate(-48.0f, 0.35f, 30.0f);   // adjust to fit course grid
+hole5.translate(-42.0f, 0.35f, -22.5f);
 
     // ── Hole 6: Bridge crossing ───────────────────────────────────────────────
     Hole6 hole6;
-    hole6.translate(-48.0f, 0.35f, 60.0f);
+hole6.translate(-14.0f, 0.35f,  -7.5f);
  
     // ── Hole 7: Swamp hazard ──────────────────────────────────────────────────
     Hole7 hole7;
-    hole7.translate(-48.0f, 0.35f, 90.0f);
+hole7.translate( 14.0f, 0.35f,   7.5f);
+
  
     // ── Hole 8: Downhill drop ─────────────────────────────────────────────────
     // Hole 8's staircase extends ~47 units in +X, so position accordingly.
     Hole8 hole8;
-    hole8.translate(-62.0f, 0.35f, 120.0f);
+hole8.translate( 42.0f, 0.35f,  22.5f);
+
+
 
 
     while (!glfwWindowShouldClose(window))

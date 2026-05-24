@@ -137,7 +137,7 @@ Hole5::Hole5() : meshCount(0)
     buildWaterfall();
     buildStream();
     buildRocks();
-    buildBoneObstacle();
+    //buildBoneObstacle();
     buildFlag();
     buildTrees();
     buildFlowers();
