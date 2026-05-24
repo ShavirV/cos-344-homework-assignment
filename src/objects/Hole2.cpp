@@ -9,6 +9,7 @@
 #include "Hole2.h"
 #include <cmath>
 #include <GLFW/glfw3.h>
+#include <glm/gtc/type_ptr.hpp>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979f
@@ -154,11 +155,21 @@ Hole2::~Hole2()
 // ---------------------------------------------------------------------------
 // draw
 // ---------------------------------------------------------------------------
-void Hole2::draw(GLuint shaderProgram, bool wireframe)
+void Hole2::draw(GLuint shaderProgram, bool wireframe,
+                 const glm::vec3& lightDir,
+                 const glm::vec3& lightColor,
+                 const glm::vec3& camPos)
 {
+    glUseProgram(shaderProgram);
+    GLint locLD = glGetUniformLocation(shaderProgram, "uLightDir");
+    GLint locVP = glGetUniformLocation(shaderProgram, "uViewPos");
+    GLint locLC = glGetUniformLocation(shaderProgram, "uLightColor");
+    if (locLD != -1) glUniform3fv(locLD, 1, glm::value_ptr(glm::normalize(lightDir)));
+    if (locVP != -1) glUniform3fv(locVP, 1, glm::value_ptr(camPos));
+    if (locLC != -1) glUniform3fv(locLC, 1, glm::value_ptr(lightColor));
+
     for (int i = 0; i < meshCount; i++)
-        if (meshes[i]) 
-            meshes[i]->draw(shaderProgram, wireframe);
+        if (meshes[i]) meshes[i]->draw(shaderProgram, wireframe);
 }
 
 // ---------------------------------------------------------------------------

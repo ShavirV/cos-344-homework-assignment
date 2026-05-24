@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979f
@@ -330,8 +331,12 @@ Mesh* Hole4::addMesh(Mesh* m)
     return m;
 }
 
-void Hole4::draw(GLuint shaderProgram, bool wireframe)
+void Hole4::draw(GLuint shaderProgram, bool wireframe,
+                 const glm::vec3& lightDir,
+                 const glm::vec3& lightColor,
+                 const glm::vec3& camPos)
 {
+    // ── Animate windmill blades ───────────────────────────────────────────────
     double now = glfwGetTime();
     if (lastDrawTime < 0.0) lastDrawTime = now;
     float dt = (float)(now - lastDrawTime);
@@ -343,6 +348,15 @@ void Hole4::draw(GLuint shaderProgram, bool wireframe)
         bladeAngle -= 2.f * (float)M_PI;
 
     updateBladeTransforms();
+
+    // ── Push lighting uniforms (same pattern as Hole5-8) ─────────────────────
+    glUseProgram(shaderProgram);
+    GLint locLD = glGetUniformLocation(shaderProgram, "uLightDir");
+    GLint locVP = glGetUniformLocation(shaderProgram, "uViewPos");
+    GLint locLC = glGetUniformLocation(shaderProgram, "uLightColor");
+    if (locLD != -1) glUniform3fv(locLD, 1, glm::value_ptr(glm::normalize(lightDir)));
+    if (locVP != -1) glUniform3fv(locVP, 1, glm::value_ptr(camPos));
+    if (locLC != -1) glUniform3fv(locLC, 1, glm::value_ptr(lightColor));
 
     for (int i = 0; i < meshCount; ++i)
         if (meshes[i]) meshes[i]->draw(shaderProgram, wireframe);

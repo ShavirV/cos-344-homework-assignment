@@ -1,5 +1,7 @@
 #include "Hole1.h"
 #include <cmath>
+#include <GL/glew.h>
+#include <glm/gtc/type_ptr.hpp>
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 #define C_GREEN         0.15f, 0.50f, 0.15f, 1.0f
@@ -205,8 +207,19 @@ void Hole1::addMesh(Mesh* m)
         meshes[meshCount++] = m;
 }
 
-void Hole1::draw(GLuint shaderProgram, bool wireframe)
+void Hole1::draw(GLuint shaderProgram, bool wireframe,
+                 const glm::vec3& lightDir,
+                 const glm::vec3& lightColor,
+                 const glm::vec3& camPos)
 {
+    glUseProgram(shaderProgram);
+    GLint locLD = glGetUniformLocation(shaderProgram, "uLightDir");
+    GLint locVP = glGetUniformLocation(shaderProgram, "uViewPos");
+    GLint locLC = glGetUniformLocation(shaderProgram, "uLightColor");
+    if (locLD != -1) glUniform3fv(locLD, 1, glm::value_ptr(glm::normalize(lightDir)));
+    if (locVP != -1) glUniform3fv(locVP, 1, glm::value_ptr(camPos));
+    if (locLC != -1) glUniform3fv(locLC, 1, glm::value_ptr(lightColor));
+
     for (int i = 0; i < meshCount; i++)
         if (meshes[i]) meshes[i]->draw(shaderProgram, wireframe);
 }
