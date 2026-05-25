@@ -1,12 +1,3 @@
-// Hole8.h  —  Downhill Drop (Hole 8)
-// Dino Park Phuket — swamp & waterfall zone (Holes 5–8)
-//
-// STRICT FOOTPRINT: 28 (X) × 15 (Z), centred at local origin.
-//   Three stepped concrete platforms descending in Y (2.0 → 1.0 → 0.0).
-//   Rocks line both ±Z borders down the full length of the staircase.
-//
-// Same public interface as Hole5 / Hole6.
-
 #pragma once
 #include "../core/Mesh.h"
 #include <GL/glew.h>
