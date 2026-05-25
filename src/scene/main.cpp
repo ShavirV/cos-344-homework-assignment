@@ -66,6 +66,7 @@
 //utilites
 #include "../objects/Skybox.h"
 #include "../objects/Water.h"
+#include "../objects/GlobalWater.h"
 
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
@@ -147,8 +148,9 @@ int main()
     skybox.dayLengthSecs = 60.0f; //60 second day/night cycle
 
     // Ground
-    Mesh ground = Mesh::makeCuboid(400.0f, 0.5f, 150.0f, 0.35f, 0.20f, 0.08f, 1.0f);
+    Mesh ground = Mesh::makeCuboid(400.0f, 0.05f, 150.0f, 0.35f, 0.20f, 0.08f, 1.0f);
     ground.setup();
+    ground.translate(0.0f, -0.5f, 0.0f);
 
     // ── Volcano ──────────────────────────────────────────────────────────────
     Mesh volcano = Mesh::makeCone(20.0f, 40.0f, 64, 0.40f, 0.26f, 0.10f, 1.0f);
@@ -218,6 +220,10 @@ int main()
 
     Hole18 h18;
     h18.translate(35.0f, 0.35f, 50.0f);
+
+    GlobalWater globalWater;
+    globalWater.translate(0.0f, 0.55f, 0.0f);
+
     
 
     // Shader uniforms 
@@ -342,10 +348,13 @@ int main()
 
         h17.draw(shader, false);
 
-
         h18.update(deltaTime);
         h18.setCameraData(view, projection, cameraPos);
         h18.draw(shader, false);
+
+        globalWater.update(deltaTime);
+        globalWater.setCameraData(view, projection, cameraPos);
+        globalWater.draw(shader);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
