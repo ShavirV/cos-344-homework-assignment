@@ -729,27 +729,6 @@ Mesh Mesh::makeRock(float scale)
     return rock;
 }
 
-// ── fairwayHeight — local height function (copy from Hole16.cpp) ─────────────
-// arcT   : [0,1] normalised position along the arc
-// radialT: [0,1] normalised position across the band (0=inner, 1=outer)
-//
-// This duplicate exists so that makeArcBorder (which must pin border bottoms
-// to the surface) can call it when implemented as a Mesh:: static.  When used
-// only from Hole16, the version in Hole16.cpp is sufficient.
-//
-// NOTE: keep the constants here in sync with the ones at the top of Hole16.cpp.
-static float h16_fairwayHeight(float arcT, float radialT)
-{
-    const float HILL_FREQ_A = 2.5f,  HILL_AMP_A = 0.70f;
-    const float HILL_FREQ_B = 4.8f,  HILL_AMP_B = 0.35f;
-    const float CROWN_AMP   = 0.25f;
-
-    float h = HILL_AMP_A * sinf(arcT * HILL_FREQ_A * 2.0f * (float)M_PI)
-            + HILL_AMP_B * sinf(arcT * HILL_FREQ_B * 2.0f * (float)M_PI + 1.1f);
-    float crown = CROWN_AMP * (1.0f - fabsf(radialT * 2.0f - 1.0f));
-    return h + crown;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Mesh::makeArcFairway
 // ─────────────────────────────────────────────────────────────────────────────
