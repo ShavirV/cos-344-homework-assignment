@@ -32,48 +32,13 @@ static const int   SEA_RES   = 96;       // high resolution for large surface
 static const float SEA_CX    =   0.0f;
 static const float SEA_CZ    =   0.0f;
 
-// ── [1] Volcano lake — crater surroundings ────────────────────────────────────
-// Volcano centre: (0, 20, -10) in main.cpp (cone translated there).
-// The lake is a flat plane at the volcano base, visible as a hot-spring ring.
-static const float VLAKE_Y   = -0.30f;
-static const float VLAKE_W   =  44.0f;
-static const float VLAKE_L   =  44.0f;
-static const int   VLAKE_RES =  48;
-static const float VLAKE_CX  =   0.0f;
-static const float VLAKE_CZ  = -10.0f;
+static const float H6_Y     = 0.00f;
+static const float H6_W     = 8.0f;   
+static const float H6_L     = 16.4f;   
+static const int   H6_RES   = 6;      
+static const float H6_CX    =   -5.0f;
+static const float H6_CZ    =   -50.0f;
 
-// ── [2] West river — through holes 5, 6, 7, 8, 9 ────────────────────────────
-// Holes 5–9 all cluster around Z=-8 to Z=-50, X=-175 to X=-40.
-// A long east–west strip covers this corridor.
-// Rotated 0° (runs along X).  Made slightly narrower than the gaps between
-// holes so it appears as a river channel, not a flood.
-static const float RIVER_Y   = -0.25f;
-static const float RIVER_W   = 140.0f;  // length along X
-static const float RIVER_L   =   9.0f;  // width along Z
-static const int   RIVER_RES =  32;
-static const float RIVER_CX  = -105.0f; // midpoint of X=-175...-40 range
-static const float RIVER_CZ  =  -20.0f; // between holes 5-6 (Z=-16) and 7-9 (Z=-35)
-static const float RIVER_ROT =   0.0f;  // aligned along X axis
-
-// ── [3] East pond — near holes 10-11 ─────────────────────────────────────────
-// Hole 10 at X=+80, Z=-10.  Hole 11 at X=+110, Z=+20.
-// Pond sits between them.
-static const float EPOND_Y   = -0.22f;
-static const float EPOND_W   =  42.0f;
-static const float EPOND_L   =  42.0f;
-static const int   EPOND_RES =  48;
-static const float EPOND_CX  =  95.0f;
-static const float EPOND_CZ  = -10.0f;
-
-// ── [4] North pond — decorative, northern edge ───────────────────────────────
-// Sits between the northernmost holes (H1-H4) and the volcano.
-// Adds visual interest to the open ground area at Z=+20..+40.
-static const float NPOND_Y   = -0.22f;
-static const float NPOND_W   =  32.0f;
-static const float NPOND_L   =  32.0f;
-static const int   NPOND_RES =  48;
-static const float NPOND_CX  = -20.0f;
-static const float NPOND_CZ  =  22.0f;
 
 // =============================================================================
 // Shared colour palettes
@@ -141,20 +106,13 @@ WaterMesh* GlobalWater::makeBody(
     return m;
 }
 
-// =============================================================================
-// Constructor
-// =============================================================================
 GlobalWater::GlobalWater()
     : seaLevel(nullptr),
-      volcanoLake(nullptr),
-      westRiver(nullptr),
-      eastPond(nullptr),
-      northPond(nullptr),
       camView(glm::mat4(1.0f)),
       camProj(glm::mat4(1.0f)),
       camPos(0.0f)
 {
-    // ── [0] Sea level ─────────────────────────────────────────────────────────
+    // [0] Sea level
     // Large gently-undulating ocean sheet. Low amplitude, long wavelengths,
     // very slow scroll so it reads as a calm sea rather than a swimming pool.
     seaLevel = makeBody(
@@ -164,96 +122,47 @@ GlobalWater::GlobalWater()
         // waves: direction, amplitude, wavelength
         { 1.0f,  0.0f}, 0.06f, 18.0f,   // primary swell
         { 0.0f,  1.0f}, 0.04f, 14.0f,   // cross-swell
-        { 0.7f,  0.7f}, 0.03f,  9.0f,   // diagonal ripple
+        { 0.3f,  0.5f}, 0.13f,  9.0f,   // diagonal ripple
         {-0.5f,  0.5f}, 0.02f,  6.0f,   // counter-diagonal
         0.018f, 0.012f,                   // slow scroll
         SEA_SHALLOW, SEA_DEEP,
         0.22f);                           // gentle foam at wave crests
 
-    // ── [1] Volcano lake ──────────────────────────────────────────────────────
-    // Slightly warmer, more turbulent than the ponds — geothermal activity.
-    // Moderate foam threshold gives a steaming, unsettled appearance.
-    volcanoLake = makeBody(
-        VLAKE_W, VLAKE_L, VLAKE_RES,
-        VLAKE_CX, VLAKE_Y, VLAKE_CZ,
-        0.0f,
-        { 1.0f,  0.2f}, 0.10f,  6.0f,
-        {-0.3f,  1.0f}, 0.08f,  4.5f,
-        { 0.6f, -0.6f}, 0.06f,  3.0f,
-        {-0.8f, -0.4f}, 0.04f,  2.0f,
-        0.10f, 0.07f,
-        VLAKE_SHALLOW, VLAKE_DEEP,
-        0.10f);                           // more foam — turbulent hot spring
+    //hole
 
-    // ── [2] West river ────────────────────────────────────────────────────────
-    // Higher scroll speed to simulate downstream flow from north to south.
-    // Wave directions biased along −Z (southward flow).
-    // The strip is aligned along X (rot=0), flow direction is along Z.
-    westRiver = makeBody(
-        RIVER_W, RIVER_L, RIVER_RES,
-        RIVER_CX, RIVER_Y, RIVER_CZ,
-        RIVER_ROT,
-        { 0.1f, -1.0f}, 0.12f,  5.0f,   // main downstream flow
-        { 0.2f, -1.0f}, 0.07f,  3.0f,   // secondary current
-        {-0.1f, -1.0f}, 0.05f,  2.0f,   // edge eddies
-        { 0.0f, -0.8f}, 0.04f,  1.5f,   // surface ripple
-        0.28f, 0.18f,                     // fast scroll — flowing river
+    h6Water = makeBody(
+        H6_W, H6_L, H6_RES,
+        H6_CX, H6_Y, H6_CZ,
+        0.0f,
+        // waves: direction, amplitude, wavelength
+        { 0.02f,  0.0f}, 0.03f, 26.0f,   // primary swell (reduced amplitude, longer waves)
+        { 0.0f,  1.2f}, 0.025f, 22.0f,  // cross-swell
+        { 0.07f,  0.07f}, 0.015f, 18.0f,  // diagonal ripple (subtle texture only)
+        {-0.05f,  0.05f}, 0.010f, 14.0f,  // counter-diagonal (barely visible detail)
+
+        0.010f, 0.006f,                 // slower scroll (key for “calm” feel)
         RIVER_SHALLOW, RIVER_DEEP,
-        0.06f);                           // light foam at rapids
-
-    // ── [3] East pond ─────────────────────────────────────────────────────────
-    // Calm standing water. Very small waves, slow scroll.
-    eastPond = makeBody(
-        EPOND_W, EPOND_L, EPOND_RES,
-        EPOND_CX, EPOND_Y, EPOND_CZ,
-        0.0f,
-        { 1.0f,  0.0f}, 0.04f,  6.0f,
-        { 0.0f,  1.0f}, 0.03f,  5.0f,
-        { 0.7f,  0.7f}, 0.02f,  3.5f,
-        {-0.5f,  0.5f}, 0.015f, 2.5f,
-        0.03f, 0.02f,
-        POND_SHALLOW, POND_DEEP,
-        0.18f);                           // almost no foam — still pond
-
-    // ── [4] North pond ────────────────────────────────────────────────────────
-    // Even calmer than east pond — ornamental water feature.
-    northPond = makeBody(
-        NPOND_W, NPOND_L, NPOND_RES,
-        NPOND_CX, NPOND_Y, NPOND_CZ,
-        0.0f,
-        { 1.0f,  0.0f}, 0.03f,  7.0f,
-        { 0.0f,  1.0f}, 0.02f,  5.5f,
-        { 0.6f,  0.6f}, 0.015f, 4.0f,
-        {-0.4f,  0.4f}, 0.010f, 3.0f,
-        0.02f, 0.015f,
-        POND_SHALLOW, POND_DEEP,
-        0.20f);
+        0.22f); 
 
     // Populate the iteration array in draw order
     // (sea first — furthest back; ponds last — nearest foreground).
     bodies[0] = seaLevel;
-    bodies[1] = volcanoLake;
-    bodies[2] = westRiver;
-    bodies[3] = eastPond;
-    bodies[4] = northPond;
+    bodies[1] = h6Water;
 }
 
-// =============================================================================
 // Destructor
-// =============================================================================
 GlobalWater::~GlobalWater()
 {
     for (int i = 0; i < BODY_COUNT; i++)
     {
-        delete bodies[i];
-        bodies[i] = nullptr;
+        if (bodies[i]){
+            delete bodies[i];
+            bodies[i] = nullptr;
+        }
     }
     // Individual pointers are aliases into bodies[] — no double-delete needed.
     seaLevel    = nullptr;
-    volcanoLake = nullptr;
-    westRiver   = nullptr;
-    eastPond    = nullptr;
-    northPond   = nullptr;
+    h6Water = nullptr;
 }
 
 // =============================================================================
@@ -265,9 +174,6 @@ void GlobalWater::update(float deltaTime)
         if (bodies[i]) bodies[i]->update(deltaTime);
 }
 
-// =============================================================================
-// setCameraData
-// =============================================================================
 void GlobalWater::setCameraData(const glm::mat4& view,
                                 const glm::mat4& proj,
                                 const glm::vec3& pos)
@@ -277,9 +183,6 @@ void GlobalWater::setCameraData(const glm::mat4& view,
     camPos  = pos;
 }
 
-// =============================================================================
-// draw
-// =============================================================================
 void GlobalWater::draw(GLuint shaderProgram, bool wireframe,
                        glm::vec3 lightDir,
                        glm::vec3 lightColor)
@@ -294,12 +197,6 @@ void GlobalWater::draw(GLuint shaderProgram, bool wireframe,
             bodies[i]->draw(camView, camProj, camPos, normDir, lightColor);
 }
 
-// =============================================================================
-// translate
-// =============================================================================
-// Shifts every body's world-space position by (x,y,z).
-// Implemented by pre-multiplying each body's modelMatrix with a translation,
-// matching the applyMatrix pattern used by Hole16/Hole18.
 void GlobalWater::translate(float x, float y, float z)
 {
     glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));

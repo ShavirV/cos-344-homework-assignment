@@ -81,13 +81,11 @@ public:
 private:
     // ── Water body pointers ───────────────────────────────────────────────────
     WaterMesh* seaLevel;     // [0] full-course underlay
-    WaterMesh* volcanoLake;  // [1] crater surroundings
-    WaterMesh* westRiver;    // [2] flowing river through western holes
-    WaterMesh* eastPond;     // [3] still pond near holes 10-11
-    WaterMesh* northPond;    // [4] decorative northern pond
+    WaterMesh* h5Water;
+    WaterMesh* h6Water;
 
     // Convenience array for uniform iteration (update, draw).
-    static const int BODY_COUNT = 5;
+    static const int BODY_COUNT = 3;
     WaterMesh* bodies[BODY_COUNT];
 
     // ── Per-frame camera state (set by setCameraData) ─────────────────────────
