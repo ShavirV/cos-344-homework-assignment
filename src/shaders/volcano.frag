@@ -1,10 +1,5 @@
 #version 330 core
 
-// Volcano fragment shader.
-// Rock surfaces use Phong with the vertex color as base color.
-// Lava (detected from the vertex color: red-dominant + warm) is rendered as
-// emissive so it visibly glows even at night without a real light source.
-
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vUV;

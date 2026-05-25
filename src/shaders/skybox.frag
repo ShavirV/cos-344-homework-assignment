@@ -25,7 +25,6 @@ uniform float     texBlend;      // 0.0 = full night, 1.0 = full day
 uniform sampler2D skyTexDay;
 uniform sampler2D skyTexNight;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 // Smooth disc with a soft glow corona
 float discFactor(vec3 dir, vec3 discDir, float edgeCos, float glowWidth)
@@ -46,21 +45,16 @@ void main()
 {
     vec3 dir = normalize(worldDir);   // rotated direction
 
-    // ── Sky colour ────────────────────────────────────────────────────────────
     // Use worldDir.y (height after rotation) for gradient so it tracks the
     // sun: sky is brighter/bluer where the sun is, darker on the night side.
     float horizBlend = clamp(dir.y * 2.0 + 0.5, 0.0, 1.0);  // 0=below, 1=above
     vec3  skyColor   = mix(skyHorizColor, skyTopColor, horizBlend);
 
-    // ── Texture (panorama) ────────────────────────────────────────────────────
     if (hasTexDay == 1 || hasTexNight == 1) {
         vec3  ldir = normalize(localPos);
         float lon  = atan(ldir.z, ldir.x) / (2.0 * 3.14159265) + 0.5;
         float lat  = asin(clamp(ldir.y, -1.0, 1.0)) / 3.14159265 + 0.5;
-        // Tile the panorama horizontally so each copy of the BMP covers less
-        // sky and pixels appear sharper ("zoomed out"). GL_REPEAT on S in
-        // Skybox.cpp lets longitude tile cleanly. Latitude is GL_CLAMP_TO_EDGE
-        // so it must stay in [0, 1] — don't scale lat.
+
         const float TILE_S = 3.0;
         vec2  suv  = vec2(lon * TILE_S, lat);
 
@@ -78,12 +72,7 @@ void main()
         skyColor = mix(skyColor, texColor, 0.85);
     }
 
-    // ── Sun disc ──────────────────────────────────────────────────────────────
-    // Sun is detected in ROTATED space (worldDir) against sunLocalDir rotated
-    // by the same matrix — but since getSun() rotates sunLocalDir, and here
-    // we compare worldDir (also rotated), we actually want to compare against
-    // the LOCAL dir of the sun in the sphere's own frame.
-    // localPos is pre-rotation, sunLocalDir is also pre-rotation → compare those.
+
     float sunF  = discFactor(worldDir, sunLocalDir,  sunDiscCos,  0.08);
     float moonF = discFactor(worldDir, moonLocalDir, moonDiscCos, 0.05);
 
@@ -96,7 +85,6 @@ void main()
     float horizon = exp(-abs(dir.y) * 4.5) * 0.35;
     vec3  hazeCol = vec3(0.90, 0.55, 0.25);
 
-    // ── Combine ───────────────────────────────────────────────────────────────
     vec3 color = skyColor;
     color += sunGlow  * sunColor;          // sun glow halo
     color += horizon  * hazeCol;           // horizon haze

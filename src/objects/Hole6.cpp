@@ -1,35 +1,6 @@
-// Hole6.cpp  —  Bridge & Waterfall Crossing (Hole 6)
-// Dino Park Phuket — swamp & waterfall zone (Holes 5–8)
-//
-// STRICT FOOTPRINT: 28 (X) × 15 (Z), centred at local origin.
-//   X runs from -14 to +14
-//   Z runs from  -7.5 to +7.5
-//
-// ELEVATION: Entirely flat at Y = 0 (no height change on this hole).
-//            Bridge Y-surface is FH (0.2) — same height as the fairway slab.
-//
-// LAYOUT (left→right, -X→+X):
-//   [-14, -4]  Left fairway  — tee end, sign post, rocks, trees
-//   [ -4, +4]  Stream channel + bridge spanning it
-//   [ +4, +14] Right fairway — cup/flag end, rocks, trees
-//
-// FEATURES (matching report Section 2.1 & 5.3):
-//   • Flat green fairway slab (earth fill beneath)
-//   • Narrow stream channel (water strip at Z-centre, running X = -4 to +4)
-//   • Wooden bridge: deck planks + vertical railing posts + horizontal handrail
-//   • Directional sign post near tee (-X end)
-//   • Rock formations along ±Z borders
-//   • Trees inside corner margins
-//   • Tropical flowers along inner edges
-//   • Cup + flag on right pad
-
 #include "Hole6.h"
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dimension constants (local space)
-// ─────────────────────────────────────────────────────────────────────────────
 
 static const float HOLE_W  = 28.0f;
 static const float HOLE_D  = 15.0f;
@@ -62,7 +33,6 @@ static const float MARGIN  = 1.2f;
 static const float INNER_X = HALF_W - MARGIN;
 static const float INNER_Z = HALF_D - MARGIN;
 
-// ── Colours ───────────────────────────────────────────────────────────────────
 // Fairway greens (slightly darker than Hole5 — deeper in the swamp zone)
 static const float GR = 0.11f, GG = 0.52f, GB = 0.13f;
 
@@ -84,17 +54,12 @@ static const float ER = 0.28f, EG = 0.20f, EB = 0.10f;
 // Sign post — wood brown
 static const float SPR = 0.40f, SPG = 0.25f, SPB = 0.08f;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
 void Hole6::addMesh(Mesh* m)
 {
     if (meshCount < MAX_MESHES)
         meshes[meshCount++] = m;
 }
 
-// ── addFlagAt ─────────────────────────────────────────────────────────────────
 void Hole6::addFlagAt(float x, float baseY, float z)
 {
     Mesh* pole = new Mesh(Mesh::makeCylinder(0.10f, 4.5f, 8,
@@ -108,7 +73,6 @@ void Hole6::addFlagAt(float x, float baseY, float z)
     pennant->setup(); addMesh(pennant);
 }
 
-// ── addFlowerAt ───────────────────────────────────────────────────────────────
 void Hole6::addFlowerAt(float x, float baseY, float z,
                          float pr, float pg, float pb)
 {
@@ -127,7 +91,6 @@ void Hole6::addFlowerAt(float x, float baseY, float z,
     centre->setup(); addMesh(centre);
 }
 
-// ── addTree ───────────────────────────────────────────────────────────────────
 void Hole6::addTree(float x, float baseY, float z, float scale)
 {
     float s = scale;
@@ -146,10 +109,6 @@ void Hole6::addTree(float x, float baseY, float z, float scale)
     c2->translate(x, baseY + 7.0f * s, z);
     c2->setup(); addMesh(c2);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructor / Destructor
-// ─────────────────────────────────────────────────────────────────────────────
 
 Hole6::Hole6() : meshCount(0)
 {
@@ -175,15 +134,8 @@ Hole6::~Hole6()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFairway
-// Left pad + right pad + border kerb walls.
-// No centre slab — the stream channel occupies X in [STREAM_X0, STREAM_X1].
-// Earth fill under both pads so the sides look solid.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole6::buildFairway()
 {
-    // ── Border kerb walls ─────────────────────────────────────────────────────
     float wallXNeg = -HALF_W - BT * 0.5f;
     float wallXPos =  HALF_W + BT * 0.5f;
     float wallZNeg = -HALF_D - BT * 0.5f;
@@ -211,7 +163,6 @@ void Hole6::buildFairway()
     bXPos->translate(wallXPos, BH * 0.5f, 0.0f);
     bXPos->setup(); addMesh(bXPos);
 
-    // ── Left fairway slab ─────────────────────────────────────────────────────
     Mesh* leftFW = new Mesh(Mesh::makeCuboid(LEFT_W, FH, HOLE_D, GR, GG, GB, 1.0f));
     leftFW->translate(LEFT_CX, FH * 0.5f, 0.0f);
     leftFW->setup(); addMesh(leftFW);
@@ -222,7 +173,6 @@ void Hole6::buildFairway()
     leftEarth->translate(LEFT_CX, -0.25f, 0.0f);
     leftEarth->setup(); addMesh(leftEarth);
 
-    // ── Right fairway slab ────────────────────────────────────────────────────
     Mesh* rightFW = new Mesh(Mesh::makeCuboid(RIGHT_W, FH, HOLE_D,
                                                GR * 0.95f, GG * 0.95f, GB, 1.0f));
     rightFW->translate(RIGHT_CX, FH * 0.5f, 0.0f);
@@ -235,12 +185,6 @@ void Hole6::buildFairway()
     rightEarth->setup(); addMesh(rightEarth);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildStream
-// Narrow water strip running through the centre of the hole in X.
-// The stream runs the full Z width of the hole.
-// A shallow mud/earth bed beneath the water surface.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole6::buildStream()
 {
     // Mud bed below the water surface — slightly depressed
@@ -269,40 +213,26 @@ void Hole6::buildStream()
     bankS->setup(); addMesh(bankS);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildBridge
-// Wooden bridge crossing the stream channel.
-//
-// From the report (Section 2.1.1 "Wooden Bridge"):
-//   "A flat rectangular quad forms the deck surface and 5-6 thinner rectangular
-//    quads are laid across it, slightly raised in the Y-value, to make it appear
-//    as if it is planks. On each long side, 2 thin cylinders serve as the railing
-//    posts and a horizontal cylinder connects them as the handrail."
-//
-// Bridge sits at X in [STREAM_X0, STREAM_X1], Z in [-BRIDGE_D/2, +BRIDGE_D/2].
-// Top surface at Y = BRIDGE_H so it floats just above the fairway.
-// ─────────────────────────────────────────────────────────────────────────────
+
 void Hole6::buildBridge()
 {
-    const float DECK_Y    = BRIDGE_H;                  // top of deck
-    const float DECK_THK  = 0.14f;                     // deck slab thickness
-    const float PLANK_THK = 0.05f;                     // plank strip thickness
-    const float PLANK_W   = 0.55f;                     // each plank strip width in X
+    const float DECK_Y    = BRIDGE_H; // top of deck
+    const float DECK_THK  = 0.14f; // deck slab thickness
+    const float PLANK_THK = 0.05f; // plank strip thickness
+    const float PLANK_W   = 0.55f; // each plank strip width in X
     const int   N_PLANKS  = 6;
-    const float POST_R    = 0.09f;                     // railing post radius
-    const float POST_H    = 1.10f;                     // railing post height
-    const float RAIL_R    = 0.055f;                    // handrail radius
-    const float POST_X0   = STREAM_X0 + 0.35f;        // first post X
-    const float POST_X1   = STREAM_X1 - 0.35f;        // last  post X
+    const float POST_R    = 0.09f; // railing post radius
+    const float POST_H    = 1.10f; // railing post height
+    const float RAIL_R    = 0.055f; // handrail radius
+    const float POST_X0   = STREAM_X0 + 0.35f; // first post X
+    const float POST_X1   = STREAM_X1 - 0.35f; // last  post X
     const float RAIL_LEN  = POST_X1 - POST_X0 + 2.0f * POST_R; // handrail spans posts
 
-    // ── Deck slab ─────────────────────────────────────────────────────────────
     Mesh* deck = new Mesh(Mesh::makeCuboid(BRIDGE_W, DECK_THK, BRIDGE_D,
                                             WDR, WDG, WDB, 1.0f));
     deck->translate(0.0f, DECK_Y - DECK_THK * 0.5f, 0.0f);
     deck->setup(); addMesh(deck);
 
-    // ── Planks (thin strips across the deck in Z, spaced along X) ─────────────
     float plankStep = (BRIDGE_W - PLANK_W) / (float)(N_PLANKS - 1);
     for (int i = 0; i < N_PLANKS; i++)
     {
@@ -316,8 +246,6 @@ void Hole6::buildBridge()
         plank->setup(); addMesh(plank);
     }
 
-    // ── Railing posts — 2 posts per side, 4 total ─────────────────────────────
-    // Post positions: left quarter and right quarter of the bridge span
     float postXPositions[2] = { POST_X0, POST_X1 };
     float railZSides[2]     = { -(BRIDGE_D * 0.5f - POST_R),
                                   (BRIDGE_D * 0.5f - POST_R) };
@@ -346,8 +274,6 @@ void Hole6::buildBridge()
         rail->setup(); addMesh(rail);
     }
 
-    // ── Structural support beams under deck (visible from the side) ────────────
-    // Two horizontal beams running the full bridge length below the deck
     float beamZPositions[2] = { -(BRIDGE_D * 0.5f - 0.4f),
                                   (BRIDGE_D * 0.5f - 0.4f) };
     for (int b = 0; b < 2; b++)
@@ -360,18 +286,6 @@ void Hole6::buildBridge()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildSignPost
-// Directional sign post near the tee (left/−X end).
-// From the report (Section 2.1.1 "Directional Sign Post"):
-//   "A single tall thin rectangle will form the base of the post and at the
-//    top, a smaller rectangle is attached horizontally as the sign board, and
-//    an equilateral triangle is attached to the left side of the rectangle to
-//    form the arrow pointer."
-//
-// Implemented as: vertical cuboid post + horizontal sign board cuboid
-//                 + triangular prism arrow head.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole6::buildSignPost()
 {
     const float POST_X = -12.0f;
@@ -398,9 +312,6 @@ void Hole6::buildSignPost()
                      POST_Z);
     board->setup(); addMesh(board);
 
-    // Arrow tip: triangular prism rotated to point in +X direction
-    // makeTriangularPrism produces a prism with triangle in XY plane, depth in Z.
-    // We rotate 90° around Y to make it face +X, then 90° around X to lay it flat.
     Mesh* arrow = new Mesh(Mesh::makeTriangularPrism(ARR_W, BOARD_H * 0.85f,
                                                       BOARD_D,
                                                       0.9f, 0.15f, 0.10f, 1.0f));
@@ -412,10 +323,6 @@ void Hole6::buildSignPost()
     arrow->setup(); addMesh(arrow);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildRocks
-// Volcanic boulders along the inner ±Z borders and flanking the stream banks.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole6::buildRocks()
 {
     struct RockDef { float x, z, s; };
@@ -453,10 +360,6 @@ void Hole6::buildRocks()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlag
-// Cup + flag on the right pad (+X end).
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole6::buildFlag()
 {
     float flagX = RIGHT_CX + 2.5f;   // toward +X end
@@ -470,10 +373,6 @@ void Hole6::buildFlag()
     addFlagAt(flagX, FH, flagZ);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildTrees
-// Palm-style trees in the four corner areas, well inside footprint.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole6::buildTrees()
 {
     struct TreeDef { float x, z, s; };
@@ -494,10 +393,6 @@ void Hole6::buildTrees()
         addTree(td.x, FH, td.z, td.s);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlowers
-// Scattered along the inner border edges of both fairways.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole6::buildFlowers()
 {
     float baseY = FH;
@@ -529,10 +424,6 @@ void Hole6::buildFlowers()
     for (auto& fd : flowers)
         addFlowerAt(fd.x, baseY, fd.z, fd.r, fd.g, fd.b);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Public interface
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole6::translate(float x, float y, float z)
 {

@@ -1,16 +1,3 @@
-// Brachio.hpp - drop-in OpenGL 3.3 wrapper for the Brachiosaurus mesh.
-// COS344 Practical: only uses allowed libraries (GLEW, glm).
-//
-// Usage:
-//   #include "Brachio.hpp"
-//   Brachio brachio;
-//   brachio.init();                                            // after glewInit()
-//   brachio.draw(modelLoc, glm::vec3(50, 0, 30), 0.35f, 0.0f); // each frame
-//   brachio.cleanup();                                         // on shutdown
-//
-// Default raw size: ~13 m head-to-tail, ~13 m tall (Blender +Z up).
-// Pass scale ≈ 0.35 for a roughly 4.5 m mini-golf decoration.
-
 #ifndef BRACHIO_HPP
 #define BRACHIO_HPP
 
@@ -54,11 +41,6 @@ public:
         initialized = true;
     }
 
-    // Build a model matrix that places the brachiosaurus.
-    //   -90deg about X: convert Blender +Z up -> OpenGL +Y up.
-    //   yawRad: rotate around world +Y so it faces a chosen direction.
-    //   placement: world position of the feet center.
-    //
     // Order (read bottom-to-top, that's application order):
     //   1. axis rotation (Z-up -> Y-up)
     //   2. scale (in already-uprighted frame)
@@ -82,6 +64,24 @@ public:
         if (modelLoc >= 0) {
             glm::mat4 m = modelMatrix(placement, scale, yawRad);
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(m));
+        }
+        glBindVertexArray(vao);
+        glDrawElements(GL_TRIANGLES, BRACHIO_INDEX_COUNT, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
+
+    // Depth-only draw for the shadow map pre-pass. The caller has bound the
+    // depth shader program and uploaded uLightSpaceMatrix; we just upload
+    // our model matrix to the shader's uModel uniform and draw.
+    void drawDepth(GLuint depthShader,
+                   const glm::vec3& placement = glm::vec3(0.0f),
+                   float scale = 1.0f,
+                   float yawRad = 0.0f) const {
+        if (!initialized) return;
+        GLint loc = glGetUniformLocation(depthShader, "uModel");
+        if (loc >= 0) {
+            glm::mat4 m = modelMatrix(placement, scale, yawRad);
+            glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(m));
         }
         glBindVertexArray(vao);
         glDrawElements(GL_TRIANGLES, BRACHIO_INDEX_COUNT, GL_UNSIGNED_INT, 0);

@@ -9,7 +9,6 @@
 #define M_PI 3.14159265358979f
 #endif
 
-// ─── Colours ──────────────────────────────────────────────────────────────────
 #define C_GREEN      0.15f, 0.50f, 0.15f, 1.0f
 #define C_CREAM      0.93f, 0.90f, 0.80f, 1.0f
 #define C_DARKBROWN  0.32f, 0.20f, 0.12f, 1.0f
@@ -28,10 +27,8 @@
 #define C_FLWPINK    0.95f, 0.45f, 0.65f, 1.0f
 #define C_FLWYELLOW  0.98f, 0.88f, 0.20f, 1.0f
 
-// ─── Windmill scale ────────────────────────────────────────────────────────────
 static constexpr float S = 2.0f;
 
-// ─── Blade geometry ───────────────────────────────────────────────────────────
 static constexpr float SPINE_OFF_X = 0.25f * S;
 static constexpr float BLADE_OFF_Y = 0.90f * S;
 static constexpr float SPINE_HALF  = (0.90f * S) * 0.5f;
@@ -40,7 +37,6 @@ static constexpr float ARM_CY      = ARM_LEN * 0.5f;
 static constexpr float SLAT_START  = BLADE_OFF_Y - SPINE_HALF + 0.10f;
 static constexpr float SLAT_STEP   = (SPINE_HALF * 2.0f - 0.10f) / 7.0f;
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
 static Mesh* place(Mesh&& src, float x, float y, float z,
                    Mesh** pool, int& cnt, int maxCnt)
 {
@@ -51,9 +47,6 @@ static Mesh* place(Mesh&& src, float x, float y, float z,
     return m;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructor
-// ─────────────────────────────────────────────────────────────────────────────
 Hole4::Hole4()
     : meshCount(0),
       pivotX(0.f), pivotY(0.f), pivotZ(0.f),
@@ -65,9 +58,6 @@ Hole4::Hole4()
         for (int j = 0; j < 8; ++j) bladeSlat[i][j] = nullptr;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 1. BASE GROUND (flat green surface that covers the entire C shape)
-    // ─────────────────────────────────────────────────────────────────────────
     const float SY = 0.0f;
     const float groundHeight = 0.2f;
 
@@ -76,10 +66,6 @@ Hole4::Hole4()
         0.0f, SY + groundHeight * 0.5f, 0.0f,
         meshes, meshCount, MAX_MESHES);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 2. BACKWARDS C-SHAPED COURSE (adjusted to fit within 28x15 ground)
-    //    Ground bounds: X from -14 to +14, Z from -7.5 to +7.5
-    // ─────────────────────────────────────────────────────────────────────────
     const float pathHeight = 0.3f;
     const float pathY = SY + groundHeight + pathHeight * 0.5f;
 
@@ -98,9 +84,6 @@ Hole4::Hole4()
         5.0f, pathY, 5.0f,
         meshes, meshCount, MAX_MESHES);
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 2. WINDMILL (at X=10, Z=0 - fits within ground bounds)
-    // ─────────────────────────────────────────────────────────────────────────
     const float WX = 10.f;
     const float WZ = 0.f;
     const float WY = pathY - 0.15f;
@@ -195,9 +178,6 @@ Hole4::Hole4()
             WX + slabOffX, WY + drumHalfH, wz, meshes, meshCount, MAX_MESHES);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // 3. SCENERY (repositioned around the C shape)
-    // ─────────────────────────────────────────────────────────────────────────
     const float groundY = SY + groundHeight;
 
     // Trees along the path edges - ONLY ON GREEN
@@ -242,16 +222,9 @@ Hole4::Hole4()
     teeBorder.translate(1.0f, pathY + 0.2f, 5.5f);
     teeBorder.setup();
     addMesh(new Mesh(std::move(teeBorder)));
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // 4. Initial blade transforms
-    // ─────────────────────────────────────────────────────────────────────────
     updateBladeTransforms();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildBlade
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole4::buildBlade(int arm)
 {
     // Arm bar: from pivot (Y=0) up to base of spines
@@ -285,9 +258,6 @@ void Hole4::buildBlade(int arm)
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// updateBladeTransforms
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole4::updateBladeTransforms()
 {
     glm::mat4 toPivot = glm::translate(glm::mat4(1.f),
@@ -319,7 +289,6 @@ void Hole4::updateBladeTransforms()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 Hole4::~Hole4()
 {
     for (int i = 0; i < meshCount; ++i) delete meshes[i];
@@ -336,7 +305,6 @@ void Hole4::draw(GLuint shaderProgram, bool wireframe,
                  const glm::vec3& lightColor,
                  const glm::vec3& camPos)
 {
-    // ── Animate windmill blades ───────────────────────────────────────────────
     double now = glfwGetTime();
     if (lastDrawTime < 0.0) lastDrawTime = now;
     float dt = (float)(now - lastDrawTime);
@@ -349,7 +317,6 @@ void Hole4::draw(GLuint shaderProgram, bool wireframe,
 
     updateBladeTransforms();
 
-    // ── Push lighting uniforms (same pattern as Hole5-8) ─────────────────────
     glUseProgram(shaderProgram);
     GLint locLD = glGetUniformLocation(shaderProgram, "uLightDir");
     GLint locVP = glGetUniformLocation(shaderProgram, "uViewPos");

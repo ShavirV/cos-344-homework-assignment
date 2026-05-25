@@ -62,6 +62,8 @@
 #include "../objects/Hole17.h"
 #include "../objects/Hole18.h"
 #include "../objects/Volcano.hpp"
+#include "../objects/Trex.hpp"
+#include "../objects/Brachio.hpp"
 #include "../objects/Skybox.h"
 #include "../lighting/ShadowMap.h"
 #include "../camera/Drone.h"
@@ -221,6 +223,40 @@ int main()
     GLint volLocLightCol = glGetUniformLocation(volcanoShader, "lightColor");
     GLint volLocAmbient  = glGetUniformLocation(volcanoShader, "ambientColor");
     GLint volLocTime     = glGetUniformLocation(volcanoShader, "time");
+
+    // ── T-rex (own shader, vertex layout pos/normal/uv/color) ────────────────
+    // Same pattern as the volcano: own shader program, own VAO inside the
+    // class. Per-frame uniforms (camera, lighting) are uploaded in the
+    // render loop. The trex header's modelMatrix() handles Blender +Z-up →
+    // OpenGL +Y-up conversion + scale + yaw + translate.
+    GLuint trexShader = LoadShaders("src/shaders/trex.vert", "src/shaders/trex.frag");
+    Trex trex;
+    trex.init();
+    const glm::vec3 TREX_POS(35.0f, 0.0f, 0.0f);
+    const float     TREX_SCALE = 0.5f;
+    const float     TREX_YAW   = glm::radians(180.0f); // face -X (toward volcano)
+    GLint trexLocModel    = glGetUniformLocation(trexShader, "model");
+    GLint trexLocView     = glGetUniformLocation(trexShader, "view");
+    GLint trexLocProj     = glGetUniformLocation(trexShader, "projection");
+    GLint trexLocViewPos  = glGetUniformLocation(trexShader, "viewPos");
+    GLint trexLocLightDir = glGetUniformLocation(trexShader, "lightDir");
+    GLint trexLocLightCol = glGetUniformLocation(trexShader, "lightColor");
+    GLint trexLocAmbient  = glGetUniformLocation(trexShader, "ambientColor");
+
+    // ── Brachiosaurus (own shader, same vertex layout as trex) ───────────────
+    GLuint brachioShader = LoadShaders("src/shaders/brachio.vert", "src/shaders/brachio.frag");
+    Brachio brachio;
+    brachio.init();
+    const glm::vec3 BRACHIO_POS(-30.0f, 0.0f, 20.0f);
+    const float     BRACHIO_SCALE = 0.4f;
+    const float     BRACHIO_YAW   = glm::radians(90.0f); // face +X (toward volcano)
+    GLint braLocModel    = glGetUniformLocation(brachioShader, "model");
+    GLint braLocView     = glGetUniformLocation(brachioShader, "view");
+    GLint braLocProj     = glGetUniformLocation(brachioShader, "projection");
+    GLint braLocViewPos  = glGetUniformLocation(brachioShader, "viewPos");
+    GLint braLocLightDir = glGetUniformLocation(brachioShader, "lightDir");
+    GLint braLocLightCol = glGetUniformLocation(brachioShader, "lightColor");
+    GLint braLocAmbient  = glGetUniformLocation(brachioShader, "ambientColor");
 
     GLint locLightColor = glGetUniformLocation(shader, "uLightColor");
     GLint locAmbient    = glGetUniformLocation(shader, "uAmbient");
@@ -469,6 +505,9 @@ int main()
         // Drone — only casts when in 3rd-person mode (drone.drawDepth has
         // an mThirdPerson guard, so calling it unconditionally is safe).
         drone.drawDepth(shadowMap.depthShader());
+        // External Blender-imported models — same depth-shader pattern.
+        trex.drawDepth   (shadowMap.depthShader(), TREX_POS,    TREX_SCALE,    TREX_YAW);
+        brachio.drawDepth(shadowMap.depthShader(), BRACHIO_POS, BRACHIO_SCALE, BRACHIO_YAW);
         shadowMap.endPass(fbW, fbH);
 
         // ── Pick view + eye position based on active controller ──────────────
@@ -523,6 +562,29 @@ int main()
         glUniform3fv(volLocAmbient,  1, glm::value_ptr(ambient));
         glUniform1f(volLocTime, (float)glfwGetTime());
         volcanoModel.draw(volLocModel, VOLCANO_POS, VOLCANO_SCALE);
+
+        // ── T-rex (own shader) ───────────────────────────────────────────────
+        // Same pattern as volcano: switch program, upload per-frame uniforms,
+        // draw, switch back to main shader for the hole draws below.
+        glUseProgram(trexShader);
+        glUniformMatrix4fv(trexLocProj, 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(trexLocView, 1, GL_FALSE, glm::value_ptr(view));
+        glUniform3fv(trexLocViewPos,  1, glm::value_ptr(eyePos));
+        glUniform3fv(trexLocLightDir, 1, glm::value_ptr(sunDir));
+        glUniform3fv(trexLocLightCol, 1, glm::value_ptr(sunColor));
+        glUniform3fv(trexLocAmbient,  1, glm::value_ptr(ambient));
+        trex.draw(trexLocModel, TREX_POS, TREX_SCALE, TREX_YAW);
+
+        // ── Brachiosaurus (own shader) ───────────────────────────────────────
+        glUseProgram(brachioShader);
+        glUniformMatrix4fv(braLocProj, 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(braLocView, 1, GL_FALSE, glm::value_ptr(view));
+        glUniform3fv(braLocViewPos,  1, glm::value_ptr(eyePos));
+        glUniform3fv(braLocLightDir, 1, glm::value_ptr(sunDir));
+        glUniform3fv(braLocLightCol, 1, glm::value_ptr(sunColor));
+        glUniform3fv(braLocAmbient,  1, glm::value_ptr(ambient));
+        brachio.draw(braLocModel, BRACHIO_POS, BRACHIO_SCALE, BRACHIO_YAW);
+
         glUseProgram(shader);
 
         h1.draw(shader, false,
@@ -637,6 +699,8 @@ int main()
     }
 
     volcanoModel.cleanup();
+    trex.cleanup();
+    brachio.cleanup();
     drone.cleanup();
     glfwTerminate();
     return 0;

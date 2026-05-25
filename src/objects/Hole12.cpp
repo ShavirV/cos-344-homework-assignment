@@ -8,7 +8,6 @@ Hole12::Hole12(float s)
     for (int i = 0; i < MAX_MESHES; i++)
         meshes[i] = nullptr;
 
-    // ── Hourglass fairway ─────────────────────────────────────────────────────
     const int   SEGS    = 20;
     const float LENGTH  = 28.0f * s;
     const float W_END   = 15.0f * s;
@@ -36,7 +35,6 @@ Hole12::Hole12(float s)
         strip->setup();
         addMesh(strip);
 
-        // ── Border strips ─────────────────────────────────────────────────────
         const float BH = 0.4f * s;
         const float BT = 0.4f * s;
 
@@ -55,7 +53,6 @@ Hole12::Hole12(float s)
         addMesh(bNeg);
     }
 
-    // ── End caps ──────────────────────────────────────────────────────────────
     const float BH  = 0.4f * s;
     const float BT  = 0.5f * s;
     const float wL  = widthAt(0.0f);
@@ -75,7 +72,6 @@ Hole12::Hole12(float s)
     capR->setup();
     addMesh(capR);
 
-    // ── Cup ───────────────────────────────────────────────────────────────────
     Mesh* cup = new Mesh(Mesh::makeCylinder(
         0.5f*s, 0.3f*s, 32,
         0.05f, 0.05f, 0.05f, 1.0f));
@@ -90,7 +86,6 @@ pole->translate(-11.0f*s, 3.2f*s, 0.0f);
 pole->setup();
 addMesh(pole);
 
-// ── Flag ──────────────────────────────────────────────────────────────────
 Mesh* flag1 = new Mesh(Mesh::makeCuboid(
     1.5f*s, 0.8f*s, 0.3f*s,
     1.0f, 0.1f, 0.1f, 1.0f));

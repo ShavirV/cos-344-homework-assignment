@@ -1,14 +1,5 @@
 #version 330 core
 
-// T-rex fragment shader.
-// Blinn-Phong with a procedural scale pattern overlay on greenish skin,
-// flatter highlights on the cream belly, and a brighter spec on
-// teeth/claws (light vs. dark colors).
-//
-// IMPORTANT: lightDir uses the SAME convention as fragment.glsl in your
-// project - it points FROM the surface TOWARD the light. Pass the same
-// value you give the hole shader's uLightDir.
-
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vUV;

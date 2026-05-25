@@ -1,12 +1,6 @@
 #pragma once
 #include "../core/Mesh.h"
 #include <glm/glm.hpp>
-
-// Hole 4 — windmill obstacle on a raised hill-shaped green.
-// Build at local origin; caller does: hole4.translate(-48.0f, 0.35f, 15.0f)
-// The hill top is 20×9, base 28×15, height 2.5 — matches the reference image
-// raised-mound look.  Windmill is ×2 scale so it fits inside the 15-deep fairway.
-
 class Hole4
 {
 public:

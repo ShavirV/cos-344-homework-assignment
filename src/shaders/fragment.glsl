@@ -1,18 +1,5 @@
 #version 330 core
 
-// =============================================================================
-// fragment.glsl
-// Blinn-Phong shading with procedural-noise "textures" for turf and kerb
-// materials, plus a hemisphere ambient term.
-//
-// Shadow mapping (NEW):
-//   - vLightSpacePos comes from the vertex shader (= uLightSpaceMatrix * worldPos)
-//   - uShadowMap is the depth texture rendered from the sun's POV in the
-//     pre-pass. We sample it with a 3x3 PCF kernel for soft edges.
-//   - Only diffuse + specular contributions are shadowed. Ambient stays
-//     unaffected so deeply-shadowed areas remain readable.
-// =============================================================================
-
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec3 vColor;
@@ -94,24 +81,6 @@ bool looksLikeKerb(vec3 c) {
     return (maxc - minc) < 0.10 && maxc > 0.50;
 }
 
-// =============================================================================
-// shadowFactor — returns 0 (fully lit) to 1 (fully in shadow)
-//
-// Implementation:
-//   1. Perspective divide (lightSpacePos.xyz / .w) → light-clip [-1,1].
-//      Orthographic light matrices keep .w=1, but doing the divide is safe
-//      either way.
-//   2. Remap to [0,1] for texture lookup.
-//   3. Bail out when the fragment is outside the light's frustum (z > 1 or
-//      any coord outside [0,1]) — treat as fully lit so the world OUTSIDE
-//      the shadow map area is normally lit.
-//   4. Bias: subtract a small constant from the fragment's depth to avoid
-//      "shadow acne" — surfaces shadowing themselves due to depth precision.
-//      The bias scales with the surface angle to the light: surfaces at
-//      grazing angles need more bias than ones facing the sun head-on.
-//   5. 3×3 PCF (percentage-closer filtering): sample 9 neighbouring texels
-//      and average. Soft shadow edges instead of pixelated bitmaps.
-// =============================================================================
 float shadowFactor(vec4 lightSpacePos, vec3 N, vec3 L)
 {
     if (uHasShadowMap == 0) return 0.0;
@@ -168,7 +137,6 @@ void main() {
     if (looksLikeKerb(vColor)) { specStrength = 0.18; specPower = 32.0; }
     float spec = pow(max(dot(N, H), 0.0), specPower) * specStrength;
 
-    // NEW — sample the shadow map and modulate the direct-light contributions.
     // Ambient stays unaffected so shadowed areas don't go pitch-black.
     float shadow = shadowFactor(vLightSpacePos, N, L);
     float litFactor = 1.0 - shadow;

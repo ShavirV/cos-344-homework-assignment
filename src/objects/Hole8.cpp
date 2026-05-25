@@ -1,40 +1,6 @@
-// Hole8.cpp  —  Downhill Drop (Hole 8)
-// Dino Park Phuket — swamp & waterfall zone (Holes 5–8)
-//
-// STRICT FOOTPRINT: 28 (X) × 15 (Z), centred at local origin.
-//   X runs from -14 to +14
-//   Z runs from  -7.5 to +7.5
-//
-// DESCRIPTION (from report):
-//   "After the waterfall zone, the fairway descends via two stepped concrete
-//    platforms. The ball accelerates down the steps. Rendered as a staircase
-//    of three flat rectangular quads at descending Y-values."
-//
-// ELEVATION LAYOUT (left → right, high → low):
-//   7 evenly-spaced steps across the 28-unit X span.
-//   Each step is exactly 4 units wide in X, descending by 0.5 units in Y.
-//   STEP 0 (TOP)    : X in [-14, -10],  surface Y = 3.0
-//   STEP 1          : X in [-10,  -6],  surface Y = 2.5
-//   STEP 2          : X in [ -6,  -2],  surface Y = 2.0
-//   STEP 3          : X in [ -2,   2],  surface Y = 1.5
-//   STEP 4          : X in [  2,   6],  surface Y = 1.0
-//   STEP 5          : X in [  6,  10],  surface Y = 0.5
-//   STEP 6 (BOTTOM) : X in [ 10,  14],  surface Y = 0.0
-//
-//   Each step is a full-depth slab (Z = -7.5 to +7.5).
-//   Each step has an earth/concrete fill column beneath it down to Y = -0.5.
-//   Two rocks per side per step (sparse, just at each end of a step).
-//   Tee is on the TOP step (-X end). Cup/flag is on the BOTTOM step (+X end).
-//
-// Pattern: raw Mesh* array, identical to Hole5 / Hole6.
-
 #include "Hole8.h"
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dimension constants  (local space, identical footprint to Hole5/6)
-// ─────────────────────────────────────────────────────────────────────────────
 
 static const float HOLE_W = 28.0f;
 static const float HOLE_D = 15.0f;
@@ -42,17 +8,16 @@ static const float HALF_W = 14.0f;
 static const float HALF_D =  7.5f;
 
 // Slab / kerb
-static const float FH = 0.18f;   // fairway slab thickness
-static const float BT = 0.5f;    // border wall thickness
-static const float BH = 0.4f;    // border kerb height
+static const float FH = 0.18f; // fairway slab thickness
+static const float BT = 0.5f; // border wall thickness
+static const float BH = 0.4f; // border kerb height
 
-// ── Staircase geometry ────────────────────────────────────────────────────────
-// 7 evenly-spaced steps. Step width = 28/7 = 4 units each.
-// Y drops by 0.5 per step: top = 3.0, bottom = 0.0.
+// 7 evenly-spaced steps. Step width = 28/7 = 4 units each
+// Y drops by 0.5 per step: top = 3.0, bottom = 0.0
 static const int   N_STEPS   = 7;
-static const float STEP_W    = 4.0f;    // each step width in X
-static const float STEP_DROP = 0.5f;    // Y decrease per step
-static const float TOP_Y     = 3.0f;   // surface Y of the topmost step
+static const float STEP_W    = 4.0f; // each step width in X
+static const float STEP_DROP = 0.5f; // Y decrease per step
+static const float TOP_Y     = 3.0f; // surface Y of the topmost step
 
 // Riser (vertical concrete face) dimensions
 static const float RISER_THK = 0.30f;   // thickness of the riser face in X
@@ -65,10 +30,6 @@ static const float KERB_R  = 0.86f, KERB_G  = 0.86f, KERB_B  = 0.86f;
 // Safe inner margin
 static const float MARGIN = 1.2f;
 static const float INNER_Z = HALF_D - MARGIN;   // 6.3
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole8::addMesh(Mesh* m)
 {
@@ -134,10 +95,6 @@ void Hole8::addTree(float x, float baseY, float z, float scale)
     c3->setup(); addMesh(c3);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructor / Destructor
-// ─────────────────────────────────────────────────────────────────────────────
-
 Hole8::Hole8() : meshCount(0)
 {
     for (int i = 0; i < MAX_MESHES; i++)
@@ -161,11 +118,6 @@ Hole8::~Hole8()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Step geometry helpers
-// stepX0(i) : left X boundary of step i
-// stepSurfY(i): surface Y of step i
-// ─────────────────────────────────────────────────────────────────────────────
 static float stepX0(int i)     { return -HALF_W + i * STEP_W; }
 static float stepX1(int i)     { return -HALF_W + (i + 1) * STEP_W; }
 static float stepCX(int i)     { return -HALF_W + (i + 0.5f) * STEP_W; }
@@ -180,11 +132,6 @@ static void stepColour(int i, float& r, float& g, float& b)
     b = 0.14f - t * 0.03f;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildBorderWalls
-// Concrete kerb walls around the full 28×15 footprint.
-// ±Z walls are tall enough to clear the top step. -X wall matches top step.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole8::buildBorderWalls()
 {
     float wallXNeg = -HALF_W - BT * 0.5f;
@@ -220,11 +167,6 @@ void Hole8::buildBorderWalls()
     bXPos->setup(); addMesh(bXPos);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildSteps
-// Seven flat green slabs at evenly descending Y-values (3.0 down to 0.0).
-// Each slab has a solid earth fill column from its base to Y = -0.5.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole8::buildSteps()
 {
     for (int i = 0; i < N_STEPS; i++)
@@ -234,12 +176,10 @@ void Hole8::buildSteps()
         float r, g, b;
         stepColour(i, r, g, b);
 
-        // ── Green surface slab ────────────────────────────────────────────────
         Mesh* slab = new Mesh(Mesh::makeCuboid(STEP_W, FH, HOLE_D, r, g, b, 1.0f));
         slab->translate(cx, surfY + FH * 0.5f, 0.0f);
         slab->setup(); addMesh(slab);
 
-        // ── Earth fill column beneath the slab (down to Y = -0.5) ─────────────
         float fillH = surfY + 0.5f;
         if (fillH > 0.01f)
         {
@@ -251,12 +191,6 @@ void Hole8::buildSteps()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildRisers
-// Vertical concrete face between each pair of adjacent steps.
-// Riser i sits at X = stepX1(i), rises from stepSurfY(i+1) to stepSurfY(i).
-// A thin concrete lip overhangs the upper edge, matching the reference photo.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole8::buildRisers()
 {
     for (int i = 0; i < N_STEPS - 1; i++)
@@ -285,11 +219,6 @@ void Hole8::buildRisers()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildRocks
-// Sparse rocks — just two per ±Z side per step, placed near the step
-// boundaries so they don't crowd the playable surface.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole8::buildRocks()
 {
     // Two X offsets within each step (near left and right edge)
@@ -324,10 +253,6 @@ void Hole8::buildRocks()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlag
-// Cup + flag on the bottom step (+X end), centred in Z.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole8::buildFlag()
 {
     int   last   = N_STEPS - 1;
@@ -343,12 +268,6 @@ void Hole8::buildFlag()
     addFlagAt(flagX, flagY + FH, flagZ);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildTrees
-// Palm-style trees along both ±Z inner borders — same placement pattern
-// as Hole5 (running the full length, not just corners).
-// Trees sit on the surface of whichever step they occupy.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole8::buildTrees()
 {
     struct TreeDef { float x, baseY, z, scale; };
@@ -374,11 +293,6 @@ void Hole8::buildTrees()
         addTree(td.x, td.baseY, td.z, td.scale);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlowers
-// Tropical flowers scattered along inner border edges of all steps —
-// same density and colour variety as Hole5.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole8::buildFlowers()
 {
     // Colour palette cycling across steps, matching Hole5 style
@@ -404,10 +318,6 @@ void Hole8::buildFlowers()
     addFlowerAt(stepX0(N_STEPS - 1) + 2.8f, lastY,  2.5f, 0.95f, 0.88f, 0.10f);
     addFlowerAt(stepX0(N_STEPS - 1) + 1.5f, lastY, -2.0f, 1.00f, 0.35f, 0.55f);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Public interface  (identical to Hole5 / Hole6 pattern)
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole8::translate(float x, float y, float z)
 {

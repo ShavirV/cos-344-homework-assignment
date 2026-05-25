@@ -3,7 +3,6 @@
 #include <GL/glew.h>
 #include <glm/gtc/type_ptr.hpp>
 
-// ─── Colours ──────────────────────────────────────────────────────────────────
 #define C_GREEN         0.15f, 0.50f, 0.15f, 1.0f
 #define C_DARKGRASS     0.08f, 0.32f, 0.08f, 1.0f
 #define C_SAND          0.93f, 0.85f, 0.60f, 1.0f
@@ -19,7 +18,6 @@ Hole1::Hole1()
     for (int i = 0; i < MAX_MESHES; i++)
         meshes[i] = nullptr;
 
-    // ─── BASE GROUND (28 x 15) ───────────────────────────────────────────────
     const float SY = 0.0f;
     const float groundHeight = 0.2f;
 
@@ -28,7 +26,6 @@ Hole1::Hole1()
     ground->setup();
     addMesh(ground);
 
-    // ─── L-SHAPED FAIRWAY ────────────────────────────────────────────────────
     const float FH = 0.2f;
     const float FW = 5.0f;
     const float pathY = SY + groundHeight + FH * 0.5f;
@@ -46,13 +43,11 @@ Hole1::Hole1()
     horizontalFairway->setup();
     addMesh(horizontalFairway);
 
-    // ─── SAND TRAP ────────────────────────────────────────────────────────────
     Mesh* sandTrap = new Mesh(Mesh::makeCylinder(1.5f, 0.1f, 20, C_SAND));
     sandTrap->translate(6.0f, pathY - 0.02f, 2.0f);
     sandTrap->setup();
     addMesh(sandTrap);
 
-    // ─── WATER HAZARD ─────────────────────────────────────────────────────────
     Mesh* water = new Mesh(Mesh::makeCylinder(1.2f, 0.05f, 24, C_WATER));
     water->translate(-2.0f, pathY - 0.03f, -2.0f);
     water->setup();
@@ -63,7 +58,6 @@ Hole1::Hole1()
     waterEdge->setup();
     addMesh(waterEdge);
 
-    // ─── TEE MAT ──────────────────────────────────────────────────────────────
     Mesh* teeMat = new Mesh(Mesh::makeCuboid(1.5f, 0.08f, 1.5f, 1.0f, 0.8f, 0.0f, 1.0f));
     teeMat->translate(-5.0f, pathY + slopeH + 0.04f, -1.0f);
     teeMat->setup();
@@ -74,7 +68,6 @@ Hole1::Hole1()
     teeBorder->setup();
     addMesh(teeBorder);
 
-    // ─── CUP & FLAG ───────────────────────────────────────────────────────────
     Mesh* cup = new Mesh(Mesh::makeCylinder(0.3f, 0.1f, 16, 0.04f, 0.04f, 0.04f, 1.0f));
     cup->translate(8.0f, pathY + 0.32f, 4.0f);
     cup->setup();
@@ -91,24 +84,17 @@ Hole1::Hole1()
     flagBanner.setup();
     addMesh(new Mesh(std::move(flagBanner)));
 
-    // ─── RAMP CONNECTOR ───────────────────────────────────────────────────────
     const float horizTopY = pathY + FH * 0.5f;
     const float hillTopY  = pathY + FH * 0.5f + slopeH;
-    // Mesh ramp = Mesh::makeRamp(-5.0f, horizTopY, 2.0f, -5.0f, hillTopY, -1.0f, FW);
-    // addMesh(new Mesh(std::move(ramp)));
 
-    // ─── ROCK ON THE FAIRWAY ──────────────────────────────────────────────────
-    // Placed mid-fairway as an obstacle — centre of horizontal section
     Mesh* fairwayRock = new Mesh(Mesh::makeHill(0.5f, 0.4f, 1.0f, 0.9f, 0.6f, C_GREY));
     fairwayRock->translate(3.0f, pathY + 0.3f, 4.0f);
     fairwayRock->setup();
     addMesh(fairwayRock);
 
-    // ─── FLOWERS — straight line along Z=2.0, evenly spaced along X ──────────
-    // Horizontal fairway spans X: -8 to +10. Place 8 flowers evenly across it.
-    // All at the same Z=2.0 (front edge of fairway) so they form a straight row.
+
     const float flowerY  = pathY + 0.05f;
-    const float flowerZ  = 2.0f;                    // single Z — straight line
+    const float flowerZ  = 2.0f; // single Z — straight line
     const float flowerX0 = -7.0f;
     const float flowerXStep = 2.0f;
     for (int i = 0; i < 8; i++) {
@@ -130,10 +116,9 @@ Hole1::Hole1()
         addMesh(center);
     }
 
-    // ─── LAMP POSTS — straight line along Z=6.0, evenly spaced along X ───────
-    // Same X spacing as flowers, opposite Z edge of fairway (Z=6.0).
+
     const float lightY  = pathY;
-    const float lightZ  = 6.0f;                     // single Z — straight line
+    const float lightZ  = 6.0f;// single Z — straight line
     const float lightX0 = -7.0f;
     const float lightXStep = 2.0f;
     for (int i = 0; i < 7; i++) {
@@ -150,7 +135,6 @@ Hole1::Hole1()
         addMesh(lamp);
     }
 
-    // ─── DINOSAUR FOOTPRINTS ──────────────────────────────────────────────────
     const float printY = SY + groundHeight + 0.03f;
     float prints[6][2] = {
         {-7.0f, 2.5f}, {-5.0f, 2.8f}, {-3.0f, 3.0f},
@@ -163,7 +147,6 @@ Hole1::Hole1()
         addMesh(print);
     }
 
-    // ─── DECORATIVE ROCKS (off-fairway) ───────────────────────────────────────
     const float rockY = SY + groundHeight + 0.1f;
     float rocks[6][2] = {
         {-10.0f,  5.0f}, {-9.0f, -5.0f}, {10.0f, -6.0f},
@@ -176,7 +159,6 @@ Hole1::Hole1()
         addMesh(rock);
     }
 
-    // ─── BUSHES ───────────────────────────────────────────────────────────────
     const float bushY = SY + groundHeight;
     float bushes[6][2] = {
         {-12.0f,  4.0f}, {12.0f,  5.0f}, {13.0f, -4.0f},

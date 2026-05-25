@@ -1,11 +1,5 @@
 #version 330 core
 
-// Brachiosaurus fragment shader.
-// Earthy sauropod skin via Blinn-Phong, with a procedural scale/wrinkle
-// pattern over the body and a higher specular for nail tips. Same
-// lightDir convention as fragment.glsl: lightDir points FROM the surface
-// TOWARD the light. No sign flip needed in dev.cpp.
-
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vUV;
