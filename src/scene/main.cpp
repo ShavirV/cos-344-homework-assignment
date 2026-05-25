@@ -1,10 +1,8 @@
 // main.cpp  :  COS344 Miniature Golf Course
 //
-// Holes are flat red cuboids 28 (length) × 0.2 (height) × 15 (width).
+// Holes are flat red cuboids 28 (length) x 0.2 (height) x 15 (width).
 // Rotation: 0° = runs along X,  90° = runs along Z.
 //
-// Directed play order:
-//   1→2→3→4→5→6→7→8→9(tunnel)→10→11→12→13→14→15→16→17→18
 //
 //  Hole  | cx    | cz    | rot
 //  ------+-------+-------+----
@@ -68,7 +66,7 @@
 #include "../objects/Water.h"
 #include "../objects/GlobalWater.h"
 
-const int WIDTH  = 1000;
+const int WIDTH  = 1500;
 const int HEIGHT = 1000;
 
 //Camera
@@ -162,38 +160,37 @@ int main()
     const float FY = 0.35f;
 
     Hole1 h1;
-    h1.translate(-180.0f, 0.35f, 60.0f); //cant rotate 
+    h1.translate(-20.0f, 0.35f, 60.0f); //cant rotate 
 
     Hole2 h2;
-    h2.translate(-170.0f, 0.35f, 40.0f);
+    h2.translate(-40.0f, 0.45f, 40.0f);
 
     Hole3 h3; 
-    h3.translate(-180.0f, 0.35, 20.0f);
+    h3.translate(-60.0f, 0.35, 20.0f);
 
     Hole4 h4;
-    h4.translate(-150.0f, 0.35f, 20.0f);
+    h4.translate(-10.0f, 0.35f, 20.0f);
 
     Hole5 h5;
-    h5.translate(-175.0f, 0.35, -16.0);
+    h5.translate(-50.0f, 0.35, -10.0);
 
     Hole6 h6;
-    h6.translate(-175.0f, 0.35f, -50.0f);
+    h6.translate(-05.0f, 0.35f, -50.0f);
 
     Hole7 h7;
-    h7.translate(-150.0f, 0.35f, -35.0f);
+    h7.translate(-40.0f, 0.35f, -45.0f);
 
     Hole8 h8 ;
-    h8.translate(-110.0f, 0.35f, -10.0f);
-
+    h8.translate(26.0f, 0.35f, 23.0f);
+ 
     Hole9E h9e;
-    h9e.translate(-55.0f, 0.35, -10.0f);
+    h9e.translate(-15.0f, 0.35, -10.0f);
 
     Hole9W h9w;
-    h9w.translate(40.0f, 0.35, -10.0f);
+    h9w.translate(50.0f, 0.35, -10.0f);
 
-    
     Hole10 h10; 
-    h10.translate(80.0f, 0.35f, -10.0f);
+    h10.translate(92.0f, 0.35f, -21.0f);
 
     Hole11 h11;
     h11.translate(110.0f, 0.35f, 20.0f);
@@ -201,13 +198,12 @@ int main()
     Hole12 h12;
     h12.translate(150.0f, 0.35f, 25.0f);
 
-    
     Hole13 h13;
     h13.init(shader);
-
+    
     Hole14 h14;
     h14.init(shader);
-
+    
     Hole15 h15;
     h15.init(shader);
 
@@ -217,9 +213,8 @@ int main()
     Hole17 h17;
     h17.translate(120.0f, 0.35f, 50.0f);
 
-
     Hole18 h18;
-    h18.translate(35.0f, 0.35f, 50.0f);
+    h18.translate(35.0f, 0.1f, 50.0f);
 
     GlobalWater globalWater;
     globalWater.translate(0.0f, 0.55f, 0.0f);
