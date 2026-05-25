@@ -82,7 +82,7 @@ Hole9W::Hole9W(float s)
         meshes[i] = nullptr;
 
     buildFairway();
-    //buildTunnel();
+    buildTunnel();
     buildRocks();
     buildFlag();
     buildTrees();
@@ -148,12 +148,12 @@ void Hole9W::buildTunnel()
     Mesh* mouth = new Mesh(Mesh::makeTunnel(
         3.5f,
         2.5f,
-        2.0f,
+        15.0f,
         32,
         TUNNEL_R, TUNNEL_G, TUNNEL_B, 1.0f));
 
     mouth->rotate(90.0f, 0.0f, 0.0f, 1.0f);
-    mouth->translate(-HALF_W + 1.0f, 3.5f, 0.0f);
+    mouth->translate(-HALF_W + 5.0f, 3.5f, 0.0f);
     mouth->setup(); addMesh(mouth);
 }
 
@@ -201,7 +201,7 @@ void Hole9W::buildFlag()
 
     Mesh* cup = new Mesh(Mesh::makeCylinder(0.48f, 0.28f, 12,
                                              0.10f, 0.10f, 0.10f, 1.0f));
-    cup->translate(-flagX, FH + 0.04f, flagZ);
+    cup->translate(flagX, FH + 0.04f, flagZ);
     cup->setup(); addMesh(cup);
 
     addFlagAt(-flagX, FH, flagZ);
