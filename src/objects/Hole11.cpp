@@ -13,14 +13,14 @@ Hole11::Hole11(float s)
     const float FH =  0.2f * s;
     const float FD = 15.0f * s;
 
-    Mesh* fairway = new Mesh(Mesh::makeCuboid(FW, FH, FD, 1.0f, 0.05f, 0.05f, 1.0f));
+    Mesh* fairway = new Mesh(Mesh::makeCuboid(FW, FH, FD, 0.20f, 0.45f, 0.10f, 1.0f));
     fairway->setup();
     addMesh(fairway);
 
     // ── Fairway 2 ─────────────────────────────────────────────────────────────
-    Mesh* fairway2 = new Mesh(Mesh::makeCuboid(FW, FH, FD, 1.0f, 0.05f, 0.05f, 1.0f));
+    Mesh* fairway2 = new Mesh(Mesh::makeCuboid(FW, FH, FD, 0.20f, 0.45f, 0.10f, 1.0f));
     fairway2->rotate(90.0f, 0.0f, 1.0f, 0.0f);
-    fairway2->translate(14.5f * s, 0.0f, 29.0f * s);
+    fairway2->translate(14.5f * s, 0.0f, 7.5f * s);
     fairway2->setup();
     addMesh(fairway2);
 
