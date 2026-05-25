@@ -6,7 +6,6 @@ class Hole3
 {
 public:
     static const int MAX_MESHES = 200;
-    // Declared alongside other static factory declarations in Mesh.h:
     static Mesh makeRamp2(float x0, float y0, float z0,
                           float x1, float y1, float z1,
                           float width, float thickness = 0.2f);
