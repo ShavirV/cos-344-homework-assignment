@@ -1,9 +1,3 @@
-// trex_mesh.h - T-rex mesh exported from Blender.
-// COS344 Practical: drop into your project and #include directly.
-// Vertex layout (11 floats): pos.xyz, normal.xyz, uv.xy, color.rgb.
-// Coordinate system: +Z up (Blender), +X forward. Convert to +Y up
-// via Trex::modelMatrix() (90 deg rotation about X).
-
 #ifndef TREX_MESH_H
 #define TREX_MESH_H
 

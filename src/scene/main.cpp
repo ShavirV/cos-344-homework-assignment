@@ -64,6 +64,7 @@
 #include "../objects/Volcano.hpp"
 #include "../objects/Skybox.h"
 #include "../lighting/ShadowMap.h"
+#include "../camera/Drone.h"
 
 
 const int WIDTH  = 1000;
@@ -77,6 +78,20 @@ const float SPEED      = 0.5f;
 const float LOOK_SPEED = 1.0f;
 float yaw   = -90.0f;
 float pitch = -29.0f;
+
+// ── Drone mode (added alongside fly-camera, not replacing it) ────────────────
+// useDrone toggles which controller drives view+input each frame. False =
+// the original fly-camera (W/S/A/D + arrow keys); true = the quadcopter
+// drone (Report §8). The drone instance itself is declared in main() so it
+// can be initialised after the GL context exists; the toggle and the mouse
+// delta accumulators live here so the key + cursor callbacks can reach them.
+static Drone* g_drone        = nullptr;
+static bool   g_useDrone     = false;
+static float  g_mouseAccumDx = 0.0f;
+static float  g_mouseAccumDy = 0.0f;
+static double g_lastMouseX   = 0.0;
+static double g_lastMouseY   = 0.0;
+static bool   g_firstMouse   = true;
 
 const char* getError() { const char* d; glfwGetError(&d); return d; }
 inline void startUpGLFW() { if (!glfwInit()) throw getError(); }
@@ -99,6 +114,11 @@ inline GLFWwindow* setUp()
 
 void processInput(GLFWwindow* window)
 {
+    // Original fly-camera input. Only acts when drone mode is OFF — the
+    // drone consumes the same A/D/W/S/Space/Shift keys in its own update(),
+    // so we'd be double-handling them otherwise.
+    if (g_useDrone) return;
+
     if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) yaw   -= LOOK_SPEED;
     if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) yaw   += LOOK_SPEED;
     if (glfwGetKey(window, GLFW_KEY_UP)    == GLFW_PRESS) pitch += LOOK_SPEED;
@@ -122,11 +142,66 @@ void processInput(GLFWwindow* window)
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) cameraPos -= SPEED * cameraUp;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GLFW key callback — toggles drone mode (C) and forwards V/Z (and any
+// future one-off keys the drone cares about) to the drone instance.
+// ─────────────────────────────────────────────────────────────────────────────
+static void key_cb(GLFWwindow* /*w*/, int key, int /*scancode*/,
+                   int action, int /*mods*/)
+{
+    // Forward to the drone so its V (1st/3rd-person) toggle works.
+    if (g_drone) g_drone->onKey(key, action);
+
+    if (action != GLFW_PRESS) return;
+    if (key == GLFW_KEY_C)
+    {
+        g_useDrone = !g_useDrone;
+        // Reset mouse-delta accumulators so the new mode doesn't get a
+        // sudden fling from the previous mode's accumulated drift.
+        g_mouseAccumDx = 0.0f;
+        g_mouseAccumDy = 0.0f;
+        g_firstMouse   = true;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GLFW cursor callback — accumulates mouse deltas for the drone, since the
+// drone's update() consumes a per-frame delta (not absolute position). The
+// fly-camera ignores the mouse and uses arrow keys, so we don't drive
+// yaw/pitch from here in fly-camera mode.
+// ─────────────────────────────────────────────────────────────────────────────
+static void cursor_cb(GLFWwindow* /*w*/, double x, double y)
+{
+    if (g_firstMouse)
+    {
+        g_lastMouseX = x;
+        g_lastMouseY = y;
+        g_firstMouse = false;
+        return;
+    }
+    double dx = x - g_lastMouseX;
+    double dy = y - g_lastMouseY;
+    g_lastMouseX = x;
+    g_lastMouseY = y;
+
+    g_mouseAccumDx += (float)dx;
+    g_mouseAccumDy += (float)dy;
+}
+
 int main()
 {
     GLFWwindow* window;
     try { window = setUp(); }
     catch (const char* e) { std::cout << e << std::endl; throw; }
+
+    // ── Input callbacks ──────────────────────────────────────────────────────
+    // C toggles fly-camera <-> drone mode. The drone's V (1st/3rd-person)
+    // and any future one-off keys it cares about are forwarded via onKey()
+    // inside key_cb. The cursor is captured + hidden so the drone's mouse-
+    // look gets continuous deltas instead of stopping at the screen edges.
+    glfwSetKeyCallback(window, key_cb);
+    glfwSetCursorPosCallback(window, cursor_cb);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
@@ -183,6 +258,16 @@ int main()
         std::cerr << "ShadowMap init failed — depth pass will be skipped.\n";
     }
     shadowMap.setSceneBounds(glm::vec3(0.0f, 0.0f, 0.0f), 250.0f);
+
+    // ── Drone (Report §8) ────────────────────────────────────────────────────
+    // Created here so the GL context exists. Shares the main shader program
+    // — Drone::init binds the uniform locations and uses the same
+    // vertex-attribute layout as the holes (pos/normal/colour). Its
+    // global pointer (used by the key+cursor callbacks) is set so input
+    // forwarding works as soon as the drone is constructed.
+    Drone drone;
+    drone.init(shader);
+    g_drone = &drone;
 
     // ── Ground ───────────────────────────────────────────────────────────────
     Mesh ground = Mesh::makeCuboid(400.0f, 0.5f, 150.0f, 0.35f, 0.20f, 0.08f, 1.0f);
@@ -284,8 +369,7 @@ int main()
         int fbW = WIDTH, fbH = HEIGHT;
         glfwGetFramebufferSize(window, &fbW, &fbH);
         if (fbH == 0) fbH = 1;   // guard against minimised window
-        projection = glm::perspective(
-            glm::radians(45.0f), (float)fbW / (float)fbH, 0.1f, 500.0f);
+        float aspect = (float)fbW / (float)fbH;
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -295,6 +379,27 @@ int main()
         double now      = glfwGetTime();
         float deltaTime = (float)(now - lastTime);
         lastTime = now;
+
+        // ── Drone update ─────────────────────────────────────────────────────
+        // Always called so the drone keeps spinning its propellers even when
+        // the fly-camera is active (it costs nothing). It reads keyboard
+        // state from `window` directly. In drone mode the accumulated mouse
+        // deltas drive 1st-person look; in fly-camera mode the deltas are
+        // ignored (the fly camera uses arrow keys for look).
+        drone.update(window, deltaTime,
+                     g_useDrone ? g_mouseAccumDx : 0.0f,
+                     g_useDrone ? g_mouseAccumDy : 0.0f);
+        g_mouseAccumDx = 0.0f;
+        g_mouseAccumDy = 0.0f;
+
+        // Projection comes from the drone in drone mode (its own FoV +
+        // optional Z-zoom), or our standard 45° perspective in fly-camera.
+        if (g_useDrone) {
+            projection = drone.projection(aspect);
+        } else {
+            projection = glm::perspective(
+                glm::radians(45.0f), aspect, 0.1f, 500.0f);
+        }
 
         // ── Skybox: advance the rotation, then read sun / moon. ──────────────
         skybox.update(deltaTime);
@@ -361,9 +466,24 @@ int main()
         h18.drawDepth(shadowMap.depthShader());
         // Ground is a single Mesh — call its drawDepth directly.
         ground.drawDepth(shadowMap.depthShader());
+        // Drone — only casts when in 3rd-person mode (drone.drawDepth has
+        // an mThirdPerson guard, so calling it unconditionally is safe).
+        drone.drawDepth(shadowMap.depthShader());
         shadowMap.endPass(fbW, fbH);
 
-        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+        // ── Pick view + eye position based on active controller ──────────────
+        // In drone mode the drone owns the camera (Report §8.3 / §8.3.1).
+        // In fly-camera mode we use the original lookAt-driven matrix.
+        glm::mat4 view;
+        glm::vec3 eyePos;
+        if (g_useDrone) {
+            view   = drone.view();
+            eyePos = drone.eyePos();
+        } else {
+            view   = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+            eyePos = cameraPos;
+        }
+
         glUseProgram(shader);
         glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
@@ -373,7 +493,7 @@ int main()
         glUniform3fv(locLightColor, 1, glm::value_ptr(sunColor));
         glUniform3fv(locAmbient,    1, glm::value_ptr(ambient));
         if (locLightDir != -1) glUniform3fv(locLightDir, 1, glm::value_ptr(sunDir));
-        if (locViewPos  != -1) glUniform3fv(locViewPos,  1, glm::value_ptr(cameraPos));
+        if (locViewPos  != -1) glUniform3fv(locViewPos,  1, glm::value_ptr(eyePos));
 
         // ── Shadow uniforms on the main shader ───────────────────────────────
         // Bind the depth texture from the shadow pre-pass to texture unit 1
@@ -396,7 +516,7 @@ int main()
         glUseProgram(volcanoShader);
         glUniformMatrix4fv(volLocProj, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(volLocView, 1, GL_FALSE, glm::value_ptr(view));
-        glUniform3fv(volLocViewPos, 1, glm::value_ptr(cameraPos));
+        glUniform3fv(volLocViewPos, 1, glm::value_ptr(eyePos));
         // Skybox-driven lighting (computed at top of frame).
         glUniform3fv(volLocLightDir, 1, glm::value_ptr(sunDir));
         glUniform3fv(volLocLightCol, 1, glm::value_ptr(sunColor));
@@ -408,92 +528,98 @@ int main()
         h1.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                      // camera position
+        eyePos);                                      // camera position
 
         h2.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h3.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h4.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h5.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h6.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h7.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h8.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h9e.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h9w.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
 
         h10.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h11.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h12.draw(shader, false,
         sunDir,  // light direction
         sunColor,                 // light colour
-        cameraPos);                                     //camera position
+        eyePos);                                     //camera position
 
         h13.draw(view, projection,
          sunDir,  // sunDir
-         cameraPos); 
+         eyePos); 
          
          h14.draw(view, projection,
          sunDir,  // sunDir
-         cameraPos); 
+         eyePos); 
          
         h15.draw(view, projection,
          sunDir,  // sunDir
-         cameraPos);   
+         eyePos);   
 
 
         h16.update(deltaTime);
-        h16.setCameraData(view, projection, cameraPos);
+        h16.setCameraData(view, projection, eyePos);
         h16.draw(shader, false);
 
         h17.draw(shader, false);
 
 
         h18.update(deltaTime);
-        h18.setCameraData(view, projection, cameraPos);
+        h18.setCameraData(view, projection, eyePos);
         h18.draw(shader, false);
+
+        // ── Drone (3rd-person body) ──────────────────────────────────────────
+        // drone.draw no-ops in 1st-person, so calling it unconditionally is
+        // safe and keeps the program-wide uniforms in scope for the skybox
+        // draw immediately below.
+        drone.draw(view, projection, sunDir, eyePos);
 
         // ── Skybox last (sits behind everything via depth-test trick) ────────
         // Skybox.cpp internally disables depth writes + culling and restores
@@ -511,6 +637,7 @@ int main()
     }
 
     volcanoModel.cleanup();
+    drone.cleanup();
     glfwTerminate();
     return 0;
 }

@@ -1,29 +1,3 @@
-// =============================================================================
-// Drone.cpp
-// Implementation of the camera-drone (Report §8).
-//
-// Reads as a quadcopter:
-//
-//      ──── front (red LEDs) ────
-//        .                     .
-//         arm0 ──── O          O ──── arm1
-//          .    motor + prop   motor + prop
-//           .         /
-//            ┌───────────┐
-//            │ oct prism │   ← body
-//            │     ●     │   ← gimbal sphere (below), torus ring around
-//            └───────────┘
-//           .         .
-//          .           .
-//         arm2 ──── O    O ──── arm3
-//        .     motor + prop   motor + prop
-//      ──── rear (green LEDs) ────
-//
-// Geometry generated procedurally (no asset files, no prebuilt meshes). All
-// CPU-side vertex buffers are uploaded once in init() and the propellers
-// then animate via a per-frame spin matrix applied during draw().
-// =============================================================================
-
 #include "Drone.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -31,33 +5,23 @@
 #include <cmath>
 #include <cstddef>
 #include <iostream>
-
-// -----------------------------------------------------------------------------
-// Geometry constants. Kept in one block so it's easy to scale the whole drone
-// uniformly without hunting through the file.
-// -----------------------------------------------------------------------------
 namespace
 {
-    // ── Body (flattened octagonal prism, Report §8.1) ────────────────────────
     const float BODY_RADIUS    = 0.55f;   // distance from centre to octagon vertex
     const float BODY_HALF_H    = 0.10f;   // half-thickness of the prism
 
-    // ── Arms ─────────────────────────────────────────────────────────────────
     const float ARM_LENGTH     = 0.80f;   // from body edge to motor centre
     const float ARM_HALF_W     = 0.045f;  // half-width across the arm
     const float ARM_HALF_H     = 0.035f;  // half-thickness vertically
 
-    // ── Motor housings (short cylinders, Report §8.1) ────────────────────────
     const float MOTOR_RADIUS   = 0.10f;
     const float MOTOR_HEIGHT   = 0.08f;
     const int   MOTOR_SEGS     = 16;
 
-    // ── Propellers (two rectangular quads crossed at 90°, Report §8.1) ──────
     const float PROP_LENGTH    = 0.55f;   // tip-to-tip = 2 * (LENGTH/2)
     const float PROP_HALF_W    = 0.025f;  // blade width
     const float PROP_THICK     = 0.005f;  // blade thickness (~paper-thin)
 
-    // ── Camera gimbal (sphere + torus, Report §8.1) ──────────────────────────
     const float GIMBAL_RADIUS  = 0.10f;
     const float GIMBAL_Y       = -BODY_HALF_H - GIMBAL_RADIUS - 0.02f; // below body
     const int   GIMBAL_LAT     = 10;
@@ -67,14 +31,10 @@ namespace
     const int   TORUS_MAJOR_S  = 24;
     const int   TORUS_MINOR_S  = 8;
 
-    // ── LEDs (Report §8.4) ───────────────────────────────────────────────────
     const float LED_HALF       = 0.022f;
     const glm::vec3 LED_RED  (1.00f, 0.05f, 0.05f);
     const glm::vec3 LED_GREEN(0.05f, 1.00f, 0.20f);
 
-    // ── Colours (linear RGB) ─────────────────────────────────────────────────
-    // Deliberately NOT in the turf-green or kerb-grey buckets so the shader's
-    // procedural-noise material detector (in dev.cpp) leaves them alone.
     const glm::vec3 COLOR_BODY    (0.18f, 0.20f, 0.24f);   // dark blue-grey
     const glm::vec3 COLOR_ARM     (0.16f, 0.18f, 0.22f);
     const glm::vec3 COLOR_MOTOR   (0.10f, 0.10f, 0.10f);
@@ -82,7 +42,6 @@ namespace
     const glm::vec3 COLOR_GIMBAL  (0.08f, 0.08f, 0.09f);
     const glm::vec3 COLOR_RING    (0.42f, 0.42f, 0.44f);
 
-    // ── Control feel ─────────────────────────────────────────────────────────
     const float MOVE_SPEED      = 12.0f;   // m/s base, multiplied by Ctrl boost
     const float BOOST_FACTOR    = 3.5f;
     const float YAW_SPEED       = 1.6f;    // rad/s (A/D)
@@ -104,10 +63,6 @@ namespace
     const float NEAR_PLANE      = 0.1f;
     const float FAR_PLANE       = 1000.0f;
 }
-
-// =============================================================================
-// Construction / destruction
-// =============================================================================
 
 Drone::Drone()
     : mTotalIndexCount(0),
@@ -137,10 +92,6 @@ Drone::~Drone()
 {
     cleanup();
 }
-
-// =============================================================================
-// Low-level geometry helpers (mirror Hole13's style)
-// =============================================================================
 
 void Drone::pushQuad(const glm::vec3& a, const glm::vec3& b,
                      const glm::vec3& c, const glm::vec3& d,
@@ -199,18 +150,7 @@ void Drone::buildLED(const glm::vec3& centre, float halfSize,
     buildBox(mn, mx, colour);
 }
 
-// =============================================================================
-// Body — flattened octagonal prism
-// =============================================================================
-//
-// An octagon is laid out in the XZ plane (the "ground plane" of the drone's
-// local frame) at y = ±halfH. We compute 8 outer vertices on a circle of
-// radius `radius`, then stitch:
-//   • Top face — fan of 8 triangles from a central top vertex
-//   • Bottom face — same, flipped
-//   • Side faces — 8 quads connecting top-ring to bottom-ring
-//
-// The flat shading is achieved by giving each face its own normal.
+
 void Drone::buildBody(float radius, float halfHeight, const glm::vec3& colour)
 {
     const int N = 8;
@@ -220,9 +160,6 @@ void Drone::buildBody(float radius, float halfHeight, const glm::vec3& colour)
     std::vector<glm::vec3> top(N), bot(N);
     for (int i = 0; i < N; ++i)
     {
-        // Start at +Z so the "front" of the drone (where front LEDs go) sits
-        // on the +Z side. Rotate clockwise looking down (i.e. -angle so the
-        // octagon vertices match the diagonal arm directions we choose below).
         float a = (float)i * (2.0f * 3.14159265358979323846f / (float)N);
         float cx = std::cos(a);
         float cz = std::sin(a);
@@ -255,9 +192,6 @@ void Drone::buildBody(float radius, float halfHeight, const glm::vec3& colour)
     }
 }
 
-// =============================================================================
-// Cylinder along +Y (used for motor housings)
-// =============================================================================
 void Drone::buildCylinderY(const glm::vec3& centre, float r, float h, int segs,
                            const glm::vec3& colour)
 {
@@ -289,9 +223,6 @@ void Drone::buildCylinderY(const glm::vec3& centre, float r, float h, int segs,
     }
 }
 
-// =============================================================================
-// UV-sphere (gimbal)
-// =============================================================================
 void Drone::buildSphere(const glm::vec3& centre, float r,
                         int latSegs, int lonSegs,
                         const glm::vec3& colour)
@@ -346,13 +277,6 @@ void Drone::buildSphere(const glm::vec3& centre, float r,
     }
 }
 
-// =============================================================================
-// Torus around +Y axis (gimbal ring)
-// =============================================================================
-//
-// Parameterised as:
-//   p(u, v) = centre + ((R + r·cos v) · cos u, r·sin v, (R + r·cos v) · sin u)
-//   u sweeps the major ring around +Y, v sweeps the minor cross-section.
 void Drone::buildTorusY(const glm::vec3& centre, float R, float r,
                         int majorSegs, int minorSegs,
                         const glm::vec3& colour)
@@ -395,20 +319,6 @@ void Drone::buildTorusY(const glm::vec3& centre, float R, float r,
     }
 }
 
-// =============================================================================
-// One arm + motor housing + propeller + LED at the tip
-// =============================================================================
-//
-// `tipDir` must be a unit vector in the XZ plane pointing from the body
-// centre toward where the motor sits. We build:
-//   • A rectangular-prism arm running from the body edge to the motor.
-//     The arm is oriented along tipDir; its "long" axis is tipDir, with
-//     a perpendicular sideDir (in XZ) defining its width and Y defining
-//     its thickness.
-//   • A cylinder motor housing centred at the arm tip.
-//   • Two crossed rectangular blades on top of the motor (registered with
-//     mProps[propIndex] so update() can spin them).
-//   • A single small LED-coloured cube next to the motor.
 void Drone::buildArm(const glm::vec3& tipDir,
                      float armLen, float armHalfW, float armHalfH,
                      float motorR, float motorH,
@@ -422,8 +332,7 @@ void Drone::buildArm(const glm::vec3& tipDir,
     // Side direction in XZ — rotate tipDir 90° around +Y.
     glm::vec3 side(-tipDir.z, 0.0f, tipDir.x);
 
-    // Arm extends from `start` (at the body's edge) to `end` (at the motor
-    // centre). The body's edge along tipDir sits at radius BODY_RADIUS.
+
     glm::vec3 start = BODY_RADIUS * tipDir;
     start.y = 0.0f;
     glm::vec3 end   = start + armLen * tipDir;
@@ -457,29 +366,15 @@ void Drone::buildArm(const glm::vec3& tipDir,
     glm::vec3 motorCentre = end + glm::vec3(0.0f, armHalfH + motorH * 0.5f, 0.0f);
     buildCylinderY(motorCentre, motorR, motorH, MOTOR_SEGS, motorColour);
 
-    // ── LED ──────────────────────────────────────────────────────────────────
-    // Placed on the OUTER face of the arm, just below the motor — visible
-    // from below + outside in 3rd-person.
     glm::vec3 ledCentre = end + (-armHalfH - LED_HALF - 0.005f) * glm::vec3(0, 1, 0);
     buildLED(ledCentre, LED_HALF, ledColour);
 
-    // Record where the propeller starts BEFORE pushing it.
-    // The propeller is built LAST in this arm's sequence so the index range
-    // is contiguous — that lets draw() handle it cleanly by drawing the
-    // static range first (body + all arms + motors + LEDs in one call) and
-    // then each of the 4 prop ranges separately with their spin transform.
     GLuint propStart = (GLuint)mIndices.size();
 
-    // ── Propeller ────────────────────────────────────────────────────────────
-    // Built directly above the motor (top face at y = motorTopY + small gap).
-    // Two crossed blades: blade A long-axis along local X, blade B along
-    // local Z. Both share the same hub (the motor centre in XZ) so the spin
-    // applied at draw time rotates them together.
     float motorTopY = motorCentre.y + motorH * 0.5f;
     float propY     = motorTopY + 0.01f;
     glm::vec3 hub(end.x, propY + PROP_THICK * 0.5f, end.z);
 
-    // Blade A — long axis = local X.
     {
         glm::vec3 mn(hub.x - PROP_LENGTH * 0.5f,
                      propY,
@@ -489,7 +384,6 @@ void Drone::buildArm(const glm::vec3& tipDir,
                      hub.z + PROP_HALF_W);
         buildBox(mn, mx, propColour);
     }
-    // Blade B — long axis = local Z, perpendicular to blade A.
     {
         glm::vec3 mn(hub.x - PROP_HALF_W,
                      propY,
@@ -505,13 +399,8 @@ void Drone::buildArm(const glm::vec3& tipDir,
     mProps[propIndex].indexOffset = propStart;
     mProps[propIndex].indexCount  = propEnd - propStart;
     mProps[propIndex].hubLocal    = hub;
-    // (void)propLen — propLen is here for future per-arm variation.
     (void)propLen;
 }
-
-// =============================================================================
-// init — build all CPU-side geometry, upload to GL, cache uniforms
-// =============================================================================
 
 void Drone::init(GLuint shaderProgram)
 {
@@ -519,10 +408,6 @@ void Drone::init(GLuint shaderProgram)
 
     mProgram = shaderProgram;
 
-    // Cache uniform locations. uMVP / uLightColor / uAmbient are not
-    // cached here anymore — dev.cpp sets view/projection/lightColor/ambient
-    // once per frame as program-wide uniforms, before any of the hole or
-    // drone draw() calls.
     mLocModel      = glGetUniformLocation(mProgram, "uModel");
     mLocNormalMat  = glGetUniformLocation(mProgram, "uNormalMat");
     mLocLightDir   = glGetUniformLocation(mProgram, "uLightDir");
@@ -531,19 +416,14 @@ void Drone::init(GLuint shaderProgram)
     mVertices.clear();
     mIndices.clear();
 
-    // ── 1. Body (octagonal prism) ────────────────────────────────────────────
     buildBody(BODY_RADIUS, BODY_HALF_H, COLOR_BODY);
 
-    // ── 2. Gimbal — sphere + torus, below the body ──────────────────────────
     buildSphere(glm::vec3(0.0f, GIMBAL_Y, 0.0f),
                 GIMBAL_RADIUS, GIMBAL_LAT, GIMBAL_LON, COLOR_GIMBAL);
     buildTorusY(glm::vec3(0.0f, GIMBAL_Y, 0.0f),
                 TORUS_MAJOR_R, TORUS_TUBE_R,
                 TORUS_MAJOR_S, TORUS_MINOR_S, COLOR_RING);
 
-    // ── 3. Four arms (diagonals at ±45° from +Z and +X) ──────────────────────
-    // Front arms (FRONT-RIGHT, FRONT-LEFT) get RED LEDs (Report §8.4).
-    // Rear arms get GREEN.
     const float k = 0.70710678f; // cos(45°) = sin(45°)
     struct ArmSpec { glm::vec3 dir; glm::vec3 led; int index; };
     ArmSpec arms[4] = {
@@ -562,7 +442,6 @@ void Drone::init(GLuint shaderProgram)
                  arms[i].index);
     }
 
-    // ── 4. Upload to GPU ─────────────────────────────────────────────────────
     if (mVertices.empty() || mIndices.empty())
     {
         std::cerr << "Drone::init — no geometry generated!" << std::endl;
@@ -608,10 +487,6 @@ void Drone::init(GLuint shaderProgram)
     mInitialised = true;
 }
 
-// =============================================================================
-// Orientation helpers
-// =============================================================================
-
 glm::mat4 Drone::bodyModel() const
 {
     glm::mat4 M(1.0f);
@@ -653,25 +528,16 @@ glm::vec3 Drone::bodyUp() const
     return glm::normalize(glm::vec3(u));
 }
 
-// =============================================================================
-// Projection
-// =============================================================================
-
 glm::mat4 Drone::projection(float aspect) const
 {
     float fovDeg = mZoom ? FOV_ZOOM_DEG : FOV_NORMAL_DEG;
     return glm::perspective(glm::radians(fovDeg), aspect, NEAR_PLANE, FAR_PLANE);
 }
 
-// =============================================================================
-// Per-frame update — controls + matrices (Report §8.2 / §8.3 / §8.3.1)
-// =============================================================================
-
 void Drone::update(GLFWwindow* window, float dt, float mouseDx, float mouseDy)
 {
     if (!window) return;
 
-    // ── 1. Mouse-look (1st-person only — locked in 3rd-person per §8.3.1) ──
     if (!mThirdPerson)
     {
         mCamYawOffset   += mouseDx * MOUSE_SENS;
@@ -680,7 +546,6 @@ void Drone::update(GLFWwindow* window, float dt, float mouseDx, float mouseDy)
         if (mCamPitchOffset < -MAX_CAM_PITCH) mCamPitchOffset = -MAX_CAM_PITCH;
     }
 
-    // ── 2. Body controls (Report §8.2) ───────────────────────────────────────
     bool boost = glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS;
     float moveSpeed = MOVE_SPEED * (boost ? BOOST_FACTOR : 1.0f);
 
@@ -693,17 +558,10 @@ void Drone::update(GLFWwindow* window, float dt, float mouseDx, float mouseDy)
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) mRoll += ROLL_SPEED * dt;
 
     // W / S — tilt forward / back AND translate along local forward.
-    // The report describes W/S as "Pitch forward / backward (tilt and
-    // translate in the drone's local forward direction)" — so we tilt the
-    // body while we're holding the key, and translate along the (now
-    // forward-flat) direction. The translation uses an XZ-plane projection
-    // of forward so the drone doesn't drift up/down when pitched.
     bool fwd = glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS;
     bool bwd = glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS;
     if (fwd) mPitch -= PITCH_SPEED * 0.4f * dt;     // nose down
     if (bwd) mPitch += PITCH_SPEED * 0.4f * dt;     // nose up
-    // Auto-level pitch & roll when no input — gives the "settles to hover"
-    // feel real quadcopters have, and prevents the drone tumbling.
     if (!fwd && !bwd) mPitch *= (1.0f - std::min(1.0f, 2.0f * dt));
     if (glfwGetKey(window, GLFW_KEY_Q) != GLFW_PRESS &&
         glfwGetKey(window, GLFW_KEY_E) != GLFW_PRESS)
@@ -712,14 +570,16 @@ void Drone::update(GLFWwindow* window, float dt, float mouseDx, float mouseDy)
     }
 
     // Clamp pitch / roll so the maths stays well-behaved.
-    if (mPitch >  MAX_PITCH) mPitch =  MAX_PITCH;
-    if (mPitch < -MAX_PITCH) mPitch = -MAX_PITCH;
-    if (mRoll  >  MAX_ROLL)  mRoll  =  MAX_ROLL;
-    if (mRoll  < -MAX_ROLL)  mRoll  = -MAX_ROLL;
+    if (mPitch >  MAX_PITCH) 
+        mPitch =  MAX_PITCH;
+    if (mPitch < -MAX_PITCH) 
+        mPitch = -MAX_PITCH;
+    if (mRoll  >  MAX_ROLL) 
+         mRoll  =  MAX_ROLL;
+    if (mRoll  < -MAX_ROLL) 
+         mRoll  = -MAX_ROLL;
 
-    // Translation. Use the yaw-only forward / right so steering stays
-    // horizontal even when pitched (matches typical mini-golf "fly camera"
-    // feel — the drone moves where it's *facing*, not where it's *tilted*).
+
     glm::vec3 fwdFlat(std::sin(mYaw), 0.0f, std::cos(mYaw));
     glm::vec3 rgtFlat(std::cos(mYaw), 0.0f, -std::sin(mYaw));
     if (fwd) mPos += fwdFlat * moveSpeed * dt;
@@ -729,25 +589,17 @@ void Drone::update(GLFWwindow* window, float dt, float mouseDx, float mouseDy)
     if (glfwGetKey(window, GLFW_KEY_SPACE)      == GLFW_PRESS) mPos.y += moveSpeed * dt;
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) mPos.y -= moveSpeed * dt;
 
-    // Z — zoom (Report §8.3 optional zoom).
     mZoom = glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS;
 
-    // (void)rgtFlat — held in scope in case we add A/D strafe later;
-    // current bindings reserve A/D for yaw per the report.
     (void)rgtFlat;
 
-    // ── 3. Propeller spin (visual only) ──────────────────────────────────────
     mPropSpin += PROP_SPIN_SPEED * dt;
     // Keep the value bounded so float precision stays good over long runs.
     const float TWO_PI = 6.28318530717958647692f;
     if (mPropSpin > 1e4f) mPropSpin = std::fmod(mPropSpin, TWO_PI);
 
-    // ── 4. Build view + eye position ─────────────────────────────────────────
     if (mThirdPerson)
     {
-        // Third-person camera (Report §8.3.1):
-        //   forward = (sin θ, 0, cos θ)
-        //   cameraPos = P − d·forward + (0, h, 0)
         glm::vec3 fwdYaw(std::sin(mYaw), 0.0f, std::cos(mYaw));
         glm::vec3 camPos = mPos - TP_DISTANCE * fwdYaw + glm::vec3(0.0f, TP_HEIGHT, 0.0f);
         mView   = glm::lookAt(camPos, mPos, glm::vec3(0, 1, 0));
@@ -755,15 +607,11 @@ void Drone::update(GLFWwindow* window, float dt, float mouseDx, float mouseDy)
     }
     else
     {
-        // First-person camera. The eye sits at the gimbal position, and the
-        // look direction is the drone's body forward rotated by the mouse-
-        // look offsets (independent per §8.2).
         glm::mat4 bodyM = bodyModel();
         glm::vec4 eyeLocal(0.0f, GIMBAL_Y, 0.0f, 1.0f);
         glm::vec3 eye = glm::vec3(bodyM * eyeLocal);
 
-        // Build look direction. Start from body forward, then apply the mouse
-        // pitch/yaw offsets around the body's up / right axes.
+
         glm::vec3 fwd = bodyForward();
         glm::vec3 up  = bodyUp();
         glm::vec3 rgt = bodyRight();
@@ -780,10 +628,6 @@ void Drone::update(GLFWwindow* window, float dt, float mouseDx, float mouseDy)
     }
 }
 
-// =============================================================================
-// frameOn — position the drone behind & above a target, looking at it
-// =============================================================================
-
 void Drone::frameOn(const glm::vec3& target, float radius)
 {
     // Approach from "south" (-Z) at an elevation proportional to the scene
@@ -796,15 +640,10 @@ void Drone::frameOn(const glm::vec3& target, float radius)
     mRoll  = 0.0f;
 
     glm::vec3 dir = glm::normalize(target - mPos);
-    // Set the camera mouse-look offsets so the 1st-person view looks at the
-    // target. (The drone body itself stays level for a clean hover pose.)
     mCamPitchOffset = std::asin(dir.y);
     mCamYawOffset   = std::atan2(dir.x, dir.z);
 }
 
-// =============================================================================
-// onKey — handle one-off key presses (V toggle)
-// =============================================================================
 
 void Drone::onKey(int key, int action)
 {
@@ -812,21 +651,6 @@ void Drone::onKey(int key, int action)
     if (key == GLFW_KEY_V) mThirdPerson = !mThirdPerson;
 }
 
-// =============================================================================
-// draw — render the drone body (3rd-person only)
-// =============================================================================
-//
-// EBO layout after init():
-//   [0, mBodyIndexCount)         — body + gimbal + ring  (all static)
-//   [mBodyIndexCount, P0.start)  — arm0 + motor0 + LED0  (static)
-//   [P0.start, P0.end)           — propeller 0           (spinning)
-//   [P0.end,    P1.start)        — arm1 + motor1 + LED1  (static)
-//   ... and so on through arm3 + prop3 ...
-//   [P3.end, mTotalIndexCount)   — (empty — nothing after the last prop)
-//
-// draw() walks this layout: it submits each static segment under the body
-// model matrix, then each propeller under (body · translateToHub · spin ·
-// translateFromHub).
 void Drone::draw(const glm::mat4& view,
                  const glm::mat4& proj,
                  const glm::vec3& sunDir,
@@ -837,20 +661,15 @@ void Drone::draw(const glm::mat4& view,
 
     glUseProgram(mProgram);
 
-    if (mLocLightDir   != -1) glUniform3fv(mLocLightDir, 1, glm::value_ptr(sunDir));
-    if (mLocViewPos    != -1) glUniform3fv(mLocViewPos,  1, glm::value_ptr(camPos));
-
-    // view + proj are program-wide; uLightColor + uAmbient are owned by
-    // dev.cpp now and set on the program each frame. Suppress unused-param
-    // warnings.
+    if (mLocLightDir   != -1) 
+        glUniform3fv(mLocLightDir, 1, glm::value_ptr(sunDir));
+    if (mLocViewPos    != -1) 
+        glUniform3fv(mLocViewPos,  1, glm::value_ptr(camPos));
     (void)view; (void)proj;
 
     glBindVertexArray(mVAO);
 
     auto pushModel = [&](const glm::mat4& M) {
-        // No MVP precompute — the vertex shader builds gl_Position from
-        // projection * view * uModel itself. We only need uModel and the
-        // matching normal matrix here.
         glm::mat3 nrmM = glm::mat3(glm::transpose(glm::inverse(M)));
         if (mLocModel     != -1) glUniformMatrix4fv(mLocModel,     1, GL_FALSE, glm::value_ptr(M));
         if (mLocNormalMat != -1) glUniformMatrix3fv(mLocNormalMat, 1, GL_FALSE, glm::value_ptr(nrmM));
@@ -858,8 +677,6 @@ void Drone::draw(const glm::mat4& view,
 
     glm::mat4 bodyM = bodyModel();
 
-    // 1. STATIC SEGMENTS — under the body model matrix.
-    //    Walk through gaps between propeller ranges.
     pushModel(bodyM);
 
     GLuint cursor = 0;
@@ -877,8 +694,7 @@ void Drone::draw(const glm::mat4& view,
         }
         cursor = pm.indexOffset + pm.indexCount;
     }
-    // Tail after the last propeller (would be empty under current init()
-    // order, but kept for robustness if more geometry is appended later).
+
     if (mTotalIndexCount > cursor)
     {
         GLsizei chunk = (GLsizei)(mTotalIndexCount - cursor);
@@ -888,12 +704,6 @@ void Drone::draw(const glm::mat4& view,
                        (void*)(uintptr_t)(cursor * sizeof(unsigned int)));
     }
 
-    // 2. PROPELLERS — each under (body · translate(hub) · rotateY(spin) ·
-    //    translate(-hub)) so the blades spin in place at their hub.
-    //    On a real quadcopter, diagonally-opposite propellers spin in the
-    //    same direction and adjacent ones counter-rotate (cancels torque).
-    //    We mimic that here: props 0 and 2 turn +spin, props 1 and 3 turn
-    //    -spin.
     for (int i = 0; i < 4; ++i)
     {
         const PropMeta& pm = mProps[i];
@@ -915,9 +725,70 @@ void Drone::draw(const glm::mat4& view,
     glBindVertexArray(0);
 }
 
-// =============================================================================
-// cleanup
-// =============================================================================
+void Drone::drawDepth(GLuint depthShader)
+{
+    if (!mInitialised)   return;
+    if (!mThirdPerson)   return;
+
+    GLint locModel = glGetUniformLocation(depthShader, "uModel");
+
+    auto pushModel = [&](const glm::mat4& M) {
+        if (locModel != -1)
+            glUniformMatrix4fv(locModel, 1, GL_FALSE, glm::value_ptr(M));
+    };
+
+    glBindVertexArray(mVAO);
+
+    glm::mat4 bodyM = bodyModel();
+
+    // 1. STATIC SEGMENTS — under the body model matrix.
+    pushModel(bodyM);
+
+    GLuint cursor = 0;
+    for (int i = 0; i < 4; ++i)
+    {
+        const PropMeta& pm = mProps[i];
+        if (pm.indexOffset > cursor)
+        {
+            GLsizei chunk = (GLsizei)(pm.indexOffset - cursor);
+            glDrawElements(GL_TRIANGLES,
+                           chunk,
+                           GL_UNSIGNED_INT,
+                           (void*)(uintptr_t)(cursor * sizeof(unsigned int)));
+        }
+        cursor = pm.indexOffset + pm.indexCount;
+    }
+    if (mTotalIndexCount > cursor)
+    {
+        GLsizei chunk = (GLsizei)(mTotalIndexCount - cursor);
+        glDrawElements(GL_TRIANGLES,
+                       chunk,
+                       GL_UNSIGNED_INT,
+                       (void*)(uintptr_t)(cursor * sizeof(unsigned int)));
+    }
+
+    // 2. PROPELLERS — same spin transforms as draw() so the shadow matches
+    //    the visible blade orientation.
+    for (int i = 0; i < 4; ++i)
+    {
+        const PropMeta& pm = mProps[i];
+        if (pm.indexCount == 0) continue;
+
+        float dir = ((i & 1) == 0) ? 1.0f : -1.0f;
+        glm::mat4 toHub   = glm::translate(glm::mat4(1.0f), pm.hubLocal);
+        glm::mat4 spin    = glm::rotate(glm::mat4(1.0f), mPropSpin * dir, glm::vec3(0,1,0));
+        glm::mat4 fromHub = glm::translate(glm::mat4(1.0f), -pm.hubLocal);
+        glm::mat4 propModel = bodyM * toHub * spin * fromHub;
+
+        pushModel(propModel);
+        glDrawElements(GL_TRIANGLES,
+                       (GLsizei)pm.indexCount,
+                       GL_UNSIGNED_INT,
+                       (void*)(uintptr_t)(pm.indexOffset * sizeof(unsigned int)));
+    }
+
+    glBindVertexArray(0);
+}
 
 void Drone::cleanup()
 {

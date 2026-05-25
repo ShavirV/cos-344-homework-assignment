@@ -1,8 +1,3 @@
-// volcano_mesh.h - procedural volcano mesh exported from Blender.
-// Generated for COS344 Practical (OpenGL 3.3). No external libraries needed.
-// Layout per vertex: vec3 position, vec3 normal, vec2 uv, vec3 color (11 floats).
-// Coordinate system: +Z is up (Blender default). Convert to +Y up in your shader if needed.
-
 #ifndef VOLCANO_MESH_H
 #define VOLCANO_MESH_H
 

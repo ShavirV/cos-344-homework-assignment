@@ -1,9 +1,3 @@
-// brachio_mesh.h - Brachiosaurus mesh exported from Blender.
-// COS344 Practical: drop into your project and #include directly.
-// Vertex layout (11 floats): pos.xyz, normal.xyz, uv.xy, color.rgb.
-// Coordinate system: +Z up (Blender), +X forward. Convert to +Y up
-// via Brachio::modelMatrix() (-90 deg rotation about X).
-
 #ifndef BRACHIO_MESH_H
 #define BRACHIO_MESH_H
 
