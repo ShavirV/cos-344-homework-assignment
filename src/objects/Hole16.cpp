@@ -682,22 +682,33 @@ void Hole16::draw(GLuint shaderProgram, bool wireframe,
                         glm::normalize(lightDir), lightColor);
 }
 
-void Hole16::translate(float x, float y, float z)
+void Hole16::drawDepth(GLuint depthShader)
 {
     for (int i = 0; i < meshCount; i++)
-        meshes[i]->translate(x, y, z);
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
+}
+
+void Hole16::translate(float x, float y, float z)
+{
+ glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
+    for (int i = 0; i < meshCount; i++)
+        meshes[i]->applyMatrix(T);
 }
 
 void Hole16::rotate(float angle, float ax, float ay, float az)
 {
+    glm::mat4 R = glm::rotate(glm::mat4(1.0f),
+                              glm::radians(angle),
+                              glm::vec3(ax, ay, az));
     for (int i = 0; i < meshCount; i++)
-        meshes[i]->rotate(angle, ax, ay, az);
+        meshes[i]->applyMatrix(R);
 }
 
 void Hole16::scale(float sx, float sy, float sz)
 {
+    glm::mat4 S = glm::scale(glm::mat4(1.0f), glm::vec3(sx, sy, sz));
     for (int i = 0; i < meshCount; i++)
-        meshes[i]->scale(sx, sy, sz);
+        meshes[i]->applyMatrix(S);
 }
 
 void Hole16::update(float deltaTime)

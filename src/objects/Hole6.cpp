@@ -562,3 +562,9 @@ void Hole6::draw(GLuint shader, bool wireframe,
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shader, wireframe);
 }
+
+void Hole6::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
+}

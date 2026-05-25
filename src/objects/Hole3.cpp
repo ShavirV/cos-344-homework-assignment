@@ -156,6 +156,12 @@ void Hole3::draw(GLuint shaderProgram, bool wireframe,
         meshes[i]->draw(shaderProgram, wireframe);
 }
 
+void Hole3::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
+}
+
 void Hole3::translate(float x, float y, float z)
 {
     for (int i = 0; i < meshCount; i++){

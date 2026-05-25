@@ -4,16 +4,31 @@
 // fragment.glsl
 // Blinn-Phong shading with procedural-noise "textures" for turf and kerb
 // materials, plus a hemisphere ambient term.
+//
+// Shadow mapping (NEW):
+//   - vLightSpacePos comes from the vertex shader (= uLightSpaceMatrix * worldPos)
+//   - uShadowMap is the depth texture rendered from the sun's POV in the
+//     pre-pass. We sample it with a 3x3 PCF kernel for soft edges.
+//   - Only diffuse + specular contributions are shadowed. Ambient stays
+//     unaffected so deeply-shadowed areas remain readable.
 // =============================================================================
 
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec3 vColor;
+in vec4 vLightSpacePos;          // NEW
 
 uniform vec3 uLightDir;
 uniform vec3 uLightColor;
 uniform vec3 uAmbient;
 uniform vec3 uViewPos;
+
+// NEW — the depth texture produced by the shadow-map pre-pass. When the
+// caller hasn't bound a texture, sampling returns 0 on most drivers and
+// the shadow term silently does nothing; the explicit `uHasShadowMap`
+// flag below makes the bypass deterministic.
+uniform sampler2D uShadowMap;
+uniform int       uHasShadowMap; // 0 = no shadow, 1 = sample the map
 
 out vec4 FragColor;
 
@@ -79,6 +94,56 @@ bool looksLikeKerb(vec3 c) {
     return (maxc - minc) < 0.10 && maxc > 0.50;
 }
 
+// =============================================================================
+// shadowFactor — returns 0 (fully lit) to 1 (fully in shadow)
+//
+// Implementation:
+//   1. Perspective divide (lightSpacePos.xyz / .w) → light-clip [-1,1].
+//      Orthographic light matrices keep .w=1, but doing the divide is safe
+//      either way.
+//   2. Remap to [0,1] for texture lookup.
+//   3. Bail out when the fragment is outside the light's frustum (z > 1 or
+//      any coord outside [0,1]) — treat as fully lit so the world OUTSIDE
+//      the shadow map area is normally lit.
+//   4. Bias: subtract a small constant from the fragment's depth to avoid
+//      "shadow acne" — surfaces shadowing themselves due to depth precision.
+//      The bias scales with the surface angle to the light: surfaces at
+//      grazing angles need more bias than ones facing the sun head-on.
+//   5. 3×3 PCF (percentage-closer filtering): sample 9 neighbouring texels
+//      and average. Soft shadow edges instead of pixelated bitmaps.
+// =============================================================================
+float shadowFactor(vec4 lightSpacePos, vec3 N, vec3 L)
+{
+    if (uHasShadowMap == 0) return 0.0;
+
+    vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
+    projCoords = projCoords * 0.5 + 0.5;
+
+    // Outside the shadow map frustum → no shadow.
+    if (projCoords.z > 1.0) return 0.0;
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0) return 0.0;
+
+    // Bias: 0.0005 minimum, scales with how oblique the light is to the
+    // surface (up to 0.005 at grazing angles). Tweak these two numbers if
+    // you see acne (raise) or "Peter Panning" — shadows floating off the
+    // ground (lower).
+    float bias = max(0.005 * (1.0 - dot(N, L)), 0.0005);
+    float currentDepth = projCoords.z - bias;
+
+    // 3×3 PCF using textureSize for the kernel offset.
+    float shadow   = 0.0;
+    vec2  texel    = 1.0 / vec2(textureSize(uShadowMap, 0));
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float closestDepth =
+                texture(uShadowMap, projCoords.xy + vec2(x, y) * texel).r;
+            shadow += (currentDepth > closestDepth) ? 1.0 : 0.0;
+        }
+    }
+    return shadow / 9.0;
+}
+
 void main() {
     vec3 base;
     if (looksLikeTurf(vColor))      base = shadeTurf(vColor, vWorldPos);
@@ -103,7 +168,13 @@ void main() {
     if (looksLikeKerb(vColor)) { specStrength = 0.18; specPower = 32.0; }
     float spec = pow(max(dot(N, H), 0.0), specPower) * specStrength;
 
-    vec3 lit = base * (ambient + diff * uLightColor) + spec * uLightColor;
+    // NEW — sample the shadow map and modulate the direct-light contributions.
+    // Ambient stays unaffected so shadowed areas don't go pitch-black.
+    float shadow = shadowFactor(vLightSpacePos, N, L);
+    float litFactor = 1.0 - shadow;
+
+    vec3 lit = base * (ambient + diff * uLightColor * litFactor)
+             + spec * uLightColor * litFactor;
     lit = lit / (1.0 + 0.4 * lit);
 
     FragColor = vec4(lit, 1.0);

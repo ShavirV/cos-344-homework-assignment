@@ -61,6 +61,9 @@
 #include "../objects/Hole16.h"
 #include "../objects/Hole17.h"
 #include "../objects/Hole18.h"
+#include "../objects/Volcano.hpp"
+#include "../objects/Skybox.h"
+#include "../lighting/ShadowMap.h"
 
 
 const int WIDTH  = 1000;
@@ -129,8 +132,57 @@ int main()
     glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
     GLuint shader = LoadShaders("src/shaders/vertex.glsl", "src/shaders/fragment.glsl");
 
+    // ── Volcano model + its own shader (added alongside the cone above) ─────
+    GLuint volcanoShader = LoadShaders("src/shaders/volcano.vert", "src/shaders/volcano.frag");
+    Volcano volcanoModel;
+    volcanoModel.init();
+    const glm::vec3 VOLCANO_POS(0.0f, 0.0f, -10.0f);
+    const float     VOLCANO_SCALE = 3.33f;
+    GLint volLocModel    = glGetUniformLocation(volcanoShader, "model");
+    GLint volLocView     = glGetUniformLocation(volcanoShader, "view");
+    GLint volLocProj     = glGetUniformLocation(volcanoShader, "projection");
+    GLint volLocViewPos  = glGetUniformLocation(volcanoShader, "viewPos");
+    GLint volLocLightDir = glGetUniformLocation(volcanoShader, "lightDir");
+    GLint volLocLightCol = glGetUniformLocation(volcanoShader, "lightColor");
+    GLint volLocAmbient  = glGetUniformLocation(volcanoShader, "ambientColor");
+    GLint volLocTime     = glGetUniformLocation(volcanoShader, "time");
+
     GLint locLightColor = glGetUniformLocation(shader, "uLightColor");
     GLint locAmbient    = glGetUniformLocation(shader, "uAmbient");
+    GLint locLightDir   = glGetUniformLocation(shader, "uLightDir");
+    GLint locViewPos    = glGetUniformLocation(shader, "uViewPos");
+
+    // ── Shadow uniforms on the main shader (Step 2) ──────────────────────────
+    GLint locLightSpaceMat = glGetUniformLocation(shader, "uLightSpaceMatrix");
+    GLint locShadowMap     = glGetUniformLocation(shader, "uShadowMap");
+    GLint locHasShadowMap  = glGetUniformLocation(shader, "uHasShadowMap");
+
+    // ── Skybox (day/night cycle drives the lighting) ─────────────────────────
+    // The skybox rotates a sun + moon around the world X axis. Whichever is
+    // currently above the horizon drives the directional light for every
+    // hole, the volcano, the ground. The skybox itself is drawn LAST each
+    // frame with GL_LEQUAL so it sits behind everything.
+    Skybox skybox;
+    skybox.dayLengthSecs = 120.0f;  // 2 minutes per full cycle
+    skybox.init("src/shaders/skybox.vert",
+                "src/shaders/skybox.frag",
+                "src/assets/textures/sky_day.bmp",
+                "src/assets/textures/sky_night.bmp");
+
+    // ── Shadow map (depth pass — Step 1 of shadow mapping integration) ───────
+    // For now, the depth pass runs and populates the depth texture every
+    // frame, but the main fragment shader doesn't sample from it yet. Step 2
+    // wires the depth texture into vertex.glsl + fragment.glsl so the
+    // shadows actually appear. setSceneBounds() controls the orthographic
+    // frustum that captures shadow casters — a 250-unit radius around the
+    // origin covers the whole course with room to spare.
+    ShadowMap shadowMap;
+    if (!shadowMap.init(2048,
+                        "src/shaders/shadow.vert",
+                        "src/shaders/shadow.frag")) {
+        std::cerr << "ShadowMap init failed — depth pass will be skipped.\n";
+    }
+    shadowMap.setSceneBounds(glm::vec3(0.0f, 0.0f, 0.0f), 250.0f);
 
     // ── Ground ───────────────────────────────────────────────────────────────
     Mesh ground = Mesh::makeCuboid(400.0f, 0.5f, 150.0f, 0.35f, 0.20f, 0.08f, 1.0f);
@@ -222,100 +274,215 @@ int main()
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
+
+        // ── Live framebuffer size ────────────────────────────────────────────
+        // The shadow depth pass changes the viewport mid-frame (to the size
+        // of the shadow map), so we MUST reset the viewport back to the real
+        // framebuffer size before any colour-pass draws. Querying GLFW every
+        // frame also makes the program survive window resizes gracefully —
+        // the perspective projection is recomputed from the live aspect.
+        int fbW = WIDTH, fbH = HEIGHT;
+        glfwGetFramebufferSize(window, &fbW, &fbH);
+        if (fbH == 0) fbH = 1;   // guard against minimised window
+        projection = glm::perspective(
+            glm::radians(45.0f), (float)fbW / (float)fbH, 0.1f, 500.0f);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // ── Frame timing (top of loop so skybox + water animations all see
+        //    the same dt; previously this was buried mid-loop). ────────────────
+        static double lastTime = glfwGetTime();
+        double now      = glfwGetTime();
+        float deltaTime = (float)(now - lastTime);
+        lastTime = now;
+
+        // ── Skybox: advance the rotation, then read sun / moon. ──────────────
+        skybox.update(deltaTime);
+        SkyLight sun  = skybox.getSun();
+        SkyLight moon = skybox.getMoon();
+
+        // Pick whichever of sun / moon is above the horizon and stronger.
+        // The moon's intensity is 0.25 * t in Skybox.cpp so multiply by 4 when
+        // comparing against the sun.
+        glm::vec3 sunDir;
+        if (sun.intensity >= moon.intensity * 4.0f && glm::length(sun.position) > 1e-3f) {
+            sunDir = glm::normalize(sun.position);
+        } else if (glm::length(moon.position) > 1e-3f) {
+            sunDir = glm::normalize(moon.position);
+        } else {
+            sunDir = glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f));
+        }
+        // Horizon clamp: never let the directional light come from below the
+        // ground, otherwise every up-facing surface goes pitch black.
+        if (sunDir.y < 0.10f) {
+            sunDir.y = 0.10f;
+            sunDir = glm::normalize(sunDir);
+        }
+
+        // Blend warm-day light vs cool-moon light by sun intensity.
+        float dayBlend = glm::clamp(sun.intensity, 0.0f, 1.0f);
+        glm::vec3 dayLight  (1.00f, 0.97f, 0.90f);
+        glm::vec3 nightLight(0.45f, 0.55f, 0.75f);
+        glm::vec3 sunColor = glm::mix(nightLight, dayLight, dayBlend);
+
+        // Ambient: brighter, warmer during the day; dimmer, cooler at night.
+        glm::vec3 dayAmbient  (0.32f, 0.30f, 0.26f);
+        glm::vec3 nightAmbient(0.08f, 0.10f, 0.16f);
+        glm::vec3 ambient = glm::mix(nightAmbient, dayAmbient, dayBlend);
+
+        // ── Shadow map depth pass ────────────────────────────────────────────
+        // Renders every shadow caster from the sun's POV into the shadow map.
+        // The colour pass below isn't sampling from it yet — that's Step 2 of
+        // the shadow integration. For now this just exercises the depth path
+        // so we catch any wiring errors before touching the main shader.
+        shadowMap.beginPass(sunDir);
+        // Caller responsibility: every renderable that should cast a shadow
+        // must implement drawDepth(GLuint) and be invoked here. Water meshes
+        // (h16 stream/moat, h18 lakes/stream) are skipped inside each hole's
+        // drawDepth. The Volcano model gets its drawDepth in Step 3.
+        h1.drawDepth (shadowMap.depthShader());
+        h2.drawDepth (shadowMap.depthShader());
+        h3.drawDepth (shadowMap.depthShader());
+        h4.drawDepth (shadowMap.depthShader());
+        h5.drawDepth (shadowMap.depthShader());
+        h6.drawDepth (shadowMap.depthShader());
+        h7.drawDepth (shadowMap.depthShader());
+        h8.drawDepth (shadowMap.depthShader());
+        h9e.drawDepth(shadowMap.depthShader());
+        h9w.drawDepth(shadowMap.depthShader());
+        h10.drawDepth(shadowMap.depthShader());
+        h11.drawDepth(shadowMap.depthShader());
+        h12.drawDepth(shadowMap.depthShader());
+        h13.drawDepth(shadowMap.depthShader());
+        h14.drawDepth(shadowMap.depthShader());
+        h15.drawDepth(shadowMap.depthShader());
+        h16.drawDepth(shadowMap.depthShader());
+        h17.drawDepth(shadowMap.depthShader());
+        h18.drawDepth(shadowMap.depthShader());
+        // Ground is a single Mesh — call its drawDepth directly.
+        ground.drawDepth(shadowMap.depthShader());
+        shadowMap.endPass(fbW, fbH);
 
         glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         glUseProgram(shader);
         glUniformMatrix4fv(locProj, 1, GL_FALSE, glm::value_ptr(projection));
         glUniformMatrix4fv(locView, 1, GL_FALSE, glm::value_ptr(view));
-        glUniform3f(locLightColor, 1.0f, 0.95f, 0.85f);   // warm sunlight
-        glUniform3f(locAmbient,    0.15f, 0.15f, 0.20f);   // soft sky bounce
+        // Per-frame light uniforms now driven by the skybox sun/moon cycle
+        // instead of being hardcoded. Any hole that doesn't pass its own
+        // light direction (e.g. h16 / h17 / h18) reads these.
+        glUniform3fv(locLightColor, 1, glm::value_ptr(sunColor));
+        glUniform3fv(locAmbient,    1, glm::value_ptr(ambient));
+        if (locLightDir != -1) glUniform3fv(locLightDir, 1, glm::value_ptr(sunDir));
+        if (locViewPos  != -1) glUniform3fv(locViewPos,  1, glm::value_ptr(cameraPos));
+
+        // ── Shadow uniforms on the main shader ───────────────────────────────
+        // Bind the depth texture from the shadow pre-pass to texture unit 1
+        // (unit 0 is reserved for any future colour texture). Tell the
+        // shader to sample from it, and pass the same light-space matrix the
+        // depth pass used so projected positions line up.
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, shadowMap.depthTexture());
+        if (locShadowMap != -1) glUniform1i(locShadowMap, 1);
+        if (locHasShadowMap != -1) glUniform1i(locHasShadowMap, 1);
+        if (locLightSpaceMat != -1)
+            glUniformMatrix4fv(locLightSpaceMat, 1, GL_FALSE,
+                               glm::value_ptr(shadowMap.lightSpaceMatrix()));
+        glActiveTexture(GL_TEXTURE0);   // restore default unit for any code below
+                                        // that does glBindTexture without setting active
 
         ground.draw(shader, false);
 
+        // ── Volcano model draw (own shader) ──────────────────────────────────
+        glUseProgram(volcanoShader);
+        glUniformMatrix4fv(volLocProj, 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(volLocView, 1, GL_FALSE, glm::value_ptr(view));
+        glUniform3fv(volLocViewPos, 1, glm::value_ptr(cameraPos));
+        // Skybox-driven lighting (computed at top of frame).
+        glUniform3fv(volLocLightDir, 1, glm::value_ptr(sunDir));
+        glUniform3fv(volLocLightCol, 1, glm::value_ptr(sunColor));
+        glUniform3fv(volLocAmbient,  1, glm::value_ptr(ambient));
+        glUniform1f(volLocTime, (float)glfwGetTime());
+        volcanoModel.draw(volLocModel, VOLCANO_POS, VOLCANO_SCALE);
+        glUseProgram(shader);
+
         h1.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                      // camera position
 
         h2.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h3.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h4.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h5.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h6.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h7.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h8.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h9e.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h9w.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
 
         h10.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h11.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h12.draw(shader, false,
-        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
-        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        sunDir,  // light direction
+        sunColor,                 // light colour
         cameraPos);                                     //camera position
 
         h13.draw(view, projection,
-         glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
+         sunDir,  // sunDir
          cameraPos); 
          
          h14.draw(view, projection,
-         glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
+         sunDir,  // sunDir
          cameraPos); 
          
         h15.draw(view, projection,
-         glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
+         sunDir,  // sunDir
          cameraPos);   
 
-
-         static double lastTime = glfwGetTime();
-        double now      = glfwGetTime();
-        float deltaTime = (float)(now - lastTime);
-        lastTime = now;
 
         h16.update(deltaTime);
         h16.setCameraData(view, projection, cameraPos);
@@ -328,6 +495,14 @@ int main()
         h18.setCameraData(view, projection, cameraPos);
         h18.draw(shader, false);
 
+        // ── Skybox last (sits behind everything via depth-test trick) ────────
+        // Skybox.cpp internally disables depth writes + culling and restores
+        // them, so we just need to switch the depth func so it can draw at
+        // the far plane behind anything already rendered.
+        glDepthFunc(GL_LEQUAL);
+        skybox.draw(view, projection);
+        glDepthFunc(GL_LESS);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
 
@@ -335,6 +510,7 @@ int main()
             glfwSetWindowShouldClose(window, true);
     }
 
+    volcanoModel.cleanup();
     glfwTerminate();
     return 0;
 }

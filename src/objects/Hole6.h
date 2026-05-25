@@ -45,6 +45,7 @@ public:
               const glm::vec3& lightDir   = glm::vec3(0.45f, 0.80f, 0.35f),
               const glm::vec3& lightColor = glm::vec3(1.00f, 0.97f, 0.90f),
               const glm::vec3& camPos     = glm::vec3(0.0f));
+    void drawDepth(GLuint depthShader);
 
 private:
     Mesh* meshes[MAX_MESHES];

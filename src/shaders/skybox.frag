@@ -57,7 +57,12 @@ void main()
         vec3  ldir = normalize(localPos);
         float lon  = atan(ldir.z, ldir.x) / (2.0 * 3.14159265) + 0.5;
         float lat  = asin(clamp(ldir.y, -1.0, 1.0)) / 3.14159265 + 0.5;
-        vec2  suv  = vec2(lon, lat);
+        // Tile the panorama horizontally so each copy of the BMP covers less
+        // sky and pixels appear sharper ("zoomed out"). GL_REPEAT on S in
+        // Skybox.cpp lets longitude tile cleanly. Latitude is GL_CLAMP_TO_EDGE
+        // so it must stay in [0, 1] — don't scale lat.
+        const float TILE_S = 3.0;
+        vec2  suv  = vec2(lon * TILE_S, lat);
 
         vec3 dayCol   = skyColor;   // fallback to gradient if texture missing
         vec3 nightCol = skyColor;

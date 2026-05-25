@@ -65,6 +65,7 @@ public:
               const glm::mat4& proj,
               const glm::vec3& sunDir,
               const glm::vec3& camPos);
+    void drawDepth(GLuint depthShader);
     void cleanup();
 
     glm::vec3 sceneCenter() const { return mCenter; }

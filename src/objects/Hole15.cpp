@@ -578,6 +578,21 @@ void Hole15::draw(const glm::mat4& view,
     glBindVertexArray(0);
 }
 
+void Hole15::drawDepth(GLuint depthShader)
+{
+    if (!mInitialised) return;
+
+    GLint loc_uModel = glGetUniformLocation(depthShader, "uModel");
+    if (loc_uModel != -1) {
+        glm::mat4 model(1.0f);
+        glUniformMatrix4fv(loc_uModel, 1, GL_FALSE, glm::value_ptr(model));
+    }
+
+    glBindVertexArray(mVAO);
+    glDrawElements(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
 // =============================================================================
 // cleanup
 // =============================================================================

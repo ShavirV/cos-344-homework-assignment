@@ -33,6 +33,7 @@ public:
     ~Hole18();
 
     void draw(GLuint shaderProgram, bool wireframe);
+    void drawDepth(GLuint depthShader);
     void update(float deltaTime);
     void setCameraData(const glm::mat4& view,
                        const glm::mat4& proj,

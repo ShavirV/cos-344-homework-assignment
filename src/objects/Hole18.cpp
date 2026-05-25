@@ -631,24 +631,35 @@ void Hole18::draw(GLuint shaderProgram, bool wireframe)
     if (waterLake2)   waterLake2->draw(camView, camProj, camPos);
 }
 
+void Hole18::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
+}
+
 // =============================================================================
 // Transforms — propagate to all meshes (water positions are baked into
 // modelMatrix so they don't get double-transformed here)
 // =============================================================================
 void Hole18::translate(float x, float y, float z)
 {
+    glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
     for (int i = 0; i < meshCount; i++)
-        meshes[i]->translate(x, y, z);
+        meshes[i]->applyMatrix(T);
 }
 
 void Hole18::rotate(float angle, float ax, float ay, float az)
 {
+    glm::mat4 R = glm::rotate(glm::mat4(1.0f),
+                              glm::radians(angle),
+                              glm::vec3(ax, ay, az));
     for (int i = 0; i < meshCount; i++)
-        meshes[i]->rotate(angle, ax, ay, az);
+        meshes[i]->applyMatrix(R);
 }
 
 void Hole18::scale(float sx, float sy, float sz)
 {
+    glm::mat4 S = glm::scale(glm::mat4(1.0f), glm::vec3(sx, sy, sz));
     for (int i = 0; i < meshCount; i++)
-        meshes[i]->scale(sx, sy, sz);
+        meshes[i]->applyMatrix(S);
 }

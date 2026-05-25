@@ -1,5 +1,4 @@
 #version 330 core
-
 // =============================================================================
 // vertex.glsl
 // Standard pass-through vertex shader used by all hole geometry and the
@@ -20,9 +19,17 @@ uniform mat4 projection;
 uniform mat4 uModel;
 uniform mat3 uNormalMat;
 
+// NEW — light's view*projection matrix for shadow mapping. Set to identity
+// (or any value) when shadows are disabled; the fragment shader's shadow
+// term is bypassed when the shadow map uniform isn't bound.
+uniform mat4 uLightSpaceMatrix;
+
 out vec3 vWorldPos;
 out vec3 vNormal;
 out vec3 vColor;
+// NEW — the world position projected into light clip space, so the fragment
+// shader can look it up in the shadow depth texture.
+out vec4 vLightSpacePos;
 
 void main()
 {
@@ -30,5 +37,9 @@ void main()
     vWorldPos = wp.xyz;
     vNormal   = normalize(uNormalMat * aNormal);
     vColor    = aColor;
+    // NEW — same world position, projected by the sun's view+projection.
+    // After perspective divide in the fragment shader this gives the UV
+    // and depth used to sample the shadow map.
+    vLightSpacePos = uLightSpaceMatrix * wp;
     gl_Position = projection * view * vec4(wp.xyz, 1.0);
 }

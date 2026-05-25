@@ -172,6 +172,12 @@ void Hole2::draw(GLuint shaderProgram, bool wireframe,
         if (meshes[i]) meshes[i]->draw(shaderProgram, wireframe);
 }
 
+void Hole2::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
+}
+
 // ---------------------------------------------------------------------------
 // translate – apply to all meshes
 // ---------------------------------------------------------------------------
