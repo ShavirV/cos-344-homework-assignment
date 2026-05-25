@@ -1,29 +1,7 @@
-// Hole5.cpp
-// Hole5.cpp  —  Swamp & Waterfall Entry Hole (Hole 5)
-// Dino Park Phuket — swamp & waterfall zone (Holes 5–8)
-//
-// STRICT FOOTPRINT: 28 (X) × 15 (Z), centred at local origin.
-//   X runs from -14 to +14
-//   Z runs from  -7.5 to +7.5
-//
-// ELEVATION LAYOUT:
-//   UPPER fairway : X in [-14 ,  0 ],  surface Y = RISE (2.5)
-//   RAMP          : X in [  0 ,  5 ],  smooth slope Y: RISE → 0
-//   LOWER pad     : X in [  5 , 14 ],  surface Y = 0    ← cup/flag here
-//
-// The ramp is a SINGLE tilted cuboid that connects the two levels.
-// A full-height earth fill hides any gap underneath.
-// All decorations sit inside ±13 X and ±6 Z so nothing pokes outside.
-//
-// Pattern: raw Mesh* array, identical to Hole9E / Hole9W.
-
 #include "Hole5.h"
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Dimension constants (local space)
-// ─────────────────────────────────────────────────────────────────────────────
 
 static const float HOLE_W = 28.0f;   // total X extent
 static const float HOLE_D = 15.0f;   // total Z extent
@@ -31,35 +9,31 @@ static const float HALF_W = HOLE_W * 0.5f;   // 14
 static const float HALF_D = HOLE_D * 0.5f;   // 7.5
 
 // Slab / kerb geometry
-static const float FH  = 0.2f;   // fairway slab height
-static const float BT  = 0.5f;   // border thickness
-static const float BH  = 0.4f;   // border kerb height
+static const float FH = 0.2f;   // fairway slab height
+static const float BT = 0.5f;   // border thickness
+static const float BH = 0.4f;   // border kerb height
 
 // Elevation
-static const float RISE = 2.5f;   // upper fairway surface Y above lower pad
-
-// Sub-section X extents (in local space)
-static const float UPPER_END  =  0.0f;      // upper fairway ends here
-static const float RAMP_LEN   =  5.0f;      // length of ramp in X
-static const float RAMP_END   = UPPER_END + RAMP_LEN;   // 5.0
-static const float LOWER_W    = HALF_W - RAMP_END;      // 9.0
-static const float LOWER_CX   = RAMP_END + LOWER_W * 0.5f; // centre X of lower pad
+static const float RISE = 2.5f;
+// Sub-section X extents
+static const float UPPER_END = 0.0f;     
+static const float RAMP_LEN = 5.0f; // length of ramp in X
+static const float RAMP_END = UPPER_END + RAMP_LEN; // 5.0
+static const float LOWER_W = HALF_W - RAMP_END; // 9.0
+static const float LOWER_CX = RAMP_END + LOWER_W * 0.5f; // centre X of lower pad
 
 // Colours
-static const float GR = 0.13f, GG = 0.58f, GB = 0.14f;   // upper green
-static const float LR = 0.10f, LG = 0.48f, LB = 0.12f;   // lower green (darker)
+static const float GR = 0.13f, GG = 0.58f, GB = 0.14f; // upper green
+static const float LR = 0.10f, LG = 0.48f, LB = 0.12f;  // lower green (darker)
 static const float EARTH_R = 0.28f, EARTH_G = 0.20f, EARTH_B = 0.10f;
-static const float CONC_R  = 0.86f, CONC_G  = 0.86f, CONC_B  = 0.86f;
-static const float WTR_R   = 0.15f, WTR_G   = 0.45f, WTR_B   = 0.88f;
+static const float CONC_R = 0.86f, CONC_G = 0.86f, CONC_B = 0.86f;
+static const float WTR_R = 0.15f, WTR_G = 0.45f, WTR_B = 0.88f;
 
 // Safe inner margin: keep decorations this far from the border walls
 static const float MARGIN = 1.2f;
-static const float INNER_X = HALF_W - MARGIN;   // ±12.8
-static const float INNER_Z = HALF_D - MARGIN;   // ±6.3
+static const float INNER_X = HALF_W - MARGIN; // 12.8
+static const float INNER_Z = HALF_D - MARGIN; // 6.3
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole5::addMesh(Mesh* m)
 {
@@ -69,24 +43,20 @@ void Hole5::addMesh(Mesh* m)
 
 void Hole5::addFlagAt(float x, float baseY, float z)
 {
-    Mesh* pole = new Mesh(Mesh::makeCylinder(0.10f, 4.5f, 8,
-                                              0.85f, 0.85f, 0.85f, 1.0f));
+    Mesh* pole = new Mesh(Mesh::makeCylinder(0.10f, 4.5f, 8, 0.85f, 0.85f, 0.85f, 1.0f));
     pole->translate(x, baseY + 2.25f, z);
     pole->setup();
     addMesh(pole);
 
-    Mesh* pennant = new Mesh(Mesh::makeTriangularPrism(1.6f, 0.85f, 0.12f,
-                                                        0.9f, 0.08f, 0.08f, 1.0f));
+    Mesh* pennant = new Mesh(Mesh::makeTriangularPrism(1.6f, 0.85f, 0.12f, 0.9f, 0.08f, 0.08f, 1.0f));
     pennant->translate(x + 0.8f, baseY + 4.4f, z);
     pennant->setup();
     addMesh(pennant);
 }
 
-void Hole5::addFlowerAt(float x, float baseY, float z,
-                         float pr, float pg, float pb)
+void Hole5::addFlowerAt(float x, float baseY, float z, float pr, float pg, float pb)
 {
-    Mesh* stem = new Mesh(Mesh::makeCylinder(0.055f, 0.55f, 6,
-                                              0.2f, 0.55f, 0.1f, 1.0f));
+    Mesh* stem = new Mesh(Mesh::makeCylinder(0.055f, 0.55f, 6, 0.2f, 0.55f, 0.1f, 1.0f));
     stem->translate(x, baseY + 0.275f, z);
     stem->setup();
     addMesh(stem);
@@ -96,8 +66,7 @@ void Hole5::addFlowerAt(float x, float baseY, float z,
     petal->setup();
     addMesh(petal);
 
-    Mesh* centre = new Mesh(Mesh::makeCylinder(0.11f, 0.12f, 8,
-                                                1.0f, 0.88f, 0.1f, 1.0f));
+    Mesh* centre = new Mesh(Mesh::makeCylinder(0.11f, 0.12f, 8, 1.0f, 0.88f, 0.1f, 1.0f));
     centre->translate(x, baseY + 0.98f, z);
     centre->setup();
     addMesh(centre);
@@ -106,28 +75,21 @@ void Hole5::addFlowerAt(float x, float baseY, float z,
 void Hole5::addTree(float x, float baseY, float z, float scale)
 {
     float s = scale;
-    Mesh* trunk = new Mesh(Mesh::makeCylinder(0.32f * s, 4.0f * s, 8,
-                                               0.44f, 0.29f, 0.11f, 1.0f));
+    Mesh* trunk = new Mesh(Mesh::makeCylinder(0.32f * s, 4.0f * s, 8, 0.44f, 0.29f, 0.11f, 1.0f));
     trunk->translate(x, baseY + 2.0f * s, z);
     trunk->setup();
     addMesh(trunk);
 
-    Mesh* c1 = new Mesh(Mesh::makeCone(2.4f * s, 3.2f * s, 10,
-                                        0.10f, 0.44f, 0.14f, 1.0f));
+    Mesh* c1 = new Mesh(Mesh::makeCone(2.4f * s, 3.2f * s, 10, 0.10f, 0.44f, 0.14f, 1.0f));
     c1->translate(x, baseY + 5.0f * s, z);
     c1->setup();
     addMesh(c1);
 
-    Mesh* c2 = new Mesh(Mesh::makeCone(1.5f * s, 2.2f * s, 10,
-                                        0.12f, 0.50f, 0.18f, 1.0f));
+    Mesh* c2 = new Mesh(Mesh::makeCone(1.5f * s, 2.2f * s, 10, 0.12f, 0.50f, 0.18f, 1.0f));
     c2->translate(x, baseY + 7.0f * s, z);
     c2->setup();
     addMesh(c2);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructor
-// ─────────────────────────────────────────────────────────────────────────────
 
 Hole5::Hole5() : meshCount(0)
 {
@@ -138,7 +100,6 @@ Hole5::Hole5() : meshCount(0)
     buildWaterfall();
     buildStream();
     buildRocks();
-    //buildBoneObstacle();
     buildFlag();
     buildTrees();
     buildFlowers();
@@ -153,56 +114,37 @@ Hole5::~Hole5()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFairways
-// Three slabs: upper fairway, ramp, lower pad  +  kerb borders all around.
-//
-// The RAMP is a flat cuboid that is:
-//   1. Built as a horizontal slab of length RAMP_LEN, height FH, depth HOLE_D
-//   2. One end raised by RISE so it smoothly bridges upper ↔ lower
-//   We do this by translating to the midpoint then rotating about Z so the
-//   left edge is at Y = RISE + FH and the right edge is at Y = FH.
-//
-// The slope angle: atan2(RISE, RAMP_LEN)
-// ─────────────────────────────────────────────────────────────────────────────
+
 void Hole5::buildFairways()
 {
-    float upperCX = ((-HALF_W) + UPPER_END) * 0.5f;   // centre X of upper fairway
-    float upperW  = UPPER_END - (-HALF_W);             // 14.0
+    float upperCX = ((-HALF_W) + UPPER_END) * 0.5f; // centre X of upper fairway
+    float upperW  = UPPER_END - (-HALF_W); // 14.0
 
-    // ── OUTER BORDER WALLS (correctly placed around the 28×15 footprint) ────
-    // The playfield extends X in [-14,14], Z in [-7.5,7.5].
-    // Walls of thickness BT are placed so their inner faces align with these edges.
-    float wallXNeg = -HALF_W - BT * 0.5f;   // -14.25
-    float wallXPos =  HALF_W + BT * 0.5f;   //  14.25
-    float wallZNeg = -HALF_D - BT * 0.5f;   // -7.75
-    float wallZPos =  HALF_D + BT * 0.5f;   //  7.75
+    float wallXNeg = -HALF_W - BT * 0.5f; // -14.25
+    float wallXPos = HALF_W + BT * 0.5f; //  14.25
+    float wallZNeg = -HALF_D - BT * 0.5f; // -7.75
+    float wallZPos = HALF_D + BT * 0.5f; //  7.75
 
     // +Z wall
-    Mesh* bZPos = new Mesh(Mesh::makeCuboid(HOLE_W, BH, BT,
-                                             CONC_R, CONC_G, CONC_B, 1.0f));
+    Mesh* bZPos = new Mesh(Mesh::makeCuboid(HOLE_W, BH, BT, CONC_R, CONC_G, CONC_B, 1.0f));
     bZPos->translate(0.0f, BH * 0.5f, wallZPos);
     bZPos->setup(); addMesh(bZPos);
 
     // -Z wall
-    Mesh* bZNeg = new Mesh(Mesh::makeCuboid(HOLE_W, BH, BT,
-                                             CONC_R, CONC_G, CONC_B, 1.0f));
+    Mesh* bZNeg = new Mesh(Mesh::makeCuboid(HOLE_W, BH, BT, CONC_R, CONC_G, CONC_B, 1.0f));
     bZNeg->translate(0.0f, BH * 0.5f, wallZNeg);
     bZNeg->setup(); addMesh(bZNeg);
 
     // -X wall (behind waterfall)
-    Mesh* bXNeg = new Mesh(Mesh::makeCuboid(BT, BH, HOLE_D + BT,
-                                             CONC_R, CONC_G, CONC_B, 1.0f));
+    Mesh* bXNeg = new Mesh(Mesh::makeCuboid(BT, BH, HOLE_D + BT, CONC_R, CONC_G, CONC_B, 1.0f));
     bXNeg->translate(wallXNeg, BH * 0.5f, 0.0f);
     bXNeg->setup(); addMesh(bXNeg);
 
     // +X wall (behind lower pad)
-    Mesh* bXPos = new Mesh(Mesh::makeCuboid(BT, BH, HOLE_D + BT,
-                                             CONC_R, CONC_G, CONC_B, 1.0f));
+    Mesh* bXPos = new Mesh(Mesh::makeCuboid(BT, BH, HOLE_D + BT, CONC_R, CONC_G, CONC_B, 1.0f));
     bXPos->translate(wallXPos, BH * 0.5f, 0.0f);
     bXPos->setup(); addMesh(bXPos);
 
-    // ── UPPER FAIRWAY SLAB ────────────────────────────────────────────────────
     Mesh* upper = new Mesh(Mesh::makeCuboid(upperW, FH, HOLE_D,
                                              GR, GG, GB, 1.0f));
     upper->translate(upperCX, RISE + FH * 0.5f, 0.0f);
@@ -214,30 +156,13 @@ void Hole5::buildFairways()
     earthCol->translate(upperCX, RISE * 0.5f, 0.0f);
     earthCol->setup(); addMesh(earthCol);
 
-    // ── RAMP (proper wedge incline — no floating) ─────────────────────────────
-    //
-    // Strategy: subdivide the ramp into N thin horizontal slices along X.
-    // Each slice i spans X in [x0 + i*step, x0 + (i+1)*step].
-    // Its surface Y is linearly interpolated from RISE (at UPPER_END)
-    // down to 0 (at RAMP_END), so sliceTopY = RISE * (1 - (i+0.5)/N).
-    // Each slice is a cuboid whose bottom is Y=0 and whose top is sliceTopY,
-    // making the pile collectively a staircase that approximates a smooth ramp.
-    // Using N=20 steps makes the staircase visually smooth.
-    //
-    // This guarantees:
-    //   • Left edge of ramp connects flush with the upper fairway surface (Y=RISE)
-    //   • Right edge connects flush with the lower pad surface (Y=0)
-    //   • No gap underneath — every slice extends from Y=0 upward
-    //   • Base rectangle (28×15 footprint) is unchanged
+    //ramp 
     {
         const int   N    = 20;
-        const float step = RAMP_LEN / (float)N;   // 0.25 per slice
-
+        const float step = RAMP_LEN / (float)N;  
         for (int i = 0; i < N; i++)
         {
-            // The top of this slice: linearly interpolated from RISE to 0
-            // Left  edge of slice → Y = RISE * (1 - i/N)
-            // Right edge of slice → Y = RISE * (1 - (i+1)/N)
+            
             // Use the average (centre top) as the height for makeCuboid
             float tLeft  = RISE * (1.0f - (float)i       / (float)N);
             float tRight = RISE * (1.0f - (float)(i + 1) / (float)N);
@@ -259,19 +184,13 @@ void Hole5::buildFairways()
         }
     }
 
-    // ── LOWER PAD ─────────────────────────────────────────────────────────────
     Mesh* lower = new Mesh(Mesh::makeCuboid(LOWER_W, FH, HOLE_D,
                                              LR, LG, LB, 1.0f));
     lower->translate(LOWER_CX, FH * 0.5f, 0.0f);
     lower->setup(); addMesh(lower);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildWaterfall
-// Placed OUTSIDE the -X border wall (behind it), so it does not consume
-// playable space. The structure is shifted left by WATERFALL_OFFSET.
-// Tiers are visible above the kerb wall.
-// ─────────────────────────────────────────────────────────────────────────────
+
 void Hole5::buildWaterfall()
 {
     const float WF_OFFSET = -3.0f;   // shift waterfall further left (outside)
@@ -324,10 +243,7 @@ void Hole5::buildWaterfall()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildStream
-// Thin water strip along the +Z side of the upper fairway surface.
-// ─────────────────────────────────────────────────────────────────────────────
+
 void Hole5::buildStream()
 {
     const float streamW  = 2.0f;
@@ -346,10 +262,7 @@ void Hole5::buildStream()
     bank->setup(); addMesh(bank);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildRocks
-// Volcanic boulders — placed along the inner edge of both Z borders.
-// ─────────────────────────────────────────────────────────────────────────────
+
 void Hole5::buildRocks()
 {
     struct RockDef { float x, surfY, z, s; };
@@ -380,38 +293,6 @@ void Hole5::buildRocks()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildBoneObstacle
-// Dinosaur femur bone lying across the mid upper fairway.
-// ─────────────────────────────────────────────────────────────────────────────
-void Hole5::buildBoneObstacle()
-{
-    const float bR = 0.92f, bG = 0.90f, bB = 0.82f;
-    float boneY = RISE + FH + 0.35f;
-    float boneX = -6.0f;
-    float shaftLen = HOLE_D * 0.55f;
-
-    Mesh* shaft = new Mesh(Mesh::makeCylinder(0.20f, shaftLen, 10,
-                                               bR, bG, bB, 1.0f));
-    shaft->rotate(90.0f, 1.0f, 0.0f, 0.0f);
-    shaft->translate(boneX, boneY, 0.0f);
-    shaft->setup(); addMesh(shaft);
-
-    Mesh* j1 = new Mesh(Mesh::makeCylinder(0.42f, 0.48f, 12, bR, bG, bB, 1.0f));
-    j1->rotate(90.0f, 1.0f, 0.0f, 0.0f);
-    j1->translate(boneX, boneY,  shaftLen * 0.48f);
-    j1->setup(); addMesh(j1);
-
-    Mesh* j2 = new Mesh(Mesh::makeCylinder(0.42f, 0.48f, 12, bR, bG, bB, 1.0f));
-    j2->rotate(90.0f, 1.0f, 0.0f, 0.0f);
-    j2->translate(boneX, boneY, -shaftLen * 0.48f);
-    j2->setup(); addMesh(j2);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlag
-// Cup + flag on the LOWER PAD.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole5::buildFlag()
 {
     float flagX = LOWER_CX;
@@ -425,10 +306,7 @@ void Hole5::buildFlag()
     addFlagAt(flagX, FH, flagZ);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildTrees
-// Palm-style trees — all placed well inside the footprint.
-// ─────────────────────────────────────────────────────────────────────────────
+
 void Hole5::buildTrees()
 {
     struct TreeDef { float x, baseY, z, scale; };
@@ -452,10 +330,7 @@ void Hole5::buildTrees()
         addTree(td.x, td.baseY, td.z, td.scale);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlowers
-// Scattered along inner border edges and near the flag.
-// ─────────────────────────────────────────────────────────────────────────────
+
 void Hole5::buildFlowers()
 {
     float uY = RISE + FH;
@@ -483,9 +358,6 @@ void Hole5::buildFlowers()
         addFlowerAt(fd.x, fd.y, fd.z, fd.r, fd.g, fd.b);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Public interface
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole5::translate(float x, float y, float z)
 {
