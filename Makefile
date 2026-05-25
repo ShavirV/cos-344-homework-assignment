@@ -61,4 +61,10 @@ run:
 
 rebuild: clean $(TARGET) run
 
+main-fast: $(TARGET)
+	./$(TARGET)
+
+dev-fast: $(DEV_BIN)
+	./$(DEV_BIN)
+
 .PHONY: all dev clean run rebuild

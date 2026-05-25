@@ -135,7 +135,9 @@ void Hole2::translate(float x, float y, float z)
 
 void Hole2::rotate(float angle, float ax, float ay, float az)
 {
+    glm::mat4 R = glm::rotate(glm::mat4(1.0f),
+                              glm::radians(angle),
+                              glm::vec3(ax, ay, az));
     for (int i = 0; i < meshCount; i++)
-        if (meshes[i]) 
-            meshes[i]->rotate(angle, ax, ay, az);
+        meshes[i]->applyMatrix(R);
 }

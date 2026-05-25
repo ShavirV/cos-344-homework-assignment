@@ -1,10 +1,8 @@
-// main.cpp  —  COS344 Miniature Golf Course
+// main.cpp  :  COS344 Miniature Golf Course
 //
-// Holes are flat red cuboids 28 (length) × 0.2 (height) × 15 (width).
+// Holes are flat red cuboids 28 (length) x 0.2 (height) x 15 (width).
 // Rotation: 0° = runs along X,  90° = runs along Z.
 //
-// Directed play order:
-//   1→2→3→4→5→6→7→8→9(tunnel)→10→11→12→13→14→15→16→17→18
 //
 //  Hole  | cx    | cz    | rot
 //  ------+-------+-------+----
@@ -42,6 +40,7 @@
 #include "../core/shader.hpp"
 #include "../core/Mesh.h"
 
+//holes
 #include "../objects/Hole1.h"
 #include "../objects/Hole2.h"
 #include "../objects/Hole3.h"
@@ -68,11 +67,15 @@
 #include "../lighting/ShadowMap.h"
 #include "../camera/Drone.h"
 
+//utilites
+#include "../objects/Skybox.h"
+#include "../objects/Water.h"
+#include "../objects/GlobalWater.h"
 
-const int WIDTH  = 1000;
+const int WIDTH  = 1500;
 const int HEIGHT = 1000;
 
-// ── Camera ──────────────────────────────────────────────────────────────────
+//Camera
 glm::vec3 cameraPos   = glm::vec3(0.0f, 90.0f, 160.0f);
 glm::vec3 cameraFront = glm::normalize(glm::vec3(0.0f, -90.0f, -160.0f));
 glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -325,52 +328,62 @@ int main()
     drone.init(shader);
     g_drone = &drone;
 
-    // ── Ground ───────────────────────────────────────────────────────────────
-    Mesh ground = Mesh::makeCuboid(400.0f, 0.5f, 150.0f, 0.35f, 0.20f, 0.08f, 1.0f);
+
+    Skybox skybox;
+    skybox.init(
+        "src/shaders/skybox.vert",
+        "src/shaders/skybox.frag",
+        "src/assets/textures/sky_day.bmp",
+        "src/assets/textures/sky_night.bmp"
+    );
+    skybox.dayLengthSecs = 60.0f; //60 second day/night cycle
+
+    // Ground
+    Mesh ground = Mesh::makeCuboid(400.0f, 0.05f, 150.0f, 0.35f, 0.20f, 0.08f, 1.0f);
     ground.setup();
+    ground.translate(0.0f, -0.5f, 0.0f);
 
     // ── Volcano ──────────────────────────────────────────────────────────────
     Mesh volcano = Mesh::makeCone(20.0f, 40.0f, 64, 0.40f, 0.26f, 0.10f, 1.0f);
     volcano.translate(0.0f, 20.0f, -10.0f);
     volcano.setup();
 
-    // ── Holes — using Mesh::makeHole(cx, cy, cz, rotY) ──────────────────────
+    // Holes : using Mesh::makeHole(cx, cy, cz, rotY) 
     // cy = 0.35 places the fairway flush on top of the ground slab (0.5 tall).
     const float FY = 0.35f;
 
     Hole1 h1;
-    h1.translate(-180.0f, 0.35f, 60.0f); //cant rotate 
+    h1.translate(-20.0f, 0.35f, 60.0f); //cant rotate 
 
     Hole2 h2;
-    h2.translate(-170.0f, 0.35f, 40.0f);
+    h2.translate(-40.0f, 0.45f, 40.0f);
 
     Hole3 h3; 
-    h3.translate(-180.0f, 0.35, 20.0f);
+    h3.translate(-60.0f, 0.35, 20.0f);
 
     Hole4 h4;
-    h4.translate(-150.0f, 0.35f, 20.0f);
+    h4.translate(-10.0f, 0.35f, 20.0f);
 
     Hole5 h5;
-    h5.translate(-175.0f, 0.35, -16.0);
+    h5.translate(-50.0f, 0.35, -10.0);
 
     Hole6 h6;
-    h6.translate(-175.0f, 0.35f, -50.0f);
+    h6.translate(-05.0f, 0.35f, -50.0f);
 
     Hole7 h7;
-    h7.translate(-150.0f, 0.35f, -35.0f);
+    h7.translate(-40.0f, 0.35f, -45.0f);
 
     Hole8 h8 ;
-    h8.translate(-110.0f, 0.35f, -10.0f);
-
+    h8.translate(26.0f, 0.35f, 23.0f);
+ 
     Hole9E h9e;
-    h9e.translate(-55.0f, 0.35, -10.0f);
+    h9e.translate(-15.0f, 0.35, -10.0f);
 
     Hole9W h9w;
-    h9w.translate(40.0f, 0.35, -10.0f);
+    h9w.translate(50.0f, 0.35, -10.0f);
 
-    
     Hole10 h10; 
-    h10.translate(80.0f, 0.35f, -10.0f);
+    h10.translate(92.0f, 0.35f, -21.0f);
 
     Hole11 h11;
     h11.translate(110.0f, 0.35f, 20.0f);
@@ -378,13 +391,12 @@ int main()
     Hole12 h12;
     h12.translate(150.0f, 0.35f, 25.0f);
 
-    
     Hole13 h13;
     h13.init(shader);
-
+    
     Hole14 h14;
     h14.init(shader);
-
+    
     Hole15 h15;
     h15.init(shader);
 
@@ -394,12 +406,15 @@ int main()
     Hole17 h17;
     h17.translate(120.0f, 0.35f, 50.0f);
 
-
     Hole18 h18;
-    h18.translate(35.0f, 0.35f, 50.0f);
+    h18.translate(35.0f, 0.1f, 50.0f);
+
+    GlobalWater globalWater;
+    globalWater.translate(0.0f, 0.55f, 0.0f);
+
     
 
-    // ── Shader uniforms ──────────────────────────────────────────────────────
+    // Shader uniforms 
     glUseProgram(shader);
     GLint locModel = glGetUniformLocation(shader, "model");
     GLint locView  = glGetUniformLocation(shader, "view");
@@ -411,7 +426,7 @@ int main()
     glm::mat4 projection = glm::perspective(
         glm::radians(45.0f), (float)WIDTH / HEIGHT, 0.1f, 500.0f);
 
-    // ── Render loop ──────────────────────────────────────────────────────────
+    // Render loop 
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
@@ -697,6 +712,15 @@ int main()
          sunDir,  // sunDir
          eyePos);   
 
+        static double lastTime = glfwGetTime();
+        double now      = glfwGetTime();
+        float deltaTime = (float)(now - lastTime);
+        lastTime = now;
+
+        skybox.update(deltaTime);
+        glDepthFunc(GL_LEQUAL);
+        skybox.draw(view, projection);
+        glDepthFunc(GL_LESS);
 
         h16.update(deltaTime);
         h16.setCameraData(view, projection, eyePos);
@@ -704,8 +728,13 @@ int main()
 
         h17.draw(shader, false);
 
-
         h18.update(deltaTime);
+        h18.setCameraData(view, projection, cameraPos);
+        h18.draw(shader, false);
+
+        globalWater.update(deltaTime);
+        globalWater.setCameraData(view, projection, cameraPos);
+        globalWater.draw(shader);
         h18.setCameraData(view, projection, eyePos);
         h18.draw(shader, false);
 
