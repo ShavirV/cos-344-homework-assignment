@@ -203,7 +203,7 @@ int main()
 
 
     Hole18 h18;
-    h18.translate(0.0f, 10.0f, 0.0f);
+    h18.translate(35.0f, 0.35f, 50.0f);
     
 
     // ── Shader uniforms ──────────────────────────────────────────────────────
@@ -326,7 +326,7 @@ int main()
 
         h18.update(deltaTime);
         h18.setCameraData(view, projection, cameraPos);
-        //h18.draw(shader, false);
+        h18.draw(shader, false);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
