@@ -1,21 +1,3 @@
-// =============================================================================
-// Hole14.cpp
-// Implementation of the descending S-curve fairway for Hole 14.
-//
-// Approach in one paragraph
-// -------------------------
-// The fairway is a swept ribbon. We pick a centreline curve C(s) for
-// s ∈ [0, 1], compute a local frame (tangent, side, up) at evenly spaced
-// samples, and emit a quad strip between successive samples for each face
-// (top, bottom, left side, right side). The kerbs are extra ribbons offset
-// from the fairway edges. To produce the "narrow areas" requested, the
-// fairway's left and right half-widths are functions of s — Gaussian bumps
-// at specific s values that pinch the corridor inward. The kerb on each
-// side has a *constant* outer extent but a varying inner extent (the bumps
-// stick into the fairway), so its inner edge bulges where the pinches are.
-// Everything else (shader, lighting, textures, dev viewer) is unchanged.
-// =============================================================================
-
 #include "Hole14.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -23,33 +5,20 @@
 #include <cmath>
 #include <iostream>
 
-// -----------------------------------------------------------------------------
-// Hole-14 geometry constants. Tuned in conjunction with the centreline math
-// (see Hole14.h) so that the average descent slope reads as ~13° with steepest
-// local slope ~20°, and the S-curve swings 3m to each side.
-// -----------------------------------------------------------------------------
 namespace
 {
-    // ── Centreline shape ─────────────────────────────────────────────────────
-    const float START_HEIGHT = 4.0f;     // tee height above the cup
-    const float Z_LEN        = 11.0f;    // forward extent of the hole
-    const float S_AMPLITUDE  = 3.0f;     // X-excursion of the S-curve
+    const float START_HEIGHT = 4.0f;
+    const float Z_LEN        = 11.0f;
+    const float S_AMPLITUDE  = 3.0f;
 
-    // ── Fairway slab ─────────────────────────────────────────────────────────
-    const float BASE_HALF_W  = 3.5f;     // un-pinched half-width
-    const float SLAB_THICK   = 0.2f;     // visible thickness of the fairway slab
+    const float BASE_HALF_W  = 3.5f;
+    const float SLAB_THICK   = 0.2f;
 
-    // ── Kerbs ────────────────────────────────────────────────────────────────
     const float KERB_HEIGHT     = 0.45f;
     const float KERB_THICKNESS  = 0.35f;
 
-    // ── Sampling resolution ──────────────────────────────────────────────────
-    // 40 samples → ~1.7m between segments. Smooth enough that the S-curve
-    // doesn't look polygonal at typical viewing distances.
     const int   CENTRELINE_SAMPLES = 40;
 
-    // ── Colours (same swatches as Hole 13 so the shader's material detector
-    //    classifies them identically) ──────────────────────────────────────
     const glm::vec3 COLOR_TURF (0.20f, 0.62f, 0.22f);
     const glm::vec3 COLOR_TEE  (0.13f, 0.45f, 0.16f);
     const glm::vec3 COLOR_CUP  (0.04f, 0.04f, 0.04f);
@@ -57,41 +26,26 @@ namespace
     const glm::vec3 COLOR_POLE (0.95f, 0.95f, 0.95f);
     const glm::vec3 COLOR_FLAG (0.85f, 0.10f, 0.10f);
 
-    // ── Cup + flag ───────────────────────────────────────────────────────────
     const float CUP_RADIUS  = 0.55f;
     const float CUP_DEPTH   = 0.15f;
     const float POLE_HEIGHT = 2.2f;
     const float POLE_RADIUS = 0.06f;
 
-    // ── Tee platform ─────────────────────────────────────────────────────────
-    const float TEE_PLATFORM_DEPTH = 2.5f;   // length along the tangent
-    const float TEE_PLATFORM_HALFW = 3.5f;   // half-width perpendicular
+    const float TEE_PLATFORM_DEPTH = 2.5f;
+    const float TEE_PLATFORM_HALFW = 3.5f;
 
-    // ── Pinches ──────────────────────────────────────────────────────────────
-    // Each entry: (s-centre, sigma, magnitude in metres, side)
-    //   side > 0 → reduces leftHalfW   (left kerb protrudes inward)
-    //   side < 0 → reduces rightHalfW  (right kerb protrudes inward)
-    //   side = 0 → reduces both        (gate-style pinch)
-    // The pattern alternates left/right along s to give the zigzag corridor.
     struct Pinch { float s; float sigma; float mag; int side; };
     const Pinch PINCHES[] = {
-        { 0.18f, 0.04f, 1.2f, +1 },   // left wall in early
-        { 0.42f, 0.05f, 1.5f, -1 },   // right wall in middle-early
-        { 0.62f, 0.04f, 1.0f, +1 },   // left wall in middle-late
-        { 0.82f, 0.05f, 1.4f, -1 },   // right wall in late
+        { 0.18f, 0.04f, 1.2f, +1 },
+        { 0.42f, 0.05f, 1.5f, -1 },
+        { 0.62f, 0.04f, 1.0f, +1 },
+        { 0.82f, 0.05f, 1.4f, -1 },
     };
     const int NUM_PINCHES = sizeof(PINCHES) / sizeof(PINCHES[0]);
 
-    // ── Hardcoded camera framing for dev.cpp ─────────────────────────────────
-    // Centre the framing on the middle of the hole, halfway down the descent.
-    // Radius generous enough to cover the whole S-curve + tee height.
     const glm::vec3 SCENE_CENTER(0.0f, 2.0f, 5.5f);
     const float     SCENE_RADIUS = 18.0f;
 }
-
-// =============================================================================
-// Construction / destruction
-// =============================================================================
 
 Hole14::Hole14()
     : mVAO(0), mVBO(0), mEBO(0),
@@ -109,13 +63,8 @@ Hole14::~Hole14()
     cleanup();
 }
 
-// =============================================================================
-// Centreline + pinch maths
-// =============================================================================
-
 glm::vec3 Hole14::centreline(float s) const
 {
-    // s in [0, 1]; s=0 is the tee end (raised), s=1 is the cup end (ground).
     float x = S_AMPLITUDE * std::sin(2.0f * 3.14159265358979323846f * s);
     float y = START_HEIGHT * (1.0f - s);
     float z = Z_LEN * s;
@@ -124,8 +73,6 @@ glm::vec3 Hole14::centreline(float s) const
 
 glm::vec3 Hole14::tangent(float s) const
 {
-    // Central difference for a stable tangent estimate. eps small enough to
-    // be local, large enough that floating-point noise doesn't dominate.
     const float eps = 1e-3f;
     float s1 = std::max(0.0f, s - eps);
     float s2 = std::min(1.0f, s + eps);
@@ -133,7 +80,7 @@ glm::vec3 Hole14::tangent(float s) const
     glm::vec3 p2 = centreline(s2);
     glm::vec3 t  = p2 - p1;
     float len = glm::length(t);
-    if (len < 1e-6f) return glm::vec3(0.0f, 0.0f, 1.0f);  // degenerate guard
+    if (len < 1e-6f) return glm::vec3(0.0f, 0.0f, 1.0f);
     return t / len;
 }
 
@@ -145,23 +92,14 @@ void Hole14::pinchProfile(float s, float& leftHalfW, float& rightHalfW) const
     {
         const Pinch& p = PINCHES[i];
         float d = s - p.s;
-        // Standard 1-D Gaussian — symmetric around s = p.s, width controlled
-        // by sigma. Max value = mag; falls off smoothly to 0 at distance.
         float bump = p.mag * std::exp(-(d * d) / (2.0f * p.sigma * p.sigma));
         if (p.side >= 0) leftHalfW  -= bump;
         if (p.side <= 0) rightHalfW -= bump;
     }
-    // Clamp to a positive minimum so the fairway never closes off (would
-    // make degenerate triangles).
     const float minHW = 0.8f;
     if (leftHalfW  < minHW) leftHalfW  = minHW;
     if (rightHalfW < minHW) rightHalfW = minHW;
 }
-
-// =============================================================================
-// Low-level geometry helpers (identical to Hole13's, kept local to avoid any
-// coupling between the two classes — each hole is self-contained).
-// =============================================================================
 
 void Hole14::pushQuad(const glm::vec3& a, const glm::vec3& b,
                       const glm::vec3& c, const glm::vec3& d,
@@ -195,47 +133,21 @@ void Hole14::buildBox(const glm::vec3& mn, const glm::vec3& mx,
     pushQuad(p000, p100, p101, p001, { 0,-1,  0}, colour);
 }
 
-// =============================================================================
-// buildFairwayRibbon — sweep a ribbon along the centreline
-// =============================================================================
-//
-// At each sample s_i, we compute:
-//   c_i  = centreline(s_i)
-//   t_i  = tangent(s_i)
-//   side_i = normalize(cross(t_i, worldUp))   // perpendicular to t in the
-//                                             // horizontal plane
-//   leftHalfW, rightHalfW = pinchProfile(s_i)
-//
-// The two top edge points are:
-//   leftTop_i  = c_i + leftHalfW * side_i      // left of travel direction
-//   rightTop_i = c_i - rightHalfW * side_i     // right of travel direction
-// And we drop slabThick along *world* -Y (not along the local normal) to get
-// the bottom edge points. Using world-Y means the slab thickness is constant
-// when viewed from above — the slope of the top surface is real, but the
-// bottom is parallel to the top in screen space rather than tilted, which
-// reads more like a real fairway than a uniformly thick ramp would.
-
 void Hole14::buildFairwayRibbon(int   sSamples,
                                 float slabThick,
                                 const glm::vec3& colour)
 {
-    // Pre-compute every ring's four edge points to avoid recomputing the
-    // local frame and pinches multiple times per ring.
     int N = sSamples;
     std::vector<glm::vec3> leftTop (N + 1), rightTop (N + 1);
     std::vector<glm::vec3> leftBot (N + 1), rightBot (N + 1);
-    std::vector<glm::vec3> topNorm (N + 1);   // per-ring top normal (for top face)
-    std::vector<glm::vec3> sideVec (N + 1);   // per-ring side direction
+    std::vector<glm::vec3> topNorm (N + 1);
+    std::vector<glm::vec3> sideVec (N + 1);
 
     for (int i = 0; i <= N; ++i)
     {
         float s = (float)i / (float)N;
         glm::vec3 c = centreline(s);
         glm::vec3 t = tangent(s);
-        // Right-handed local frame: side = horizontal-perpendicular to t.
-        // worldUp = (0, 1, 0). If t happens to be vertical (it never is here
-        // since we're descending at ~15°) the cross would be zero; guard
-        // anyway.
         glm::vec3 side = glm::cross(t, glm::vec3(0.0f, 1.0f, 0.0f));
         float sideLen = glm::length(side);
         if (sideLen < 1e-6f)
@@ -243,22 +155,15 @@ void Hole14::buildFairwayRibbon(int   sSamples,
         else
             side /= sideLen;
 
-        // Local up = side × tangent. This is the proper "fairway surface
-        // normal" — perpendicular to both the direction of travel and the
-        // side. It tilts with the slope.
         glm::vec3 up = glm::cross(side, t);
-        // up should be near +Y for a descending fairway; sanity-clamp.
         if (up.y < 0.0f) up = -up;
 
         float leftHW, rightHW;
         pinchProfile(s, leftHW, rightHW);
 
-        // The edge points are offset along `side`. By convention "left"
-        // means +side (relative to direction of travel).
         leftTop [i] = c + side * leftHW;
         rightTop[i] = c - side * rightHW;
 
-        // Bottom edges: drop straight down along world -Y by slabThick.
         leftBot [i] = leftTop [i] - glm::vec3(0.0f, slabThick, 0.0f);
         rightBot[i] = rightTop[i] - glm::vec3(0.0f, slabThick, 0.0f);
 
@@ -266,69 +171,34 @@ void Hole14::buildFairwayRibbon(int   sSamples,
         sideVec[i] = side;
     }
 
-    // Now stitch quad strips for each face.
     for (int i = 0; i < N; ++i)
     {
-        // ── Top face (turf) ──────────────────────────────────────────────────
-        // Winding: leftTop[i] → rightTop[i] → rightTop[i+1] → leftTop[i+1]
-        // (CCW when viewed from +up — which is the local up direction)
-        //
-        // Average the two adjacent local-up normals so the strip looks
-        // smoothly shaded (Gouraud-style) where the slope changes. Since
-        // pushQuad takes a single flat normal we'd lose that — but the
-        // S-curve is gentle enough that a single mid-quad normal is fine.
         glm::vec3 nTop = glm::normalize(topNorm[i] + topNorm[i + 1]);
         pushQuad(leftTop[i], rightTop[i], rightTop[i + 1], leftTop[i + 1],
                  nTop, colour);
 
-        // ── Bottom face (-up, reversed winding) ──────────────────────────────
         pushQuad(leftBot[i], leftBot[i + 1], rightBot[i + 1], rightBot[i],
                  -nTop, colour);
 
-        // ── Left side strip ──────────────────────────────────────────────────
-        // The outward normal of the left edge is +side (left points to +side).
         glm::vec3 nSide = glm::normalize(sideVec[i] + sideVec[i + 1]);
-        // CCW from outside: leftBot[i] → leftBot[i+1] → leftTop[i+1] → leftTop[i]
         pushQuad(leftBot[i], leftBot[i + 1], leftTop[i + 1], leftTop[i],
                  nSide, colour);
 
-        // ── Right side strip ─────────────────────────────────────────────────
-        // Right edge faces -side.
         pushQuad(rightBot[i + 1], rightBot[i], rightTop[i], rightTop[i + 1],
                  -nSide, colour);
     }
 
-    // End caps (tee end and cup end of the ribbon) so the slab isn't open.
-    // Tee end cap: at i=0, facing -tangent (back toward the tee).
     {
         glm::vec3 t0 = tangent(0.0f);
         pushQuad(rightBot[0], leftBot[0], leftTop[0], rightTop[0],
                  -t0, colour);
     }
-    // Cup end cap: at i=N, facing +tangent (forward beyond the cup).
     {
         glm::vec3 tN = tangent(1.0f);
         pushQuad(leftBot[N], rightBot[N], rightTop[N], leftTop[N],
                  tN, colour);
     }
 }
-
-// =============================================================================
-// buildKerbRibbon — sweep a kerb along one side
-// =============================================================================
-//
-// The kerb's INNER edge tracks the fairway's edge (so where the fairway
-// pinches narrow, the kerb's inner face protrudes inward — exactly the
-// "walls stick out" effect).
-//
-// The kerb's OUTER edge sits at a FIXED offset (BASE_HALF_W + KERB_THICKNESS)
-// from the centreline. This way the outer perimeter of the hole is a smooth
-// continuous curve, and only the inner face wobbles. Visually this reads as
-// "the wall is thicker here" rather than "the wall is wonkily placed".
-//
-// Each kerb is built as a four-faced ribbon: top, outer side, inner side,
-// and two end caps. We skip the bottom face (the kerb sits on the fairway
-// slab top, hidden from view).
 
 void Hole14::buildKerbRibbon(int   sSamples,
                              float kerbH, float kerbT,
@@ -354,8 +224,6 @@ void Hole14::buildKerbRibbon(int   sSamples,
         float leftHW, rightHW;
         pinchProfile(s, leftHW, rightHW);
 
-        // Inner edge: hugs the (possibly-pinched) fairway boundary.
-        // Outer edge: constant offset, regardless of pinches.
         if (leftSide)
         {
             innerBot[i] = c + side * leftHW;
@@ -366,17 +234,12 @@ void Hole14::buildKerbRibbon(int   sSamples,
             innerBot[i] = c - side * rightHW;
             outerBot[i] = c - side * (baseHalfW + kerbT);
         }
-        // The kerb sits ON TOP of the fairway slab, so its "bottom" is at the
-        // fairway top surface. The top is bottom + kerbH (in world up).
         innerTop[i] = innerBot[i] + glm::vec3(0.0f, kerbH, 0.0f);
         outerTop[i] = outerBot[i] + glm::vec3(0.0f, kerbH, 0.0f);
 
         sideVec[i] = side;
     }
 
-    // Stitch quad strips. The outward normal for the OUTER side is +side (for
-    // the left kerb) or -side (for the right kerb). For the INNER face it's
-    // the opposite. We compute that once based on `leftSide`.
     glm::vec3 outDirSign(leftSide ? 1.0f : -1.0f);
 
     for (int i = 0; i < N; ++i)
@@ -384,10 +247,6 @@ void Hole14::buildKerbRibbon(int   sSamples,
         glm::vec3 sideAvg = glm::normalize(sideVec[i] + sideVec[i + 1]);
         glm::vec3 outN = sideAvg * (leftSide ? 1.0f : -1.0f);
 
-        // ── Top face (+Y) ────────────────────────────────────────────────────
-        // Winding from above:
-        // left kerb: outer→outer+1→inner+1→inner   (CCW from +Y when leftSide=true)
-        // right kerb: inner→inner+1→outer+1→outer
         if (leftSide)
         {
             pushQuad(outerTop[i], outerTop[i + 1], innerTop[i + 1], innerTop[i],
@@ -399,8 +258,6 @@ void Hole14::buildKerbRibbon(int   sSamples,
                      glm::vec3(0, 1, 0), colour);
         }
 
-        // ── Outer face (faces away from the fairway centreline) ──────────────
-        // Walk from bottom outer to top outer along the swept direction.
         if (leftSide)
         {
             pushQuad(outerBot[i], outerBot[i + 1], outerTop[i + 1], outerTop[i],
@@ -408,13 +265,10 @@ void Hole14::buildKerbRibbon(int   sSamples,
         }
         else
         {
-            // For right kerb, swap winding so the outward normal still leaves
-            // the surface front-facing.
             pushQuad(outerBot[i + 1], outerBot[i], outerTop[i], outerTop[i + 1],
                      outN, colour);
         }
 
-        // ── Inner face (faces the fairway centreline) ────────────────────────
         if (leftSide)
         {
             pushQuad(innerBot[i + 1], innerBot[i], innerTop[i], innerTop[i + 1],
@@ -427,14 +281,11 @@ void Hole14::buildKerbRibbon(int   sSamples,
         }
     }
 
-    // End caps — small quads at the tee and cup ends of the kerb ribbon.
     glm::vec3 t0 = tangent(0.0f), tN = tangent(1.0f);
     if (leftSide)
     {
-        // Tee end cap: facing -t0
         pushQuad(innerBot[0], outerBot[0], outerTop[0], innerTop[0],
                  -t0, colour);
-        // Cup end cap: facing +tN
         pushQuad(outerBot[N], innerBot[N], innerTop[N], outerTop[N],
                  tN, colour);
     }
@@ -447,26 +298,18 @@ void Hole14::buildKerbRibbon(int   sSamples,
     }
 }
 
-// =============================================================================
-// Tee platform — a small slab at the start of the descent
-// =============================================================================
-
 void Hole14::buildTeePlatform(const glm::vec3& centre,
                               const glm::vec3& tan,
                               float halfW, float depth,
                               float slabThick,
                               const glm::vec3& colour)
 {
-    // Local frame
-    glm::vec3 t = glm::normalize(glm::vec3(tan.x, 0.0f, tan.z));   // horizontal
+    glm::vec3 t = glm::normalize(glm::vec3(tan.x, 0.0f, tan.z));
     if (glm::length(t) < 1e-6f) t = glm::vec3(0, 0, 1);
     glm::vec3 side = glm::cross(t, glm::vec3(0.0f, 1.0f, 0.0f));
     if (glm::length(side) < 1e-6f) side = glm::vec3(1, 0, 0);
     else side = glm::normalize(side);
 
-    // The platform extends `depth` *backward* from the centre (away from the
-    // descent), and `halfW` to each side. It sits at the centre's height,
-    // with slabThick thickness downward.
     glm::vec3 back = centre - t * depth;
 
     glm::vec3 frontL = centre + side * halfW;
@@ -478,27 +321,13 @@ void Hole14::buildTeePlatform(const glm::vec3& centre,
     glm::vec3 frontLb = frontL - dn, frontRb = frontR - dn;
     glm::vec3 backLb  = backL  - dn, backRb  = backR  - dn;
 
-    // Top
     pushQuad(backL, backR, frontR, frontL, glm::vec3(0, 1, 0), colour);
-    // Bottom
     pushQuad(backLb, frontLb, frontRb, backRb, glm::vec3(0,-1, 0), colour);
-    // Left side (+side direction)
     pushQuad(backLb, backL, frontL, frontLb, side, colour);
-    // Right side (-side direction)
     pushQuad(frontRb, frontR, backR, backRb, -side, colour);
-    // Back end (away from descent, normal -t)
     pushQuad(backRb, backR, backL, backLb, -t, colour);
-    // Front end (where the platform meets the fairway, normal +t)
     pushQuad(frontLb, frontL, frontR, frontRb, t, colour);
 }
-
-// =============================================================================
-// End wall — closing boundary wall at the cup end of the ribbon
-// =============================================================================
-//
-// A short upright slab that caps the open end of the fairway + kerbs at s=1
-// so the hole reads as enclosed rather than cut off in mid-air. The wall
-// spans the full kerb-to-kerb width and matches the kerb height.
 
 void Hole14::buildEndWall(const glm::vec3& centre,
                           const glm::vec3& segTan,
@@ -507,18 +336,16 @@ void Hole14::buildEndWall(const glm::vec3& centre,
                           float wallT,
                           float wallH)
 {
-    // Horizontal side vector (same derivation as in buildKerbRibbon).
     glm::vec3 t    = glm::normalize(segTan);
     glm::vec3 side = glm::cross(t, glm::vec3(0.0f, 1.0f, 0.0f));
     float sLen = glm::length(side);
     if (sLen < 1e-6f) side = glm::vec3(1.0f, 0.0f, 0.0f);
     else              side /= sLen;
 
-    float span  = halfW + kerbT;   // half-span including kerbs
-    float baseY = centre.y;        // fairway surface height at s=1
+    float span  = halfW + kerbT;
+    float baseY = centre.y;
     float topY  = baseY + wallH;
 
-    // Near edge (at the cup end of the ribbon) and far edge (wallT beyond).
     glm::vec3 BL  = centre + span * side;
     glm::vec3 BR  = centre - span * side;
     glm::vec3 BLf = BL + wallT * t;
@@ -529,23 +356,13 @@ void Hole14::buildEndWall(const glm::vec3& centre,
     glm::vec3 TLf (BLf.x, topY, BLf.z);
     glm::vec3 TRf (BRf.x, topY, BRf.z);
 
-    // Inner face (faces back up the fairway, normal = -t)
     pushQuad(BR, BL, TL, TR, -t, COLOR_KERB);
-    // Outer face (back of wall, normal = +t)
     pushQuad(BLf, BRf, TRf, TLf, t, COLOR_KERB);
-    // Top face
     pushQuad(TL, TR, TRf, TLf, glm::vec3(0, 1, 0), COLOR_KERB);
-    // Left side (+side)
     pushQuad(BLf, BL, TL, TLf, side, COLOR_KERB);
-    // Right side (-side)
     pushQuad(BR, BRf, TRf, TR, -side, COLOR_KERB);
-    // Bottom (hidden)
     pushQuad(BL, BLf, BRf, BR, glm::vec3(0, -1, 0), COLOR_KERB);
 }
-
-// =============================================================================
-// Cup + flag
-// =============================================================================
 
 void Hole14::buildCup(const glm::vec3& centre, const glm::vec3& colour)
 {
@@ -558,12 +375,10 @@ void Hole14::buildFlag(const glm::vec3& base, float poleH, float poleR,
                        const glm::vec3& poleColour,
                        const glm::vec3& flagColour)
 {
-    // Pole
     glm::vec3 mn(base.x - poleR, base.y,         base.z - poleR);
     glm::vec3 mx(base.x + poleR, base.y + poleH, base.z + poleR);
     buildBox(mn, mx, poleColour);
 
-    // Triangular pennant in +X, double-sided.
     float flagW = 0.9f;
     float flagH = 0.55f;
     glm::vec3 fA(base.x,         base.y + poleH - flagH,        base.z);
@@ -590,19 +405,12 @@ void Hole14::buildFlag(const glm::vec3& base, float poleH, float poleR,
     }
 }
 
-// =============================================================================
-// init — build all CPU-side geometry and upload to GL
-// =============================================================================
-
 void Hole14::init(GLuint shaderProgram)
 {
     if (mInitialised) return;
 
     mProgram = shaderProgram;
 
-    // Cache uniform locations — uMVP / uLightColor / uAmbient have moved
-    // out of per-hole control (dev.cpp owns them now). See Hole13.cpp for
-    // the full explanation.
     mLocModel      = glGetUniformLocation(mProgram, "uModel");
     mLocNormalMat  = glGetUniformLocation(mProgram, "uNormalMat");
     mLocLightDir   = glGetUniformLocation(mProgram, "uLightDir");
@@ -611,16 +419,13 @@ void Hole14::init(GLuint shaderProgram)
     mVertices.clear();
     mIndices.clear();
 
-    // ── 1. Fairway ribbon (turf, swept along the S-curve, pinches baked in) ─
     buildFairwayRibbon(CENTRELINE_SAMPLES, SLAB_THICK, COLOR_TURF);
 
-    // ── 2. Kerb ribbons (left + right) ─────────────────────────────────────
     buildKerbRibbon(CENTRELINE_SAMPLES, KERB_HEIGHT, KERB_THICKNESS,
                     BASE_HALF_W, COLOR_KERB, /*leftSide=*/true);
     buildKerbRibbon(CENTRELINE_SAMPLES, KERB_HEIGHT, KERB_THICKNESS,
                     BASE_HALF_W, COLOR_KERB, /*leftSide=*/false);
 
-    // ── 3. Tee platform at s=0 ──────────────────────────────────────────────
     {
         glm::vec3 teeCentre = centreline(0.0f);
         glm::vec3 teeTan    = tangent(0.0f);
@@ -628,17 +433,12 @@ void Hole14::init(GLuint shaderProgram)
                          TEE_PLATFORM_HALFW, TEE_PLATFORM_DEPTH,
                          SLAB_THICK, COLOR_TURF);
 
-        // Darker tee patch on top of the platform.
         const float eps = 0.001f;
         glm::vec3 mn(teeCentre.x - 1.2f, teeCentre.y + eps,         teeCentre.z - 1.2f);
         glm::vec3 mx(teeCentre.x + 1.2f, teeCentre.y + 0.02f + eps, teeCentre.z + 1.2f);
         buildBox(mn, mx, COLOR_TEE);
     }
 
-    // ── 4. Cup + flag at s=1 ────────────────────────────────────────────────
-    // Pull the cup inward (away from the end wall) so it doesn't clip through.
-    // The wall's inner face sits at centreline(1.0); offset by CUP_RADIUS + a
-    // small clearance gap back along -tangent (toward the tee).
     {
         glm::vec3 cupEnd = centreline(1.0f);
         glm::vec3 cupTan = tangent(1.0f);
@@ -651,9 +451,6 @@ void Hole14::init(GLuint shaderProgram)
                   COLOR_POLE, COLOR_FLAG);
     }
 
-    // ── 5. Closing boundary wall at the cup end ──────────────────────────────
-    // The wall spans the full kerb-to-kerb width at s=1, capping the open end
-    // of the fairway so the flag doesn't float at the boundary of nothing.
     {
         glm::vec3 cupCentre = centreline(1.0f);
         glm::vec3 cupTan    = tangent(1.0f);
@@ -665,7 +462,6 @@ void Hole14::init(GLuint shaderProgram)
                      /*wallH=*/KERB_HEIGHT);
     }
 
-    // ── 6. Upload to GPU ────────────────────────────────────────────────────
     if (mVertices.empty() || mIndices.empty())
     {
         std::cerr << "Hole14::init — no geometry was generated!" << std::endl;
@@ -711,28 +507,28 @@ void Hole14::init(GLuint shaderProgram)
     mInitialised = true;
 }
 
-// =============================================================================
-// draw — same uniform-pushing path as Hole13 (the shader is shared)
-// =============================================================================
-
 void Hole14::draw(const glm::mat4& view,
                   const glm::mat4& proj,
                   const glm::vec3& sunDir,
                   const glm::vec3& camPos)
 {
-    if (!mInitialised) return;
+    if (!mInitialised) 
+        return;
 
     glUseProgram(mProgram);
 
-glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.35f, -15.0f));
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.35f, -15.0f));
     glm::mat3 nrmM  = glm::mat3(glm::transpose(glm::inverse(model)));
 
-    if (mLocModel      != -1) glUniformMatrix4fv(mLocModel,     1, GL_FALSE, glm::value_ptr(model));
-    if (mLocNormalMat  != -1) glUniformMatrix3fv(mLocNormalMat, 1, GL_FALSE, glm::value_ptr(nrmM));
-    if (mLocLightDir   != -1) glUniform3fv(mLocLightDir,        1, glm::value_ptr(sunDir));
-    if (mLocViewPos    != -1) glUniform3fv(mLocViewPos,         1, glm::value_ptr(camPos));
+    if (mLocModel      != -1) 
+        glUniformMatrix4fv(mLocModel,1, GL_FALSE, glm::value_ptr(model));
+    if (mLocNormalMat  != -1) 
+        glUniformMatrix3fv(mLocNormalMat, 1, GL_FALSE, glm::value_ptr(nrmM));
+    if (mLocLightDir   != -1)
+        glUniform3fv(mLocLightDir,1, glm::value_ptr(sunDir));
+    if (mLocViewPos    != -1) 
+        glUniform3fv(mLocViewPos, 1, glm::value_ptr(camPos));
 
-    // view + proj are program-wide; suppress unused-param warnings.
     (void)view; (void)proj;
 
     glBindVertexArray(mVAO);
@@ -740,9 +536,22 @@ glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(150.0f, 0.35f, -15.0
     glBindVertexArray(0);
 }
 
-// =============================================================================
-// cleanup
-// =============================================================================
+void Hole14::drawDepth(GLuint depthShader)
+{
+    if (!mInitialised) 
+        return;
+
+    GLint loc_uModel = glGetUniformLocation(depthShader, "uModel");
+    if (loc_uModel != -1) 
+    {
+        glm::mat4 model(1.0f);
+        glUniformMatrix4fv(loc_uModel, 1, GL_FALSE, glm::value_ptr(model));
+    }
+
+    glBindVertexArray(mVAO);
+    glDrawElements(GL_TRIANGLES, mIndexCount, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
 
 void Hole14::cleanup()
 {

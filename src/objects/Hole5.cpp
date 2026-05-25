@@ -1,29 +1,6 @@
-// Hole5.cpp
-// Hole5.cpp  —  Swamp & Waterfall Entry Hole (Hole 5)
-// Dino Park Phuket — swamp & waterfall zone (Holes 5–8)
-//
-// STRICT FOOTPRINT: 28 (X) × 15 (Z), centred at local origin.
-//   X runs from -14 to +14
-//   Z runs from  -7.5 to +7.5
-//
-// ELEVATION LAYOUT:
-//   UPPER fairway : X in [-14 ,  0 ],  surface Y = RISE (2.5)
-//   RAMP          : X in [  0 ,  5 ],  smooth slope Y: RISE → 0
-//   LOWER pad     : X in [  5 , 14 ],  surface Y = 0    ← cup/flag here
-//
-// The ramp is a SINGLE tilted cuboid that connects the two levels.
-// A full-height earth fill hides any gap underneath.
-// All decorations sit inside ±13 X and ±6 Z so nothing pokes outside.
-//
-// Pattern: raw Mesh* array, identical to Hole9E / Hole9W.
-
 #include "Hole5.h"
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dimension constants (local space)
-// ─────────────────────────────────────────────────────────────────────────────
 
 static const float HOLE_W = 28.0f;   // total X extent
 static const float HOLE_D = 15.0f;   // total Z extent
@@ -56,10 +33,6 @@ static const float WTR_R   = 0.15f, WTR_G   = 0.45f, WTR_B   = 0.88f;
 static const float MARGIN = 1.2f;
 static const float INNER_X = HALF_W - MARGIN;   // ±12.8
 static const float INNER_Z = HALF_D - MARGIN;   // ±6.3
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole5::addMesh(Mesh* m)
 {
@@ -125,10 +98,6 @@ void Hole5::addTree(float x, float baseY, float z, float scale)
     addMesh(c2);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructor
-// ─────────────────────────────────────────────────────────────────────────────
-
 Hole5::Hole5() : meshCount(0)
 {
     for (int i = 0; i < MAX_MESHES; i++)
@@ -153,26 +122,11 @@ Hole5::~Hole5()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFairways
-// Three slabs: upper fairway, ramp, lower pad  +  kerb borders all around.
-//
-// The RAMP is a flat cuboid that is:
-//   1. Built as a horizontal slab of length RAMP_LEN, height FH, depth HOLE_D
-//   2. One end raised by RISE so it smoothly bridges upper ↔ lower
-//   We do this by translating to the midpoint then rotating about Z so the
-//   left edge is at Y = RISE + FH and the right edge is at Y = FH.
-//
-// The slope angle: atan2(RISE, RAMP_LEN)
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole5::buildFairways()
 {
     float upperCX = ((-HALF_W) + UPPER_END) * 0.5f;   // centre X of upper fairway
     float upperW  = UPPER_END - (-HALF_W);             // 14.0
 
-    // ── OUTER BORDER WALLS (correctly placed around the 28×15 footprint) ────
-    // The playfield extends X in [-14,14], Z in [-7.5,7.5].
-    // Walls of thickness BT are placed so their inner faces align with these edges.
     float wallXNeg = -HALF_W - BT * 0.5f;   // -14.25
     float wallXPos =  HALF_W + BT * 0.5f;   //  14.25
     float wallZNeg = -HALF_D - BT * 0.5f;   // -7.75
@@ -202,7 +156,6 @@ void Hole5::buildFairways()
     bXPos->translate(wallXPos, BH * 0.5f, 0.0f);
     bXPos->setup(); addMesh(bXPos);
 
-    // ── UPPER FAIRWAY SLAB ────────────────────────────────────────────────────
     Mesh* upper = new Mesh(Mesh::makeCuboid(upperW, FH, HOLE_D,
                                              GR, GG, GB, 1.0f));
     upper->translate(upperCX, RISE + FH * 0.5f, 0.0f);
@@ -214,31 +167,12 @@ void Hole5::buildFairways()
     earthCol->translate(upperCX, RISE * 0.5f, 0.0f);
     earthCol->setup(); addMesh(earthCol);
 
-    // ── RAMP (proper wedge incline — no floating) ─────────────────────────────
-    //
-    // Strategy: subdivide the ramp into N thin horizontal slices along X.
-    // Each slice i spans X in [x0 + i*step, x0 + (i+1)*step].
-    // Its surface Y is linearly interpolated from RISE (at UPPER_END)
-    // down to 0 (at RAMP_END), so sliceTopY = RISE * (1 - (i+0.5)/N).
-    // Each slice is a cuboid whose bottom is Y=0 and whose top is sliceTopY,
-    // making the pile collectively a staircase that approximates a smooth ramp.
-    // Using N=20 steps makes the staircase visually smooth.
-    //
-    // This guarantees:
-    //   • Left edge of ramp connects flush with the upper fairway surface (Y=RISE)
-    //   • Right edge connects flush with the lower pad surface (Y=0)
-    //   • No gap underneath — every slice extends from Y=0 upward
-    //   • Base rectangle (28×15 footprint) is unchanged
     {
         const int   N    = 20;
         const float step = RAMP_LEN / (float)N;   // 0.25 per slice
 
         for (int i = 0; i < N; i++)
         {
-            // The top of this slice: linearly interpolated from RISE to 0
-            // Left  edge of slice → Y = RISE * (1 - i/N)
-            // Right edge of slice → Y = RISE * (1 - (i+1)/N)
-            // Use the average (centre top) as the height for makeCuboid
             float tLeft  = RISE * (1.0f - (float)i       / (float)N);
             float tRight = RISE * (1.0f - (float)(i + 1) / (float)N);
             float sliceH = (tLeft + tRight) * 0.5f + FH;   // full height from Y=0
@@ -266,12 +200,6 @@ void Hole5::buildFairways()
     lower->setup(); addMesh(lower);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildWaterfall
-// Placed OUTSIDE the -X border wall (behind it), so it does not consume
-// playable space. The structure is shifted left by WATERFALL_OFFSET.
-// Tiers are visible above the kerb wall.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole5::buildWaterfall()
 {
     const float WF_OFFSET = -3.0f;   // shift waterfall further left (outside)
@@ -324,10 +252,6 @@ void Hole5::buildWaterfall()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildStream
-// Thin water strip along the +Z side of the upper fairway surface.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole5::buildStream()
 {
     const float streamW  = 2.0f;
@@ -346,10 +270,6 @@ void Hole5::buildStream()
     bank->setup(); addMesh(bank);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildRocks
-// Volcanic boulders — placed along the inner edge of both Z borders.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole5::buildRocks()
 {
     struct RockDef { float x, surfY, z, s; };
@@ -380,10 +300,6 @@ void Hole5::buildRocks()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildBoneObstacle
-// Dinosaur femur bone lying across the mid upper fairway.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole5::buildBoneObstacle()
 {
     const float bR = 0.92f, bG = 0.90f, bB = 0.82f;
@@ -408,10 +324,6 @@ void Hole5::buildBoneObstacle()
     j2->setup(); addMesh(j2);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlag
-// Cup + flag on the LOWER PAD.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole5::buildFlag()
 {
     float flagX = LOWER_CX;
@@ -425,10 +337,6 @@ void Hole5::buildFlag()
     addFlagAt(flagX, FH, flagZ);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildTrees
-// Palm-style trees — all placed well inside the footprint.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole5::buildTrees()
 {
     struct TreeDef { float x, baseY, z, scale; };
@@ -452,10 +360,6 @@ void Hole5::buildTrees()
         addTree(td.x, td.baseY, td.z, td.scale);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlowers
-// Scattered along inner border edges and near the flag.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole5::buildFlowers()
 {
     float uY = RISE + FH;
@@ -483,10 +387,6 @@ void Hole5::buildFlowers()
         addFlowerAt(fd.x, fd.y, fd.z, fd.r, fd.g, fd.b);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Public interface
-// ─────────────────────────────────────────────────────────────────────────────
-
 void Hole5::translate(float x, float y, float z)
 {
     for (int i = 0; i < meshCount; i++)
@@ -504,9 +404,6 @@ void Hole5::draw(GLuint shader, bool wireframe,
                  const glm::vec3& lightColor,
                  const glm::vec3& camPos)
 {
-    // Set the per-frame directional-light uniforms that dev.cpp does NOT push
-    // program-wide (uLightDir and uViewPos). uLightColor and uAmbient are
-    // already set by dev.cpp before this draw() is called, so we skip them.
     glUseProgram(shader);
     GLint locLD = glGetUniformLocation(shader, "uLightDir");
     GLint locVP = glGetUniformLocation(shader, "uViewPos");
@@ -517,4 +414,10 @@ void Hole5::draw(GLuint shader, bool wireframe,
 
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shader, wireframe);
+}
+
+void Hole5::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
 }

@@ -1,24 +1,7 @@
-// Hole9E.cpp  —  Hole 9 East exit fairway
-// Dino Park Phuket
-//
-// STRICT FOOTPRINT: 28 (X) × 15 (Z), centred at local origin.
-//   X runs from -14 to +14
-//   Z runs from  -7.5 to +7.5
-//
-// LAYOUT:
-//   The tunnel mouth sits at the +X end of the fairway (mirrored).
-//   A clear fairway runs to -X.
-//   A central rock obstacle breaks up the run. Trees + flowers + border
-//   kerbs round the hole out so it visually matches Holes 5–8.
-
 #include "Hole9E.h"
 #include <cmath>
 #include <iostream>
 #include <glm/gtc/type_ptr.hpp>
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dimension constants  (local space, identical footprint to Hole5–8)
-// ─────────────────────────────────────────────────────────────────────────────
 
 static const float HOLE_W = 28.0f;
 static const float HOLE_D = 15.0f;
@@ -26,24 +9,19 @@ static const float HALF_W = 14.0f;
 static const float HALF_D =  7.5f;
 
 // Slab / kerb
-static const float FH = 0.20f;   // fairway slab thickness
-static const float BT = 0.5f;    // border wall thickness
-static const float BH = 0.4f;    // border kerb height
+static const float FH = 0.20f; // fairway slab thickness
+static const float BT = 0.5f; // border wall thickness
+static const float BH = 0.4f; // border kerb height
 
-// ── Colours (consistent with Hole7) ──────────────────────────────────────────
-static const float GR = 0.20f, GG = 0.62f, GB = 0.22f;   // grass fairway
-static const float MR = 0.28f, MG = 0.20f, MB = 0.10f;   // earth fill under
-static const float CR = 0.86f, CG = 0.86f, CB = 0.86f;   // concrete kerb
+static const float GR = 0.20f, GG = 0.62f, GB = 0.22f; // grass fairway
+static const float MR = 0.28f, MG = 0.20f, MB = 0.10f; // earth fill under
+static const float CR = 0.86f, CG = 0.86f, CB = 0.86f; // concrete kerb
 static const float TUNNEL_R = 0.22f, TUNNEL_G = 0.14f, TUNNEL_B = 0.05f;
 
 // Safe decoration margin
 static const float MARGIN  = 1.2f;
 static const float INNER_X = HALF_W - MARGIN;
 static const float INNER_Z = HALF_D - MARGIN;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole9E::addMesh(Mesh* m)
 {
@@ -100,10 +78,6 @@ void Hole9E::addTree(float x, float baseY, float z, float s)
     c2->setup(); addMesh(c2);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructor / Destructor
-// ─────────────────────────────────────────────────────────────────────────────
-
 Hole9E::Hole9E(float s)
     : meshCount(0), scale(s)
 {
@@ -128,24 +102,18 @@ Hole9E::~Hole9E()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFairway
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9E::buildFairway()
 {
-    // ── Grass fairway slab ────────────────────────────────────────────────────
     Mesh* fairway = new Mesh(Mesh::makeCuboid(HOLE_W, FH, HOLE_D,
                                                GR, GG, GB, 1.0f));
     fairway->translate(0.0f, FH * 0.5f, 0.0f);
     fairway->setup(); addMesh(fairway);
 
-    // ── Earth fill under the fairway ──────────────────────────────────────────
     Mesh* earth = new Mesh(Mesh::makeCuboid(HOLE_W, 0.5f, HOLE_D,
                                              MR, MG, MB, 1.0f));
     earth->translate(0.0f, -0.25f, 0.0f);
     earth->setup(); addMesh(earth);
 
-    // ── Border kerb walls ─────────────────────────────────────────────────────
     float wallXNeg = -HALF_W - BT * 0.5f;
     float wallXPos =  HALF_W + BT * 0.5f;
     float wallZNeg = -HALF_D - BT * 0.5f;
@@ -180,9 +148,6 @@ void Hole9E::buildFairway()
     bXNeg->setup(); addMesh(bXNeg);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildTunnel  —  tunnel mouth now at the +X end (mirrored)
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9E::buildTunnel()
 {
     Mesh* mouth = new Mesh(Mesh::makeTunnel(
@@ -197,9 +162,6 @@ void Hole9E::buildTunnel()
     mouth->setup(); addMesh(mouth);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildRocks
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9E::buildRocks()
 {
     // Central obstacle (X negated)
@@ -234,9 +196,6 @@ void Hole9E::buildRocks()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildTrees
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9E::buildTrees()
 {
     struct TreeDef { float x, z, s; };
@@ -258,9 +217,6 @@ void Hole9E::buildTrees()
         addTree(td.x, FH, td.z, td.s);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlowers
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9E::buildFlowers()
 {
     float baseY = FH;
@@ -281,10 +237,6 @@ void Hole9E::buildFlowers()
     for (auto& fd : flowers)
         addFlowerAt(fd.x, baseY, fd.z, fd.r, fd.g, fd.b);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Public interface
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole9E::translate(float x, float y, float z)
 {
@@ -313,4 +265,10 @@ void Hole9E::draw(GLuint shader, bool wireframe,
 
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shader, wireframe);
+}
+
+void Hole9E::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
 }

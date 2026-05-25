@@ -631,6 +631,12 @@ void Hole18::draw(GLuint shaderProgram, bool wireframe)
     if (waterLake2)   waterLake2->draw(camView, camProj, camPos);
 }
 
+void Hole18::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
+}
+
 // =============================================================================
 // Transforms — propagate to all meshes (water positions are baked into
 // modelMatrix so they don't get double-transformed here)

@@ -68,6 +68,12 @@ public:
     void cleanup();
     void buildWireVBO();
     void draw(GLuint shaderProgram, bool wireframe);
+    // ── Depth-only draw (shadow map pass) ─────────────────────────────────────
+    // Used during the shadow map depth pass. Uploads only `uModel` to the
+    // bound depth shader and issues a glDrawElements — no colours, no normals
+    // bound, no lighting uniforms. Caller is responsible for binding the
+    // depth shader program and uploading the light-space matrix.
+    void drawDepth(GLuint depthShader);
 
     // ── Transform helpers ─────────────────────────────────────────────────────
     void translate(float x, float y, float z);

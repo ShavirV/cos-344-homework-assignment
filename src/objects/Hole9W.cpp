@@ -1,16 +1,3 @@
-// Hole9W.cpp  —  Hole 9 West approach fairway
-// Dino Park Phuket
-//
-// STRICT FOOTPRINT: 28 (X) × 15 (Z), centred at local origin.
-//   X runs from -14 to +14
-//   Z runs from  -7.5 to +7.5
-//
-// LAYOUT:
-//   This is the approach side of Hole 9. The cup + flag sit on the +X end
-//   (the green). The tunnel entrance is on the -X end — players who hole
-//   out here are matched to the East-side exit (Hole9E) for continuity.
-//   Two rock obstacles break up the run between tee and green.
-
 #include "Hole9W.h"
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
@@ -32,10 +19,6 @@ static const float TUNNEL_R = 0.22f, TUNNEL_G = 0.14f, TUNNEL_B = 0.05f;
 static const float MARGIN  = 1.2f;
 static const float INNER_X = HALF_W - MARGIN;
 static const float INNER_Z = HALF_D - MARGIN;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole9W::addMesh(Mesh* m)
 {
@@ -92,10 +75,6 @@ void Hole9W::addTree(float x, float baseY, float z, float s)
     c2->setup(); addMesh(c2);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructor / Destructor
-// ─────────────────────────────────────────────────────────────────────────────
-
 Hole9W::Hole9W(float s)
     : meshCount(0), scale(s)
 {
@@ -119,9 +98,6 @@ Hole9W::~Hole9W()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFairway
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9W::buildFairway()
 {
     Mesh* fairway = new Mesh(Mesh::makeCuboid(HOLE_W, FH, HOLE_D,
@@ -167,9 +143,6 @@ void Hole9W::buildFairway()
     bXNeg_b->setup(); addMesh(bXNeg_b);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildTunnel  —  tunnel mouth now at the -X end (mirrored)
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9W::buildTunnel()
 {
     Mesh* mouth = new Mesh(Mesh::makeTunnel(
@@ -184,9 +157,6 @@ void Hole9W::buildTunnel()
     mouth->setup(); addMesh(mouth);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildRocks
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9W::buildRocks()
 {
     // Two central obstacles (X negated)
@@ -224,9 +194,6 @@ void Hole9W::buildRocks()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlag  —  cup + flagpole at the +X end (mirrored green)
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9W::buildFlag()
 {
     float flagX =  8.0f;
@@ -240,9 +207,6 @@ void Hole9W::buildFlag()
     addFlagAt(-flagX, FH, flagZ);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildTrees
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9W::buildTrees()
 {
     struct TreeDef { float x, z, s; };
@@ -264,9 +228,6 @@ void Hole9W::buildTrees()
         addTree(td.x, FH, td.z, td.s);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlowers
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole9W::buildFlowers()
 {
     float baseY = FH;
@@ -291,10 +252,6 @@ void Hole9W::buildFlowers()
     for (auto& fd : flowers)
         addFlowerAt(fd.x, baseY, fd.z, fd.r, fd.g, fd.b);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Public interface
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole9W::translate(float x, float y, float z)
 {
@@ -323,4 +280,10 @@ void Hole9W::draw(GLuint shader, bool wireframe,
 
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shader, wireframe);
+}
+
+void Hole9W::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
 }

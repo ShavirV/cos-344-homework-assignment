@@ -1,24 +1,3 @@
-// Hole7.h  —  Swamp Hazard Hole (Hole 7)
-// Dino Park Phuket — swamp & waterfall zone
-//
-// FOOTPRINT: 28 (X) × 15 (Z), matching all other holes exactly.
-// Pattern: raw pointer array, same as Hole5/Hole6.
-//
-// LOCAL LAYOUT (X in [-14,+14], Z in [-7.5,+7.5]):
-//
-//  Tee at -X end, cup/flag at +X end. Flat fairway at Y=0.
-//  A swamp pool (murky-green semi-transparent plane) surrounds the fairway
-//  on both Z sides, forcing the ball to stay on the narrow central path.
-//
-//  KEY FEATURES:
-//    • Flat narrow fairway strip through the swamp (width ≈ 6 units in Z)
-//    • Swamp pool: two murky-green semi-transparent panels flanking fairway
-//    • Swamp border mud banks (dark earth-tone raised strips)
-//    • Bone obstacle lying across the fairway mid-section
-//    • Rock formations clustering around the swamp edges
-//    • Trees and flowers at the dry ends
-//    • Cup + flag on +X end
-
 #pragma once
 #include "../core/Mesh.h"
 #include <glm/glm.hpp>
@@ -37,6 +16,7 @@ public:
               const glm::vec3& lightDir   = glm::vec3(0.45f, 0.80f, 0.35f),
               const glm::vec3& lightColor = glm::vec3(1.00f, 0.97f, 0.90f),
               const glm::vec3& camPos     = glm::vec3(0.0f));
+    void drawDepth(GLuint depthShader);
 
 private:
     Mesh* meshes[MAX_MESHES];

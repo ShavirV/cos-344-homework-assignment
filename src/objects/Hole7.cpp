@@ -1,52 +1,20 @@
-// Hole7.cpp  —  Swamp Hazard Hole (Hole 7)
-// Dino Park Phuket — swamp & waterfall zone (Holes 5–8)
-//
-// STRICT FOOTPRINT: 28 (X) × 15 (Z), centred at local origin.
-//   X runs from -14 to +14
-//   Z runs from  -7.5 to +7.5
-//
-// ELEVATION: Entirely flat at Y = 0.
-//
-// LAYOUT (left→right, -X→+X):
-//   Full-length fairway strip in the Z-centre, width = FAIRWAY_Z (6 units).
-//   Swamp panels fill the remaining Z area on both sides of the fairway.
-//   The fairway narrows slightly in the swamp zone (X in [-8, +8]) for challenge.
-//
-//   [-14,  -8]  Dry entry section — tee end, trees, rocks
-//   [ -8,  +8]  Swamp zone — narrow fairway + swamp pools flanking it
-//   [ +8, +14]  Dry exit section — cup/flag end, trees, rocks
-//
-// FEATURES (matching report Sections 2.1 & 5.3):
-//   • Full-length narrow fairway slab with slightly narrowed swamp section
-//   • Swamp pool: two murky-green semi-transparent panels (±Z of fairway)
-//   • Mud bank strips between fairway edge and swamp water
-//   • Bone obstacle lying across the fairway in the swamp zone
-//   • Rock clusters at the swamp perimeter
-//   • Trees at dry entry/exit ends
-//   • Flowers along inner borders
-//   • Cup + flag on +X exit end
-
 #include "Hole7.h"
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Dimension constants (local space)
-// ─────────────────────────────────────────────────────────────────────────────
 
 static const float HOLE_W  = 28.0f;
 static const float HOLE_D  = 15.0f;
 static const float HALF_W  = 14.0f;
 static const float HALF_D  = 7.5f;
 
-static const float FH  = 0.2f;    // fairway slab height
-static const float BT  = 0.5f;    // border wall thickness
-static const float BH  = 0.4f;    // border kerb height
+static const float FH  = 0.2f;  // fairway slab height
+static const float BT  = 0.5f;  // border wall thickness
+static const float BH  = 0.4f;  // border kerb height
 
 // Fairway widths
-static const float FW_DRY   = HOLE_D;       // full width on dry ends
-static const float FW_SWAMP = 6.0f;         // narrow path through swamp
-static const float FW_HALF  = FW_SWAMP * 0.5f;  // 3.0
+static const float FW_DRY   = HOLE_D;// full width on dry ends
+static const float FW_SWAMP = 6.0f;  // narrow path through swamp
+static const float FW_HALF  = FW_SWAMP * 0.5f; // 3.0
 
 // Dry end extents
 static const float DRY_X0 = -HALF_W;    // -14
@@ -54,18 +22,17 @@ static const float DRY_X1 = -8.0f;      // left dry section ends here
 static const float SWAMP_X0 = -8.0f;
 static const float SWAMP_X1 = +8.0f;
 static const float DRY_X2 = +8.0f;
-static const float DRY_X3 = +HALF_W;   // +14
+static const float DRY_X3 = +HALF_W; // +14
 
-static const float DRY_LEFT_W   = DRY_X1 - DRY_X0;    // 6
+static const float DRY_LEFT_W   = DRY_X1 - DRY_X0; // 6
 static const float SWAMP_ZONE_W = SWAMP_X1 - SWAMP_X0; // 16
-static const float DRY_RIGHT_W  = DRY_X3 - DRY_X2;    // 6
+static const float DRY_RIGHT_W  = DRY_X3 - DRY_X2; // 6
 
 static const float DRY_LEFT_CX   = DRY_X0  + DRY_LEFT_W   * 0.5f;  // -11
 static const float SWAMP_ZONE_CX = (SWAMP_X0 + SWAMP_X1)   * 0.5f;  //   0
 static const float DRY_RIGHT_CX  = DRY_X2  + DRY_RIGHT_W  * 0.5f;  // +11
 
-// Swamp pool: flanks the narrow fairway in the swamp zone
-// Fairway runs Z in [-FW_HALF, +FW_HALF], so swamp starts outside that
+
 static const float MUD_W    = 1.0f;    // mud bank width in Z (between fair & water)
 static const float SWAMP_Z0 = FW_HALF + MUD_W;   // inner edge of swamp water from Z=0
 static const float SWAMP_ZW = HALF_D - SWAMP_Z0; // swamp water extent in Z
@@ -75,7 +42,6 @@ static const float MARGIN  = 1.2f;
 static const float INNER_X = HALF_W - MARGIN;
 static const float INNER_Z = HALF_D - MARGIN;
 
-// ── Colours ───────────────────────────────────────────────────────────────────
 // Fairway — darkening as we go deeper into the swamp zone
 static const float GR = 0.10f, GG = 0.47f, GB = 0.13f;  // dry sections
 static const float SGR= 0.09f, SGG= 0.40f, SGB= 0.11f;  // swamp-side strip (darker)
@@ -95,9 +61,6 @@ static const float CR = 0.86f, CG = 0.86f, CB = 0.86f;
 // Bone — chalky off-white (matches Hole5 bone obstacle)
 static const float BR = 0.92f, BG = 0.90f, BB = 0.82f;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole7::addMesh(Mesh* m)
 {
@@ -155,10 +118,6 @@ void Hole7::addTree(float x, float baseY, float z, float scale)
     c2->setup(); addMesh(c2);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constructor / Destructor
-// ─────────────────────────────────────────────────────────────────────────────
-
 Hole7::Hole7() : meshCount(0)
 {
     for (int i = 0; i < MAX_MESHES; i++)
@@ -182,18 +141,8 @@ Hole7::~Hole7()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFairway
-// Three-section flat fairway:
-//   1. Left dry section  (full HOLE_D width)
-//   2. Narrow swamp path (FW_SWAMP width, centred in Z)
-//   3. Right dry section (full HOLE_D width)
-//
-// Border kerb walls go around the whole 28×15 footprint as usual.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole7::buildFairway()
 {
-    // ── Border kerb walls ─────────────────────────────────────────────────────
     float wallXNeg = -HALF_W - BT * 0.5f;
     float wallXPos =  HALF_W + BT * 0.5f;
     float wallZNeg = -HALF_D - BT * 0.5f;
@@ -217,7 +166,6 @@ void Hole7::buildFairway()
     bXPos->translate(wallXPos, BH * 0.5f, 0.0f);
     bXPos->setup(); addMesh(bXPos);
 
-    // ── Left dry section ──────────────────────────────────────────────────────
     Mesh* leftFW = new Mesh(Mesh::makeCuboid(DRY_LEFT_W, FH, FW_DRY,
                                               GR, GG, GB, 1.0f));
     leftFW->translate(DRY_LEFT_CX, FH * 0.5f, 0.0f);
@@ -229,7 +177,6 @@ void Hole7::buildFairway()
     leftEarth->translate(DRY_LEFT_CX, -0.25f, 0.0f);
     leftEarth->setup(); addMesh(leftEarth);
 
-    // ── Swamp zone — narrow fairway path (centred in Z) ───────────────────────
     Mesh* swampFW = new Mesh(Mesh::makeCuboid(SWAMP_ZONE_W, FH, FW_SWAMP,
                                                SGR, SGG, SGB, 1.0f));
     swampFW->translate(SWAMP_ZONE_CX, FH * 0.5f, 0.0f);
@@ -241,7 +188,6 @@ void Hole7::buildFairway()
     swampEarth->translate(SWAMP_ZONE_CX, -0.25f, 0.0f);
     swampEarth->setup(); addMesh(swampEarth);
 
-    // ── Right dry section ─────────────────────────────────────────────────────
     Mesh* rightFW = new Mesh(Mesh::makeCuboid(DRY_RIGHT_W, FH, FW_DRY,
                                                GR * 0.95f, GG * 0.95f, GB, 1.0f));
     rightFW->translate(DRY_RIGHT_CX, FH * 0.5f, 0.0f);
@@ -254,33 +200,14 @@ void Hole7::buildFairway()
     rightEarth->setup(); addMesh(rightEarth);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildSwamp
-// Swamp pool flanking the narrow fairway strip in the swamp zone.
-//
-// From the report (Section 2.1 obstacle 7):
-//   "A shallow swamp pool surrounds part of Hole 7's fairway, acting as an
-//    out-of-bounds marker. Rendered as a flat plane with a murky-green
-//    semi-transparent texture."
-//
-// Layout (for each ±Z side):
-//   [mud bank strip] [swamp water panel] — from fairway edge to border wall
-//
-// The swamp ONLY covers the swamp zone in X [-8, +8], matching the
-// narrow fairway section. Outside that (dry sections) the full-width
-// fairway already covers Z.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole7::buildSwamp()
 {
-    // Mud bank Z positions (between fairway edge and swamp water)
     float mudCZ_pos = FW_HALF + MUD_W * 0.5f;   //  +Z mud bank centre
     float mudCZ_neg = -(FW_HALF + MUD_W * 0.5f); // -Z mud bank centre
 
-    // Swamp water panel centre Z
     float swampCZ_pos =  SWAMP_Z0 + SWAMP_ZW * 0.5f;
     float swampCZ_neg = -(SWAMP_Z0 + SWAMP_ZW * 0.5f);
 
-    // ── Mud banks (each side) ─────────────────────────────────────────────────
     Mesh* mudPos = new Mesh(Mesh::makeCuboid(SWAMP_ZONE_W, FH * 0.6f, MUD_W,
                                               SMR, SMG, SMB, 1.0f));
     mudPos->translate(SWAMP_ZONE_CX, FH * 0.3f, mudCZ_pos);
@@ -291,8 +218,6 @@ void Hole7::buildSwamp()
     mudNeg->translate(SWAMP_ZONE_CX, FH * 0.3f, mudCZ_neg);
     mudNeg->setup(); addMesh(mudNeg);
 
-    // ── Swamp water panels — semi-transparent murky green ─────────────────────
-    // Water surface flush with / just above ground (Y = 0.06)
     Mesh* waterPos = new Mesh(Mesh::makeCuboid(SWAMP_ZONE_W, 0.10f, SWAMP_ZW,
                                                 SWR, SWG, SWB, SWA));
     waterPos->translate(SWAMP_ZONE_CX, 0.05f, swampCZ_pos);
@@ -303,7 +228,6 @@ void Hole7::buildSwamp()
     waterNeg->translate(SWAMP_ZONE_CX, 0.05f, swampCZ_neg);
     waterNeg->setup(); addMesh(waterNeg);
 
-    // ── Swamp bed (dark earth under the water panels, for visible depth) ──────
     Mesh* bedPos = new Mesh(Mesh::makeCuboid(SWAMP_ZONE_W, 0.25f, SWAMP_ZW,
                                               SMR * 0.7f, SMG * 0.6f,
                                               SMB * 0.5f, 1.0f));
@@ -316,8 +240,7 @@ void Hole7::buildSwamp()
     bedNeg->translate(SWAMP_ZONE_CX, -0.12f, swampCZ_neg);
     bedNeg->setup(); addMesh(bedNeg);
 
-    // ── Lily pad accents — small flat discs on the swamp surface ──────────────
-    // Simple thin cylinders to suggest aquatic vegetation
+    // Simple thin cylinders 
     struct LilyDef { float x, z; };
     LilyDef lilies[] = {
         { -5.0f,  swampCZ_pos - 0.4f },
@@ -337,13 +260,6 @@ void Hole7::buildSwamp()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildBoneObstacle
-// Oversized dinosaur bone lying across the narrow fairway path, mid swamp zone.
-// From the report (Section 2.1 obstacle 3):
-//   "Elongated cylinders...chalky appearance."
-// Bone runs in Z across the FW_SWAMP width.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole7::buildBoneObstacle()
 {
     float boneX  = SWAMP_ZONE_CX - 1.0f;   // slightly left of centre
@@ -369,11 +285,6 @@ void Hole7::buildBoneObstacle()
     j2->setup(); addMesh(j2);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildRocks
-// Clusters of boulders at the swamp perimeter and along the dry section borders.
-// The swamp edge rocks help define the boundary visually.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole7::buildRocks()
 {
     struct RockDef { float x, z, s; };
@@ -410,10 +321,6 @@ void Hole7::buildRocks()
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlag
-// Cup + flag on the right (exit) dry section.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole7::buildFlag()
 {
     float flagX = DRY_RIGHT_CX + 1.5f;  // toward +X end
@@ -427,11 +334,6 @@ void Hole7::buildFlag()
     addFlagAt(flagX, FH, flagZ);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildTrees
-// Trees confined to the dry entry and exit sections where there is full width.
-// Nothing in the swamp zone — the narrowness is the challenge.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole7::buildTrees()
 {
     struct TreeDef { float x, z, s; };
@@ -453,10 +355,6 @@ void Hole7::buildTrees()
         addTree(td.x, FH, td.z, td.s);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// buildFlowers
-// Flowers on the dry section inner borders only.
-// ─────────────────────────────────────────────────────────────────────────────
 void Hole7::buildFlowers()
 {
     float baseY = FH;
@@ -483,10 +381,6 @@ void Hole7::buildFlowers()
     for (auto& fd : flowers)
         addFlowerAt(fd.x, baseY, fd.z, fd.r, fd.g, fd.b);
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Public interface
-// ─────────────────────────────────────────────────────────────────────────────
 
 void Hole7::translate(float x, float y, float z)
 {
@@ -515,4 +409,10 @@ void Hole7::draw(GLuint shader, bool wireframe,
 
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shader, wireframe);
+}
+
+void Hole7::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
 }

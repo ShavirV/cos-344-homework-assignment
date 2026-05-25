@@ -294,6 +294,33 @@ void Mesh::draw(GLuint shaderProgram, bool wireframe)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// drawDepth — minimal depth-pass draw for shadow map generation
+//
+// Called during the shadow map's depth pre-pass. We only need to write
+// gl_Position (i.e. depth) to the framebuffer, so we skip every uniform
+// except the per-mesh model matrix. The caller is responsible for:
+//   - binding the depth shader program (glUseProgram)
+//   - uploading the light-space matrix (uniform "uLightSpaceMatrix")
+//   - binding the shadow framebuffer + setting the viewport
+// ─────────────────────────────────────────────────────────────────────────────
+void Mesh::drawDepth(GLuint depthShader)
+{
+    if (!buffersInitialized && vertexCount > 0)
+        setup();
+
+    if (vertexCount == 0 || indexCount == 0)
+        return;
+
+    GLint loc_uModel = glGetUniformLocation(depthShader, "uModel");
+    if (loc_uModel != -1)
+        glUniformMatrix4fv(loc_uModel, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+
+    glBindVertexArray(VAO);
+    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
+    glBindVertexArray(0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Transform helpers
 // ─────────────────────────────────────────────────────────────────────────────
 

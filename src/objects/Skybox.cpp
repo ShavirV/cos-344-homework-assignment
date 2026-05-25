@@ -135,17 +135,23 @@ void Skybox::draw(const glm::mat4& view, const glm::mat4& projection)
 
     // Skybox render state:
     //   - Depth test ON but write OFF (sky is always behind everything)
-    //   - Cull front faces (we're inside the sphere)
+    //   - Cull off while drawing (we're inside the sphere)
     //   - No blending needed
+    // IMPORTANT: capture the previous culling state and RESTORE it after the
+    // draw — do NOT blindly glEnable(GL_CULL_FACE), because dev.cpp leaves
+    // culling DISABLED globally (the hole/turf geometry uses mixed winding).
+    // Re-enabling it here was eating one face of every later-rendered object
+    // depending on viewing angle (e.g. the volcano losing its camera-facing side).
+    GLboolean wasCulling = glIsEnabled(GL_CULL_FACE);
     glDepthMask(GL_FALSE);
-    glDisable(GL_CULL_FACE);  // safer: no culling (we're inside sphere)
+    glDisable(GL_CULL_FACE);
 
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 
     glDepthMask(GL_TRUE);
-    glEnable(GL_CULL_FACE);
+    if (wasCulling) glEnable(GL_CULL_FACE);  // restore caller's culling state
 
     glUseProgram(0);
 }

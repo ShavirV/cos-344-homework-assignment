@@ -682,6 +682,12 @@ void Hole16::draw(GLuint shaderProgram, bool wireframe,
                         glm::normalize(lightDir), lightColor);
 }
 
+void Hole16::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
+}
+
 void Hole16::translate(float x, float y, float z)
 {
  glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));

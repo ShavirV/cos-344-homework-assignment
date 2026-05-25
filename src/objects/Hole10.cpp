@@ -5,20 +5,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Height function — drives the entire surface as one continuous terrain.
-//
-// nx : [0,1] normalised position along X (0=left end, 1=right end)
-// nz : [0,1] normalised position along Z (0=front, 1=back)
-//
-// The terrain is divided into three X bands:
-//   [0.00 – 0.38]  left flat section  y = HIGH
-//   [0.38 – 0.58]  ramp               y = lerp(HIGH, LOW, t)
-//   [0.58 – 1.00]  right flat section y = LOW
-//
-// A gentle crown (higher in the centre of Z) is added across the full surface
-// to give the fairway a slight camber.
-// ─────────────────────────────────────────────────────────────────────────────
 static float hole10Height(float nx, float nz, float s)
 {
     const float HIGH  = 4.0f   * s;
@@ -44,11 +30,6 @@ static float hole10Height(float nx, float nz, float s)
     return base + crown;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Width mask — controls how wide the fairway is at each X position.
-// Returns a half-width in Z world units (before scaling).
-// Left end: wide (8).  Ramp throat: narrow (4).  Right end: wide (7.5).
-// ─────────────────────────────────────────────────────────────────────────────
 static float hole10HalfWidth(float nx, float s)
 {
     // Left section tapers from 8 → 4 toward the ramp.
@@ -69,17 +50,12 @@ static float hole10HalfWidth(float nx, float s)
     return (5.0f + 2.5f * t) * s;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Hole10
-// ─────────────────────────────────────────────────────────────────────────────
-
 Hole10::Hole10(float scale)
     : meshCount(0), s(scale)
 {
     for (int i = 0; i < MAX_MESHES; i++)
         meshes[i] = nullptr;
 
-    // ── Main terrain surface ──────────────────────────────────────────────────
     const float TERRAIN_LEN = 48.0f * s;
     const float TERRAIN_WID = 18.0f * s;
     const int   SEGS_X      = 48;
@@ -109,22 +85,18 @@ Hole10::Hole10(float scale)
     terrain->setup();
     addMesh(terrain);
 
-    // ── Left-section rocks (mirrored) ────────────────────────────────────────
     addRock( 22.0f*s,  3.0f*s,   9.0f*s, 1.5f*s);
     addRock( 20.0f*s,  3.0f*s,  -9.0f*s, 1.5f*s);
     addRock( 18.0f*s,  3.0f*s,   7.0f*s, 1.3f*s);
     addRock( 16.0f*s,  3.0f*s,  -7.5f*s, 1.2f*s);
     addRock( 14.0f*s,  3.0f*s,  10.0f*s, 1.0f*s);
 
-    // ── Ramp-side rocks (mirrored) ────────────────────────────────────────────
     addRock(  4.0f*s,  1.5f*s,   6.0f*s, 1.0f*s);
     addRock(  2.0f*s,  1.5f*s,  -6.0f*s, 1.0f*s);
 
-    // ── Right-section rocks (mirrored) ───────────────────────────────────────
     addRock(-14.0f*s, -0.65f*s,  9.0f*s, 2.0f*s);
     addRock(-18.0f*s, -0.65f*s, -8.5f*s, 2.0f*s);
 
-    // ── Cup (mirrored) ────────────────────────────────────────────────────────
     Mesh* cup = new Mesh(Mesh::makeCylinder(
         0.8f*s, 0.15f*s, 32,
         0.08f, 0.08f, 0.08f, 1.0f));
@@ -132,7 +104,6 @@ Hole10::Hole10(float scale)
     cup->setup();
     addMesh(cup);
 
-    // ── Flag pole (mirrored) ──────────────────────────────────────────────────
     Mesh* pole = new Mesh(Mesh::makeCylinder(
         0.08f * s, 6.0f * s, 8,
         0.9f, 0.9f, 0.9f, 1.0f));
@@ -140,7 +111,6 @@ Hole10::Hole10(float scale)
     pole->setup();
     addMesh(pole);
 
-    // ── Flag (mirrored) ───────────────────────────────────────────────────────
     Mesh* flag1 = new Mesh(Mesh::makeCuboid(
         1.5f * s, 0.8f * s, 0.3f * s,
         1.0f, 0.1f, 0.1f, 1.0f));
@@ -148,7 +118,6 @@ Hole10::Hole10(float scale)
     flag1->setup();
     addMesh(flag1);
 
-    // ── Extra rocks (mirrored) ────────────────────────────────────────────────
     addRock( 17.0f*s, 4.35f*s,  1.0f*s, 1.8f*s);
     addRock( 17.0f*s, 4.35f*s,  4.0f*s, 1.8f*s);
 }
@@ -191,6 +160,12 @@ void Hole10::draw(GLuint shaderProgram, bool wireframe,
 
     for (int i = 0; i < meshCount; i++)
         meshes[i]->draw(shaderProgram, wireframe);
+}
+
+void Hole10::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
 }
 
 void Hole10::translate(float x, float y, float z)

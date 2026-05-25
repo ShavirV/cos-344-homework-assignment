@@ -855,6 +855,12 @@ void Hole17::draw(GLuint shaderProgram, bool wireframe)
         meshes[i]->draw(shaderProgram, wireframe);
 }
 
+void Hole17::drawDepth(GLuint depthShader)
+{
+    for (int i = 0; i < meshCount; i++)
+        if (meshes[i]) meshes[i]->drawDepth(depthShader);
+}
+
 void Hole17::translate(float x, float y, float z)
 {
     glm::mat4 T = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));

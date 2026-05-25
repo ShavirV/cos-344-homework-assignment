@@ -33,6 +33,9 @@
 //   F1 / F2 / F3 / F4                             switch hole (1/2/3/4)
 //   C              toggle FLY-CAMERA <-> DRONE
 //   R              re-frame the active controller on the current hole
+//   B              toggle the volcano landmark on/off
+//   N              toggle the T-rex landmark on/off
+//   G              toggle the Brachiosaurus landmark on/off
 //
 //   Fly-camera (default):
 //     W / S        fly forward / back
@@ -97,8 +100,35 @@
 #include "../objects/Hole2.h"
 #include "../objects/Hole3.h"
 #include "../objects/Hole4.h"
+// Holes 17 / 18 — same Mesh-based pattern. Hole17 is the cave; Hole18 is
+// the S-shaped river hole with animated water (uses WaterMesh internally,
+// like Hole16).
+#include "../objects/Hole17.h"
+#include "../objects/Hole18.h"
+// Hole 9 — split into West approach (with cup/flag + tunnel entry) and
+// East exit (tunnel mouth + run-out fairway). Both follow the Mesh-based
+// pattern of Holes 5–8.
+#include "../objects/Hole9W.h"
+#include "../objects/Hole9E.h"
 
 #include "../camera/Drone.h"
+
+// Volcano — header-only decorative obstacle modelled in Blender, baked into
+// volcano_mesh.h as raw vertex/index arrays. Rendered with its OWN shader
+// pair so the lava streaks shade as emissive instead of being repainted by
+// the hole/turf classifier in fragment.glsl. Toggled per-hole via the B key.
+#include "../objects/Volcano.hpp"
+
+// T-rex — same pattern as the volcano. Detailed reptilian decoration baked
+// into trex_mesh.h. Its own shader pair handles the green-skin/teeth/claws
+// vertex colours without going through the hole turf classifier (which
+// would mistakenly treat the green skin as turf). Toggled via the N key.
+#include "../objects/Trex.hpp"
+
+// Brachiosaurus — same pipeline. Long-necked sauropod landmark for the
+// "lost-world" backdrop. Dedicated shader because its earthy skin would
+// also get misclassified by fragment.glsl. Toggled via the G key.
+#include "../objects/Brachio.hpp"
 
 
 // -----------------------------------------------------------------------------
@@ -114,6 +144,23 @@ static const char* VERTEX_PATH       = "src/shaders/vertex.glsl";
 static const char* FRAGMENT_PATH     = "src/shaders/fragment.glsl";
 static const char* SKYBOX_VERT_PATH  = "src/shaders/skybox.vert";
 static const char* SKYBOX_FRAG_PATH  = "src/shaders/skybox.frag";
+// Volcano runs on its OWN shader pair, separate from the hole/turf shader.
+// The hole shader's fragment.glsl is built around the procedural turf/kerb
+// classifier (it picks a material from per-mesh r/g/b), which would silently
+// repaint the volcano's rock + lava colours. Volcano keeps a dedicated
+// Phong+emissive shader so the lava actually glows.
+static const char* VOLCANO_VERT_PATH = "src/shaders/volcano.vert";
+static const char* VOLCANO_FRAG_PATH = "src/shaders/volcano.frag";
+// T-rex shader pair. Same reasoning as the volcano: its baked-in green skin
+// would get repainted by the hole shader's turf classifier (greens get the
+// procedural turf treatment), and its teeth/claws/eyes need a different
+// specular profile. Dedicated trex.vert/trex.frag keeps it correct.
+static const char* TREX_VERT_PATH    = "src/shaders/trex.vert";
+static const char* TREX_FRAG_PATH    = "src/shaders/trex.frag";
+// Brachiosaurus shader pair. Earthy sauropod skin + dark nails; same
+// lightDir convention as fragment.glsl.
+static const char* BRACHIO_VERT_PATH = "src/shaders/brachio.vert";
+static const char* BRACHIO_FRAG_PATH = "src/shaders/brachio.frag";
 
 // Read an entire file into a std::string. Uses C stdio so we only depend on
 // headers the assignment spec explicitly allows (<stdio.h>, <sstream>).
@@ -270,7 +317,34 @@ static Hole1*  g_h1  = NULL;
 static Hole2*  g_h2  = NULL;
 static Hole3*  g_h3  = NULL;
 static Hole4*  g_h4  = NULL;
+// Holes 17 / 18 — same Mesh-based pattern. Hole18 has water like Hole16.
+static Hole17* g_h17 = NULL;
+static Hole18* g_h18 = NULL;
+// Hole 9 — split West / East halves.
+static Hole9W* g_h9W = NULL;
+static Hole9E* g_h9E = NULL;
 static Skybox  g_skybox;
+
+// Volcano decoration. One instance shared across every hole; B toggles its
+// visibility. g_volcanoProgram is the dedicated Phong+emissive shader pair
+// loaded from volcano.vert / volcano.frag in main(). The volcano is placed
+// at a fixed offset behind/right of the active hole's centre so it shows up
+// as a far-background landmark rather than blocking the fairway.
+static Volcano g_volcano;
+static GLuint  g_volcanoProgram = 0;
+static bool    g_showVolcano    = true;
+
+// T-rex decoration. Same pattern as the volcano. Dedicated shader program
+// so the skin/teeth/claws colours render with the right Phong tweaks
+// instead of being misclassified as turf. Toggled via the N key.
+static Trex    g_trex;
+static GLuint  g_trexProgram = 0;
+static bool    g_showTrex    = true;
+
+// Brachiosaurus decoration. Same pattern. Toggled via the G key.
+static Brachio g_brachio;
+static GLuint  g_brachioProgram = 0;
+static bool    g_showBrachio    = true;
 
 static void frameCurrent() {
     glm::vec3 c(0.0f); float r = 50.0f;
@@ -302,6 +376,19 @@ static void frameCurrent() {
     if (g_activeHole == 3  && g_h3)  { c = glm::vec3(  0.0f, 2.0f,   0.0f); r = 22.0f; }
     // Hole4 (windmill) is on a raised hill; frame a bit higher and wider.
     if (g_activeHole == 4  && g_h4)  { c = glm::vec3(  0.0f, 3.0f,   0.0f); r = 26.0f; }
+    // Hole 17 — cave hole running along +X. Geometry sits between x≈0
+    // (tee) and x≈28 (green). Centre at the cave's midpoint with enough
+    // radius to fit the rock dome on top.
+    if (g_activeHole == 17 && g_h17) { c = glm::vec3( 14.0f, 1.0f,   0.0f); r = 24.0f; }
+    // Hole 18 — S-shaped river hole. Tee at (13, ?, 0), green at (12, ?, 40)
+    // so the bounding box centre is roughly (12, 0, 20); a 28 m radius
+    // shows both curves and the lake on the right.
+    if (g_activeHole == 18 && g_h18) { c = glm::vec3( 12.0f, 1.0f,  20.0f); r = 28.0f; }
+    // Hole 9 — West (approach + cup/flag/tunnel-entry) and East (tunnel-exit
+    // + run-out). Both 28×15, built at the local origin. We position them
+    // side-by-side along X (W on -X side, E on +X side) with a small gap.
+    if (g_activeHole == 91 && g_h9W) { c = glm::vec3(-15.0f, 0.5f,   0.0f); r = 22.0f; }
+    if (g_activeHole == 92 && g_h9E) { c = glm::vec3( 15.0f, 0.5f,   0.0f); r = 22.0f; }
     g_cam.frameOn(c, r);
     g_drone.frameOn(c, r);   // also reframe the drone so R works in either mode
 }
@@ -334,6 +421,14 @@ static void key_cb(GLFWwindow* w, int key, int /*sc*/, int action, int /*mods*/)
     if (key == GLFW_KEY_F2) { g_activeHole = 2; g_needFrame = true; }
     if (key == GLFW_KEY_F3) { g_activeHole = 3; g_needFrame = true; }
     if (key == GLFW_KEY_F4) { g_activeHole = 4; g_needFrame = true; }
+    // Holes 17 / 18 on the bracket keys [ and ] — physically adjacent on
+    // the keyboard so they're easy to remember as "the last two".
+    if (key == GLFW_KEY_LEFT_BRACKET)  { g_activeHole = 17; g_needFrame = true; }
+    if (key == GLFW_KEY_RIGHT_BRACKET) { g_activeHole = 18; g_needFrame = true; }
+    // Hole 9 — semicolon = West half (approach + flag), apostrophe = East
+    // half (tunnel exit). Adjacent keys to mirror the two halves of the hole.
+    if (key == GLFW_KEY_SEMICOLON)  { g_activeHole = 91; g_needFrame = true; }
+    if (key == GLFW_KEY_APOSTROPHE) { g_activeHole = 92; g_needFrame = true; }
     if (key == GLFW_KEY_R) g_needFrame = true;
     if (key == GLFW_KEY_TAB) {
         g_wireframe = !g_wireframe;
@@ -345,6 +440,29 @@ static void key_cb(GLFWwindow* w, int key, int /*sc*/, int action, int /*mods*/)
                          g_mouseLook ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
         g_firstMouse = true;
     }
+    // ── B: toggle the volcano landmark on/off ────────────────────────────────
+    // Not bound to V (drone 1st/3rd-person) or Z (drone zoom) to avoid
+    // clashing with the drone's existing controls. B is otherwise unused.
+    if (key == GLFW_KEY_B) {
+        g_showVolcano = !g_showVolcano;
+        std::cout << "Volcano: " << (g_showVolcano ? "ON" : "OFF") << std::endl;
+    }
+
+    // ── N: toggle the T-rex landmark on/off ──────────────────────────────────
+    // Picked N because every other letter row near here is taken: C drone
+    // toggle, V drone view, B volcano, M mouse, R reframe. N has no clash.
+    if (key == GLFW_KEY_N) {
+        g_showTrex = !g_showTrex;
+        std::cout << "T-rex: " << (g_showTrex ? "ON" : "OFF") << std::endl;
+    }
+
+    // ── G: toggle the brachiosaurus landmark on/off ──────────────────────────
+    // G for "giant" / "grazer". Free key.
+    if (key == GLFW_KEY_G) {
+        g_showBrachio = !g_showBrachio;
+        std::cout << "Brachiosaurus: " << (g_showBrachio ? "ON" : "OFF") << std::endl;
+    }
+
     // ── C: toggle fly-camera ↔ drone mode ────────────────────────────────────
     if (key == GLFW_KEY_C) {
         g_useDrone = !g_useDrone;
@@ -410,9 +528,7 @@ int main() {
     GLFWwindow* win = glfwCreateWindow(g_winW, g_winH,
         "COS344 - Holes 13/14/15 (1/2/3 select, C toggle drone, R reframe)", NULL, NULL);
     if (!win) {
-        const char* desc;
-        glfwGetError(&desc);
-        std::cerr << "Window creation failed\n" << desc;
+        std::cerr << "Window creation failed\n";
         glfwTerminate(); return 1;
     }
     glfwMakeContextCurrent(win);
@@ -439,6 +555,36 @@ int main() {
 
     GLuint program = buildProgramFromFiles(VERTEX_PATH, FRAGMENT_PATH);
     // (Removed g_meshProgram - Hole16's Mesh class now binds the SAME shader
+
+    // Dedicated volcano shader. Reused for every hole because the volcano is
+    // a shared decoration. If the source files are missing, buildProgramFromFiles
+    // returns 0 and we just skip volcano rendering (volcano stays invisible).
+    g_volcanoProgram = buildProgramFromFiles(VOLCANO_VERT_PATH, VOLCANO_FRAG_PATH);
+    if (g_volcanoProgram == 0) {
+        std::cerr << "Volcano shader failed to build — volcano will not render." << std::endl;
+        g_showVolcano = false;
+    } else {
+        g_volcano.init();
+    }
+
+    // Dedicated T-rex shader. Same fail-soft pattern as the volcano.
+    g_trexProgram = buildProgramFromFiles(TREX_VERT_PATH, TREX_FRAG_PATH);
+    if (g_trexProgram == 0) {
+        std::cerr << "T-rex shader failed to build — T-rex will not render." << std::endl;
+        g_showTrex = false;
+    } else {
+        g_trex.init();
+    }
+
+    // Dedicated Brachiosaurus shader.
+    g_brachioProgram = buildProgramFromFiles(BRACHIO_VERT_PATH, BRACHIO_FRAG_PATH);
+    if (g_brachioProgram == 0) {
+        std::cerr << "Brachio shader failed to build — Brachio will not render." << std::endl;
+        g_showBrachio = false;
+    } else {
+        g_brachio.init();
+    }
+    // (Removed g_meshProgram — Hole16's Mesh class now binds the SAME shader
     // as Hole13/14/15 and the Drone. The Mesh::draw method sets uModel +
     // uNormalMat directly, and feeds the per-mesh r/g/b through a constant
     // vertex attribute at slot 2 so the shader's turf/kerb material
@@ -481,6 +627,18 @@ int main() {
     Hole4 hole4;  g_h4 = &hole4;
 
     // Drone shares the same shader program - it uses the same vertex layout
+    // Holes 17 / 18 — same Mesh-based pattern. Hole17 (cave) lives at the
+    // origin per its local coords (tee x=0, green x=28). Hole18 (S-river)
+    // also at origin (tee at x=13, z=0; green at x=12, z=40).
+    Hole17 hole17;  g_h17 = &hole17;
+    Hole18 hole18;  g_h18 = &hole18;
+
+    // Hole 9 — split halves. Place West (with flag) on -X side and East
+    // (tunnel exit) on +X side so they read as a continuous tunnel link.
+    Hole9W hole9W;  g_h9W = &hole9W;  hole9W.translate(-15.0f, 0.35f, 0.0f);
+    Hole9E hole9E;  g_h9E = &hole9E;  hole9E.translate( 15.0f, 0.35f, 0.0f);
+
+    // Drone shares the same shader program — it uses the same vertex layout
     // (pos / normal / colour) as the holes, so all uniforms line up.
     g_drone.init(program);
 
@@ -499,8 +657,14 @@ int main() {
     std::cout
         << "Controls:\n"
         << "  1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 0 / -   select Hole 13/14/15/16/5/6/7/8/10/11/12\n"
+        << "  F1 / F2 / F3 / F4                          select Hole 1/2/3/4\n"
+        << "  [  / ]                                     select Hole 17 / 18\n"
+        << "  ;  / '                                     select Hole 9 West / East\n"
         << "  C              toggle FLY-CAMERA <-> DRONE mode\n"
         << "  R              reframe view on current hole\n"
+        << "  B              toggle the volcano landmark on/off\n"
+        << "  N              toggle the T-rex landmark on/off\n"
+        << "  G              toggle the Brachiosaurus landmark on/off\n"
         << "  Fly-camera (default):\n"
         << "    W/S/A/D      forward / back / strafe left / right\n"
         << "    Space/LShift ascend / descend\n"
@@ -671,7 +835,134 @@ int main() {
             case 3: hole3.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
             case 4: hole4.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
 
+            // Hole 17 — cave hole. Plain Mesh-based draw (no water).
+            case 17: hole17.draw(program, g_wireframe); break;
+
+            // Hole 9 — same draw signature as Holes 5–8 (forward the
+            // skybox-driven light direction, colour, and eye position).
+            case 91: hole9W.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
+            case 92: hole9E.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
+
+            // Hole 18 — S-river hole. Has an animated WaterMesh just like
+            // Hole 16, so hand it the camera + dt before drawing.
+            case 18: {
+                g_h18->setCameraData(view, proj, eyePos);
+                g_h18->update(dt);
+                g_h18->draw(program, g_wireframe);
+                break;
+            }
+
             default: hole13.draw(view, proj, lightDir, eyePos); break;
+        }
+
+        // ── Volcano landmark ────────────────────────────────────────────────
+        // Drawn AFTER the holes but BEFORE the drone so the drone body still
+        // sits in front when you fly past. The volcano has its own shader
+        // program (Phong rock + emissive lava with flicker), so we save +
+        // restore minimal state: just swap programs and let it do its thing.
+        // It's anchored at a fixed offset from the world origin — far enough
+        // back that it reads as a background landmark on every hole. Pick
+        // your own placement here (or move it per-hole) when you wire it
+        // into the final golf-course layout.
+        if (g_showVolcano && g_volcanoProgram != 0) {
+            glUseProgram(g_volcanoProgram);
+            GLint vLocModel    = glGetUniformLocation(g_volcanoProgram, "model");
+            GLint vLocView     = glGetUniformLocation(g_volcanoProgram, "view");
+            GLint vLocProj     = glGetUniformLocation(g_volcanoProgram, "projection");
+            GLint vLocEye      = glGetUniformLocation(g_volcanoProgram, "viewPos");
+            GLint vLocLightDir = glGetUniformLocation(g_volcanoProgram, "lightDir");
+            GLint vLocLightCol = glGetUniformLocation(g_volcanoProgram, "lightColor");
+            GLint vLocAmbient  = glGetUniformLocation(g_volcanoProgram, "ambientColor");
+            GLint vLocTime     = glGetUniformLocation(g_volcanoProgram, "time");
+
+            if (vLocView     != -1) glUniformMatrix4fv(vLocView, 1, GL_FALSE, glm::value_ptr(view));
+            if (vLocProj     != -1) glUniformMatrix4fv(vLocProj, 1, GL_FALSE, glm::value_ptr(proj));
+            if (vLocEye      != -1) glUniform3fv(vLocEye, 1, glm::value_ptr(eyePos));
+            // volcano.frag now uses the SAME light-direction convention as
+            // fragment.glsl: `lightDir` points FROM surface TOWARD the light,
+            // which is exactly what the skybox sun/moon position gives us.
+            // No sign flip needed.
+            if (vLocLightDir != -1) glUniform3fv(vLocLightDir, 1, glm::value_ptr(lightDir));
+            if (vLocLightCol != -1) glUniform3fv(vLocLightCol, 1, glm::value_ptr(lightColor));
+            if (vLocAmbient  != -1) glUniform3fv(vLocAmbient, 1, glm::value_ptr(ambient));
+            if (vLocTime     != -1) glUniform1f (vLocTime, (float)now);
+
+            // Place the volcano as a background landmark. Behind the holes
+            // (+Z direction, since the fly-camera starts at -40 looking +Z)
+            // and slightly off to the side. Scale = 2.0 so it reads as a
+            // proper mountain (base radius ~12 m, height ~24 m).
+            glm::vec3 volcanoPos(35.0f, 0.0f, 70.0f);
+            float     volcanoScale = 2.0f;
+            g_volcano.draw(vLocModel, volcanoPos, volcanoScale);
+        }
+
+        // ── T-rex landmark ─────────────────────────────────────────────────
+        // Same render pattern as the volcano: swap to the T-rex program,
+        // set its uniforms (the skybox-driven sun direction + day/night
+        // colours), then draw. trex.frag uses the SAME lightDir convention
+        // as fragment.glsl ("from surface toward light"), so we pass the
+        // hole-shader's lightDir unchanged — no sign flip.
+        if (g_showTrex && g_trexProgram != 0) {
+            glUseProgram(g_trexProgram);
+            GLint tLocModel    = glGetUniformLocation(g_trexProgram, "model");
+            GLint tLocView     = glGetUniformLocation(g_trexProgram, "view");
+            GLint tLocProj     = glGetUniformLocation(g_trexProgram, "projection");
+            GLint tLocEye      = glGetUniformLocation(g_trexProgram, "viewPos");
+            GLint tLocLightDir = glGetUniformLocation(g_trexProgram, "lightDir");
+            GLint tLocLightCol = glGetUniformLocation(g_trexProgram, "lightColor");
+            GLint tLocAmbient  = glGetUniformLocation(g_trexProgram, "ambientColor");
+
+            if (tLocView     != -1) glUniformMatrix4fv(tLocView, 1, GL_FALSE, glm::value_ptr(view));
+            if (tLocProj     != -1) glUniformMatrix4fv(tLocProj, 1, GL_FALSE, glm::value_ptr(proj));
+            if (tLocEye      != -1) glUniform3fv(tLocEye, 1, glm::value_ptr(eyePos));
+            if (tLocLightDir != -1) glUniform3fv(tLocLightDir, 1, glm::value_ptr(lightDir));
+            if (tLocLightCol != -1) glUniform3fv(tLocLightCol, 1, glm::value_ptr(lightColor));
+            if (tLocAmbient  != -1) glUniform3fv(tLocAmbient, 1, glm::value_ptr(ambient));
+
+            // Place the T-rex on the course. Sits in front-left of the
+            // volcano so the two read as a "lost-world" backdrop together.
+            // Scale = 0.45 turns the 12.5 m raw model into a ~5.6 m
+            // decoration (still tall enough to be a clear landmark, not
+            // so large it dominates the camera).
+            // yaw = -110° rotates it to face slightly inward toward the
+            // course, so its roaring head is angled at the player rather
+            // than off into the distance.
+            glm::vec3 trexPos(15.0f, 0.0f, 55.0f);
+            float     trexScale = 0.45f;
+            float     trexYaw   = glm::radians(-110.0f);
+            g_trex.draw(tLocModel, trexPos, trexScale, trexYaw);
+        }
+
+        // ── Brachiosaurus landmark ─────────────────────────────────────────
+        // Same render pattern as the T-rex. Placed on the opposite side of
+        // the course from the T-rex so the two read as separate creatures
+        // rather than facing off. Smaller scale than its raw 13 m frame
+        // because it's already very tall; ~0.35 brings it to about 4.6 m
+        // tall — roughly the same visual weight as the T-rex.
+        if (g_showBrachio && g_brachioProgram != 0) {
+            glUseProgram(g_brachioProgram);
+            GLint bLocModel    = glGetUniformLocation(g_brachioProgram, "model");
+            GLint bLocView     = glGetUniformLocation(g_brachioProgram, "view");
+            GLint bLocProj     = glGetUniformLocation(g_brachioProgram, "projection");
+            GLint bLocEye      = glGetUniformLocation(g_brachioProgram, "viewPos");
+            GLint bLocLightDir = glGetUniformLocation(g_brachioProgram, "lightDir");
+            GLint bLocLightCol = glGetUniformLocation(g_brachioProgram, "lightColor");
+            GLint bLocAmbient  = glGetUniformLocation(g_brachioProgram, "ambientColor");
+
+            if (bLocView     != -1) glUniformMatrix4fv(bLocView, 1, GL_FALSE, glm::value_ptr(view));
+            if (bLocProj     != -1) glUniformMatrix4fv(bLocProj, 1, GL_FALSE, glm::value_ptr(proj));
+            if (bLocEye      != -1) glUniform3fv(bLocEye, 1, glm::value_ptr(eyePos));
+            if (bLocLightDir != -1) glUniform3fv(bLocLightDir, 1, glm::value_ptr(lightDir));
+            if (bLocLightCol != -1) glUniform3fv(bLocLightCol, 1, glm::value_ptr(lightColor));
+            if (bLocAmbient  != -1) glUniform3fv(bLocAmbient, 1, glm::value_ptr(ambient));
+
+            // Place it on the opposite side of the volcano from the T-rex,
+            // facing roughly across the course toward the holes. Scale 0.35
+            // gives a tall but not overwhelming landmark (~4.6 m tall).
+            glm::vec3 brachioPos(-25.0f, 0.0f, 60.0f);
+            float     brachioScale = 0.35f;
+            float     brachioYaw   = glm::radians(80.0f);
+            g_brachio.draw(bLocModel, brachioPos, brachioScale, brachioYaw);
         }
 
         // Draw the drone body LAST so it overlays the hole correctly. It
@@ -717,6 +1008,12 @@ int main() {
     // Hole16 cleans itself up in its destructor (Mesh* meshes are deleted
     // there). No explicit cleanup() call needed.
     g_drone.cleanup();
+    g_volcano.cleanup();
+    if (g_volcanoProgram != 0) glDeleteProgram(g_volcanoProgram);
+    g_trex.cleanup();
+    if (g_trexProgram != 0) glDeleteProgram(g_trexProgram);
+    g_brachio.cleanup();
+    if (g_brachioProgram != 0) glDeleteProgram(g_brachioProgram);
     glDeleteProgram(program);
     glfwTerminate();
     return 0;

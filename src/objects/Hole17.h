@@ -77,6 +77,7 @@ public:
     Hole17& operator=(const Hole17&) = delete;
 
     void draw     (GLuint shaderProgram, bool wireframe = false);
+    void drawDepth(GLuint depthShader);
     void translate(float x, float y, float z);
     void rotate   (float angle, float ax, float ay, float az);
     void scale    (float sx, float sy, float sz);

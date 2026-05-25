@@ -1,5 +1,4 @@
 #version 330 core
-
 // =============================================================================
 // vertex.glsl
 // Standard pass-through vertex shader used by all hole geometry and the
@@ -20,9 +19,12 @@ uniform mat4 projection;
 uniform mat4 uModel;
 uniform mat3 uNormalMat;
 
+uniform mat4 uLightSpaceMatrix;
+
 out vec3 vWorldPos;
 out vec3 vNormal;
 out vec3 vColor;
+out vec4 vLightSpacePos;
 
 void main()
 {
@@ -30,5 +32,6 @@ void main()
     vWorldPos = wp.xyz;
     vNormal   = normalize(uNormalMat * aNormal);
     vColor    = aColor;
+    vLightSpacePos = uLightSpaceMatrix * wp;
     gl_Position = projection * view * vec4(wp.xyz, 1.0);
 }
