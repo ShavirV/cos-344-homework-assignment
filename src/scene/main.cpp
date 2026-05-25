@@ -180,11 +180,27 @@ int main()
     h10.translate(80.0f, 0.35f, -10.0f);
 
     Hole11 h11;
-    h11.translate(120.0f, 0.35f, -20.0f);
-    
+    h11.translate(110.0f, 0.35f, 20.0f);
 
+    Hole12 h12;
+    h12.translate(150.0f, 0.35f, 25.0f);
+
+    
     Hole13 h13;
     h13.init(shader);
+
+    Hole14 h14;
+    h14.init(shader);
+
+    Hole15 h15;
+    h15.init(shader);
+
+    Hole16 h16;
+    h16.translate(80.0f, 0.35f, 50.0f);
+
+    Hole17 h17;
+    h17.translate(120.0f, 0.35f, 50.0f);
+
 
     Hole18 h18;
     h18.translate(0.0f, 10.0f, 0.0f);
@@ -278,15 +294,35 @@ int main()
         glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
         cameraPos);                                     //camera position
 
+        h12.draw(shader, false,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // light direction
+        glm::vec3(1.0f, 0.95f, 0.85f),                 // light colour
+        cameraPos);                                     //camera position
 
-        // h13.draw(view, projection,
-        //  glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
-        //  cameraPos);   
+        h13.draw(view, projection,
+         glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
+         cameraPos); 
+         
+         h14.draw(view, projection,
+         glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
+         cameraPos); 
+         
+        h15.draw(view, projection,
+         glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
+         cameraPos);   
+
 
          static double lastTime = glfwGetTime();
         double now      = glfwGetTime();
         float deltaTime = (float)(now - lastTime);
         lastTime = now;
+
+        h16.update(deltaTime);
+        h16.setCameraData(view, projection, cameraPos);
+        h16.draw(shader, false);
+
+        h17.draw(shader, false);
+
 
         h18.update(deltaTime);
         h18.setCameraData(view, projection, cameraPos);

@@ -823,7 +823,7 @@ void Hole13::draw(const glm::mat4& view,
     // in world space). uModel + uNormalMat are the only matrices THIS hole
     // owns; view and projection are program-wide uniforms set by dev.cpp
     // once per frame, before any hole's draw() is called.
-glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(80.0f, 0.35f, 15.0f));
+glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(160.0f, 0.35f, 5.0f));
     glm::mat3 nrmM  = glm::mat3(glm::transpose(glm::inverse(model)));
 
     if (mLocModel      != -1) glUniformMatrix4fv(mLocModel,     1, GL_FALSE, glm::value_ptr(model));

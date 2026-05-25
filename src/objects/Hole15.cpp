@@ -34,25 +34,25 @@
 static constexpr float PI = 3.14159265358979f;
 
 // Mantle (head ellipse)
-static constexpr float MANTLE_RX   = 3.0f;   // half-width  (X)
-static constexpr float MANTLE_RZ   = 2.2f;   // half-depth  (Z)
+static constexpr float MANTLE_RX   = 12.0f;  // half-width  (X)   — was 3.0f
+static constexpr float MANTLE_RZ   = 8.8f;   // half-depth  (Z)   — was 2.2f
 static constexpr int   MANTLE_SEGS = 64;
-static constexpr float SLAB_THICK  = 0.18f;
+static constexpr float SLAB_THICK  = 0.72f;  // was 0.18f
 
 // Corridors (tee on right, cup on left)
-static constexpr float CORR_HALF_W = 0.65f;  // half-width of corridor
-static constexpr float CORR_LENGTH = 2.2f;   // how far they stick out from ellipse edge
+static constexpr float CORR_HALF_W = 2.6f;   // half-width of corridor — was 0.65f
+static constexpr float CORR_LENGTH = 8.8f;   // how far they stick out — was 2.2f
 
 // Kerbs
-static constexpr float KERB_H = 0.12f;
-static constexpr float KERB_T = 0.12f;
+static constexpr float KERB_H = 0.48f;       // was 0.12f
+static constexpr float KERB_T = 0.48f;       // was 0.12f
 
 // Cup
-static constexpr float CUP_HALF = 0.22f;
+static constexpr float CUP_HALF = 0.88f;     // was 0.22f
 
 // Flag
-static constexpr float FLAG_POLE_H = 1.2f;
-static constexpr float FLAG_POLE_R = 0.035f;
+static constexpr float FLAG_POLE_H = 4.8f;   // was 1.2f
+static constexpr float FLAG_POLE_R = 0.14f;  // was 0.035f
 
 // =============================================================================
 // Colours
@@ -424,9 +424,9 @@ void Hole15::init(GLuint shaderProgram)
                  {1,0,0}, COL_KERB_SIDE);
 
         // ----- Tee patch (dark green box near the far end) -----
-        float teeX = xFar - 0.4f;
-        buildBox({ teeX - 0.3f, y1, -hw + 0.05f },
-                 { teeX + 0.3f, y1 + 0.01f, hw - 0.05f }, COL_TEE);
+        float teeX = xFar - 1.6f;
+        buildBox({ teeX - 1.2f, y1, -hw + 0.2f },
+                 { teeX + 1.2f, y1 + 0.01f, hw - 0.2f }, COL_TEE);
     }
 
     // =========================================================================
@@ -488,7 +488,7 @@ void Hole15::init(GLuint shaderProgram)
                  {-1,0,0}, COL_KERB_SIDE);
 
         // ----- Cup + flag at the far end of left corridor -----
-        glm::vec3 cupPos { xFar + 0.35f, 0.0f, 0.0f };
+        glm::vec3 cupPos { xFar + 1.4f, 0.0f, 0.0f };
         buildCup(cupPos, COL_CUP);
         buildFlag(cupPos + glm::vec3(0, 0.01f, 0),
                   FLAG_POLE_H, FLAG_POLE_R, COL_POLE, COL_FLAG);
@@ -496,7 +496,6 @@ void Hole15::init(GLuint shaderProgram)
 
     // =========================================================================
     // 5. UPLOAD TO GPU
-    // =========================================================================
     // =========================================================================
     glGenVertexArrays(1, &mVAO);
     glGenBuffers(1, &mVBO);
@@ -560,7 +559,7 @@ void Hole15::draw(const glm::mat4& view,
 {
     if (!mInitialised) return;
 
-    glm::mat4 model     = glm::mat4(1.0f);
+    glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(130.0f, 0.35f, -35.0f));
     glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
 
     glUseProgram(mProgram);
