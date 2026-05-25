@@ -268,6 +268,26 @@ int main()
     GLint locShadowMap     = glGetUniformLocation(shader, "uShadowMap");
     GLint locHasShadowMap  = glGetUniformLocation(shader, "uHasShadowMap");
 
+    // ── Volcano point light (a 2nd light source, not just ambient) ──────────
+    // The position sits just above the crater rim so the warm glow reaches the
+    // ground and nearby holes / dinosaurs. The light colour is a saturated
+    // orange — multiplied here by an intensity scalar so the wattage is easy
+    // to tweak without recolouring. Attenuation is in the shaders.
+    const glm::vec3 VOLCANO_LIGHT_POS   = VOLCANO_POS + glm::vec3(0.0f, 12.0f, 0.0f);
+    const glm::vec3 VOLCANO_LIGHT_COLOR = glm::vec3(1.0f, 0.45f, 0.10f) * 2.2f;
+
+    // Uniform locations for the volcano light on EACH shader that should
+    // receive it. Looked up once at startup. The uniform names are the
+    // same across all four shaders for symmetry.
+    GLint locVolPos       = glGetUniformLocation(shader,        "uVolcanoLightPos");
+    GLint locVolCol       = glGetUniformLocation(shader,        "uVolcanoLightColor");
+    GLint volLocVolPos    = glGetUniformLocation(volcanoShader, "uVolcanoLightPos");
+    GLint volLocVolCol    = glGetUniformLocation(volcanoShader, "uVolcanoLightColor");
+    GLint trexLocVolPos   = glGetUniformLocation(trexShader,    "uVolcanoLightPos");
+    GLint trexLocVolCol   = glGetUniformLocation(trexShader,    "uVolcanoLightColor");
+    GLint braLocVolPos    = glGetUniformLocation(brachioShader, "uVolcanoLightPos");
+    GLint braLocVolCol    = glGetUniformLocation(brachioShader, "uVolcanoLightColor");
+
     // ── Skybox (day/night cycle drives the lighting) ─────────────────────────
     // The skybox rotates a sun + moon around the world X axis. Whichever is
     // currently above the horizon drives the directional light for every
@@ -549,6 +569,12 @@ int main()
         glActiveTexture(GL_TEXTURE0);   // restore default unit for any code below
                                         // that does glBindTexture without setting active
 
+        // ── Volcano point light on the main shader ──────────────────────────
+        // Uploaded once per frame (constant for now — could be modulated by
+        // dayBlend later to make the volcano dominate at night).
+        if (locVolPos != -1) glUniform3fv(locVolPos, 1, glm::value_ptr(VOLCANO_LIGHT_POS));
+        if (locVolCol != -1) glUniform3fv(locVolCol, 1, glm::value_ptr(VOLCANO_LIGHT_COLOR));
+
         ground.draw(shader, false);
 
         // ── Volcano model draw (own shader) ──────────────────────────────────
@@ -561,6 +587,8 @@ int main()
         glUniform3fv(volLocLightCol, 1, glm::value_ptr(sunColor));
         glUniform3fv(volLocAmbient,  1, glm::value_ptr(ambient));
         glUniform1f(volLocTime, (float)glfwGetTime());
+        if (volLocVolPos != -1) glUniform3fv(volLocVolPos, 1, glm::value_ptr(VOLCANO_LIGHT_POS));
+        if (volLocVolCol != -1) glUniform3fv(volLocVolCol, 1, glm::value_ptr(VOLCANO_LIGHT_COLOR));
         volcanoModel.draw(volLocModel, VOLCANO_POS, VOLCANO_SCALE);
 
         // ── T-rex (own shader) ───────────────────────────────────────────────
@@ -573,6 +601,8 @@ int main()
         glUniform3fv(trexLocLightDir, 1, glm::value_ptr(sunDir));
         glUniform3fv(trexLocLightCol, 1, glm::value_ptr(sunColor));
         glUniform3fv(trexLocAmbient,  1, glm::value_ptr(ambient));
+        if (trexLocVolPos != -1) glUniform3fv(trexLocVolPos, 1, glm::value_ptr(VOLCANO_LIGHT_POS));
+        if (trexLocVolCol != -1) glUniform3fv(trexLocVolCol, 1, glm::value_ptr(VOLCANO_LIGHT_COLOR));
         trex.draw(trexLocModel, TREX_POS, TREX_SCALE, TREX_YAW);
 
         // ── Brachiosaurus (own shader) ───────────────────────────────────────
@@ -583,6 +613,8 @@ int main()
         glUniform3fv(braLocLightDir, 1, glm::value_ptr(sunDir));
         glUniform3fv(braLocLightCol, 1, glm::value_ptr(sunColor));
         glUniform3fv(braLocAmbient,  1, glm::value_ptr(ambient));
+        if (braLocVolPos != -1) glUniform3fv(braLocVolPos, 1, glm::value_ptr(VOLCANO_LIGHT_POS));
+        if (braLocVolCol != -1) glUniform3fv(braLocVolCol, 1, glm::value_ptr(VOLCANO_LIGHT_COLOR));
         brachio.draw(braLocModel, BRACHIO_POS, BRACHIO_SCALE, BRACHIO_YAW);
 
         glUseProgram(shader);

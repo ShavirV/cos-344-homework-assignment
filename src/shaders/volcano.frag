@@ -1,5 +1,10 @@
 #version 330 core
 
+// Volcano fragment shader.
+// Rock surfaces use Phong with the vertex color as base color.
+// Lava (detected from the vertex color: red-dominant + warm) is rendered as
+// emissive so it visibly glows even at night without a real light source.
+
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vUV;
@@ -11,6 +16,12 @@ uniform vec3 lightDir;      // unit vector pointing FROM surface TOWARD the ligh
 uniform vec3 lightColor;    // e.g. vec3(1.0, 0.95, 0.85)
 uniform vec3 ambientColor;  // e.g. vec3(0.15, 0.16, 0.20)
 uniform float time;         // seconds, used for lava flicker
+
+// NEW — volcano point light. The crater glows on the volcano's own rocky
+// flanks too (and far more strongly there than anywhere else in the scene
+// since it's just below the rim).
+uniform vec3 uVolcanoLightPos;
+uniform vec3 uVolcanoLightColor;
 
 out vec4 FragColor;
 
@@ -36,6 +47,17 @@ void main() {
     vec3 rockShade = ambientColor * rockBase
                    + diff * lightColor * rockBase
                    + spec * lightColor;
+
+    // ── Volcano point light on the rock (NEW) ─────────────────────────────
+    // The crater illuminates the rocky flanks below it. Falloff is the same
+    // shape as in fragment.glsl so the volcano's edge glow matches the
+    // glow it casts on holes / dinosaurs.
+    vec3 toCrater  = uVolcanoLightPos - vWorldPos;
+    float craterD  = length(toCrater);
+    vec3 craterL   = (craterD > 1e-4) ? (toCrater / craterD) : vec3(0.0, 1.0, 0.0);
+    float craterAtt = 1.0 / (1.0 + 0.014 * craterD + 0.0007 * craterD * craterD);
+    float craterDiff = max(dot(N, craterL), 0.0);
+    rockShade += rockBase * uVolcanoLightColor * craterDiff * craterAtt;
 
     // --- Lava: emissive with flicker, plus a hot glow ---
     float flicker = 0.85 + 0.15 * sin(time * 6.0 + hash(floor(vWorldPos * 4.0)) * 6.28);

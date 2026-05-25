@@ -1,5 +1,14 @@
 #version 330 core
 
+// T-rex fragment shader.
+// Blinn-Phong with a procedural scale pattern overlay on greenish skin,
+// flatter highlights on the cream belly, and a brighter spec on
+// teeth/claws (light vs. dark colors).
+//
+// IMPORTANT: lightDir uses the SAME convention as fragment.glsl in your
+// project - it points FROM the surface TOWARD the light. Pass the same
+// value you give the hole shader's uLightDir.
+
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec2 vUV;
@@ -9,6 +18,10 @@ uniform vec3 viewPos;
 uniform vec3 lightDir;
 uniform vec3 lightColor;
 uniform vec3 ambientColor;
+
+// NEW — volcano point light (see fragment.glsl for the full explanation).
+uniform vec3 uVolcanoLightPos;
+uniform vec3 uVolcanoLightColor;
 
 out vec4 FragColor;
 
@@ -76,7 +89,16 @@ void main() {
     if (isMouth)       { specStrength = 0.30; specPower = 32.0; }
     float spec = pow(max(dot(N, H), 0.0), specPower) * specStrength;
 
-    vec3 lit = base * (ambient + diff * lightColor) + spec * lightColor;
+    // ── Volcano point light (NEW) — same maths as fragment.glsl ─────────────
+    vec3 toCrater  = uVolcanoLightPos - vWorldPos;
+    float craterD  = length(toCrater);
+    vec3 craterL   = (craterD > 1e-4) ? (toCrater / craterD) : vec3(0.0, 1.0, 0.0);
+    float craterAtt = 1.0 / (1.0 + 0.014 * craterD + 0.0007 * craterD * craterD);
+    float craterDiff = max(dot(N, craterL), 0.0);
+    vec3 volcanoContrib = uVolcanoLightColor * craterDiff * craterAtt;
+
+    vec3 lit = base * (ambient + diff * lightColor + volcanoContrib)
+             + spec * lightColor;
     // Soft tonemap
     lit = lit / (1.0 + 0.4 * lit);
 
