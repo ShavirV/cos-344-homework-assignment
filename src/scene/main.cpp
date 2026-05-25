@@ -1,4 +1,4 @@
-// main.cpp  —  COS344 Miniature Golf Course
+// main.cpp  :  COS344 Miniature Golf Course
 //
 // Holes are flat red cuboids 28 (length) × 0.2 (height) × 15 (width).
 // Rotation: 0° = runs along X,  90° = runs along Z.
@@ -42,6 +42,7 @@
 #include "../core/shader.hpp"
 #include "../core/Mesh.h"
 
+//holes
 #include "../objects/Hole1.h"
 #include "../objects/Hole2.h"
 #include "../objects/Hole3.h"
@@ -62,11 +63,14 @@
 #include "../objects/Hole17.h"
 #include "../objects/Hole18.h"
 
+//utilites
+#include "../objects/Skybox.h"
+#include "../objects/Water.h"
 
 const int WIDTH  = 1000;
 const int HEIGHT = 1000;
 
-// ── Camera ──────────────────────────────────────────────────────────────────
+//Camera
 glm::vec3 cameraPos   = glm::vec3(0.0f, 90.0f, 160.0f);
 glm::vec3 cameraFront = glm::normalize(glm::vec3(0.0f, -90.0f, -160.0f));
 glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -132,7 +136,17 @@ int main()
     GLint locLightColor = glGetUniformLocation(shader, "uLightColor");
     GLint locAmbient    = glGetUniformLocation(shader, "uAmbient");
 
-    // ── Ground ───────────────────────────────────────────────────────────────
+
+    Skybox skybox;
+    skybox.init(
+        "src/shaders/skybox.vert",
+        "src/shaders/skybox.frag",
+        "src/assets/textures/sky_day.bmp",
+        "src/assets/textures/sky_night.bmp"
+    );
+    skybox.dayLengthSecs = 60.0f; //60 second day/night cycle
+
+    // Ground
     Mesh ground = Mesh::makeCuboid(400.0f, 0.5f, 150.0f, 0.35f, 0.20f, 0.08f, 1.0f);
     ground.setup();
 
@@ -141,7 +155,7 @@ int main()
     volcano.translate(0.0f, 20.0f, -10.0f);
     volcano.setup();
 
-    // ── Holes — using Mesh::makeHole(cx, cy, cz, rotY) ──────────────────────
+    // Holes : using Mesh::makeHole(cx, cy, cz, rotY) 
     // cy = 0.35 places the fairway flush on top of the ground slab (0.5 tall).
     const float FY = 0.35f;
 
@@ -206,7 +220,7 @@ int main()
     h18.translate(35.0f, 0.35f, 50.0f);
     
 
-    // ── Shader uniforms ──────────────────────────────────────────────────────
+    // Shader uniforms 
     glUseProgram(shader);
     GLint locModel = glGetUniformLocation(shader, "model");
     GLint locView  = glGetUniformLocation(shader, "view");
@@ -218,7 +232,7 @@ int main()
     glm::mat4 projection = glm::perspective(
         glm::radians(45.0f), (float)WIDTH / HEIGHT, 0.1f, 500.0f);
 
-    // ── Render loop ──────────────────────────────────────────────────────────
+    // Render loop 
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
@@ -303,19 +317,24 @@ int main()
          glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
          cameraPos); 
          
-         h14.draw(view, projection,
-         glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
-         cameraPos); 
+        h14.draw(view, projection,
+        glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
+        cameraPos); 
          
         h15.draw(view, projection,
          glm::normalize(glm::vec3(0.4f, 1.0f, 0.3f)),  // sunDir
          cameraPos);   
 
 
-         static double lastTime = glfwGetTime();
+        static double lastTime = glfwGetTime();
         double now      = glfwGetTime();
         float deltaTime = (float)(now - lastTime);
         lastTime = now;
+
+        skybox.update(deltaTime);
+        glDepthFunc(GL_LEQUAL);
+        skybox.draw(view, projection);
+        glDepthFunc(GL_LESS);
 
         h16.update(deltaTime);
         h16.setCameraData(view, projection, cameraPos);
