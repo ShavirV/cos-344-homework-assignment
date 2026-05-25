@@ -13,7 +13,7 @@
 //   F1/F2/F3/F4    - Hole 1 / 2 / 3 / 4
 //
 // All Mesh-based holes (5/6/7/8/10/11/12/16) render through the SAME shader as the
-// per-vertex-colour holes (13/14/15) — Mesh.cpp feeds the per-mesh r/g/b
+// per-vertex-colour holes (13/14/15) - Mesh.cpp feeds the per-mesh r/g/b
 // to the shader via a constant vertex attribute, so the procedural turf/
 // kerb classifier in fragment.glsl picks the right look automatically.
 //
@@ -24,8 +24,8 @@
 // scene, using the depth-trick (gl_Position.xyww + GL_LEQUAL).
 //
 // Camera modes:
-//   1. FLY-CAMERA (default) — the original free-flight camera.
-//   2. DRONE (press C) — the quadcopter from Report §8.
+//   1. FLY-CAMERA (default) - the original free-flight camera.
+//   2. DRONE (press C) - the quadcopter from Report §8.
 // Both controllers coexist; C toggles which one drives the view+input.
 //
 // Controls:
@@ -76,13 +76,13 @@
 // ADD HOLE 15: when that class exists, add its #include here.
 #include "../objects/Hole15.h"
 
-// Shav's contributions — Hole 16 + the dynamic skybox + the Mesh class his
+// Shav's contributions - Hole 16 + the dynamic skybox + the Mesh class his
 // holes are built from. These live in the same src/ tree as our holes, so
 // the relative includes match the existing pattern.
 #include "../core/Mesh.h"
 #include "../objects/Hole16.h"
 #include "../objects/Skybox.h"
-// Diya's holes — same Mesh-based pattern as Hole16 (raw Mesh* array,
+// Diya's holes - same Mesh-based pattern as Hole16 (raw Mesh* array,
 // translate / draw API). They get wired in via the dev.cpp render switch
 // the same way Hole16 does.
 #include "../objects/Hole5.h"
@@ -92,7 +92,7 @@
 #include "../objects/Hole10.h"
 #include "../objects/Hole11.h"
 #include "../objects/Hole12.h"
-// Holes 1 / 2 / 3 / 4 — same Mesh-based pattern as holes 5–8.
+// Holes 1 / 2 / 3 / 4 - same Mesh-based pattern as holes 5–8.
 #include "../objects/Hole1.h"
 #include "../objects/Hole2.h"
 #include "../objects/Hole3.h"
@@ -104,7 +104,7 @@
 // -----------------------------------------------------------------------------
 // Shader source paths. ONE shader program drives every renderable in the
 // scene (Holes 13/14/15/16 + Drone), so a uniform set by dev.cpp on this
-// program is visible to all of them. The Skybox has its own shader pair —
+// program is visible to all of them. The Skybox has its own shader pair -
 // it draws with a completely separate program created by Skybox::init().
 //
 // Paths are relative to the working directory the program is launched from.
@@ -166,7 +166,7 @@ static GLuint buildProgramFromFiles(const char* vertPath, const char* fragPath)
     std::string vsSrc = readFile(vertPath);
     std::string fsSrc = readFile(fragPath);
     if (vsSrc.empty() || fsSrc.empty()) {
-        std::cerr << "Cannot build shader program — source files missing ("
+        std::cerr << "Cannot build shader program - source files missing ("
                   << vertPath << ", " << fragPath << ")." << std::endl;
         return 0;
     }
@@ -238,7 +238,7 @@ static bool   g_needFrame = true;  // request a camera reframe on hole switch
 // fly-camera; true = the quadcopter drone from Report §8. Toggle with C.
 // Mouse deltas are accumulated by cursor_cb each time the OS reports cursor
 // movement, then consumed once per frame by either the camera (subtracted
-// directly from g_cam.yaw/pitch — the legacy path) or the drone (consumed
+// directly from g_cam.yaw/pitch - the legacy path) or the drone (consumed
 // via g_drone.update()'s mouseDx/Dy parameters). Tracking deltas in one
 // place keeps the two input paths from fighting over the cursor.
 static Drone  g_drone;
@@ -252,7 +252,7 @@ static Hole14* g_h14 = NULL;
 // ADD HOLE 15: declare g_h15 pointer here when that class exists.
 static Hole15* g_h15 = NULL;
 
-// Shav's Hole 16 + the dynamic skybox. The skybox is shared by ALL holes —
+// Shav's Hole 16 + the dynamic skybox. The skybox is shared by ALL holes -
 // its current sun/moon direction is fed into the shader each frame as the
 // directional light, so 13/14/15/16 all track the same time of day.
 static Hole16* g_h16     = NULL;
@@ -261,11 +261,11 @@ static Hole5*  g_h5  = NULL;
 static Hole6*  g_h6  = NULL;
 static Hole7*  g_h7  = NULL;
 static Hole8*  g_h8  = NULL;
-// Holes 10 / 11 / 12 — same Mesh-based pattern.
+// Holes 10 / 11 / 12 - same Mesh-based pattern.
 static Hole10* g_h10 = NULL;
 static Hole11* g_h11 = NULL;
 static Hole12* g_h12 = NULL;
-// Holes 1 / 2 / 3 / 4 — same Mesh-based pattern.
+// Holes 1 / 2 / 3 / 4 - same Mesh-based pattern.
 static Hole1*  g_h1  = NULL;
 static Hole2*  g_h2  = NULL;
 static Hole3*  g_h3  = NULL;
@@ -278,7 +278,7 @@ static void frameCurrent() {
     if (g_activeHole == 14 && g_h14) { c = g_h14->sceneCenter(); r = g_h14->sceneRadius(); }
     // ADD HOLE 15: add the matching `if` line here.
     if (g_activeHole == 15 && g_h15) { c = g_h15->sceneCenter(); r = g_h15->sceneRadius(); }
-    // Hole 16 doesn't expose sceneCenter/sceneRadius — its arc fairway is
+    // Hole 16 doesn't expose sceneCenter/sceneRadius - its arc fairway is
     // centred at the origin with outer radius ~19 m and ground disc ~21 m,
     // so a 30 m framing radius gives a comfortable view of everything.
     if (g_activeHole == 16 && g_h16) { c = glm::vec3(0.0f, 0.5f, 0.0f); r = 30.0f; }
@@ -296,7 +296,7 @@ static void frameCurrent() {
     if (g_activeHole == 11 && g_h11) { c = glm::vec3(  0.0f, 1.0f,  14.0f); r = 30.0f; }
     // Hole12 hourglass is 28 units long; 22 shows both wide ends.
     if (g_activeHole == 12 && g_h12) { c = glm::vec3(  0.0f, 0.5f,   0.0f); r = 22.0f; }
-    // Holes 1 / 2 / 3 / 4 — built at local origin, 28×15 footprint.
+    // Holes 1 / 2 / 3 / 4 - built at local origin, 28×15 footprint.
     if (g_activeHole == 1  && g_h1)  { c = glm::vec3(  0.0f, 1.0f,   0.0f); r = 22.0f; }
     if (g_activeHole == 2  && g_h2)  { c = glm::vec3(  0.0f, 1.0f,   0.0f); r = 22.0f; }
     if (g_activeHole == 3  && g_h3)  { c = glm::vec3(  0.0f, 2.0f,   0.0f); r = 22.0f; }
@@ -368,7 +368,7 @@ static void cursor_cb(GLFWwindow* /*w*/, double x, double y) {
     g_mouseAccumDx += (float)dx;
     g_mouseAccumDy += (float)dy;
 
-    // Original fly-camera path — only active when the camera is driving.
+    // Original fly-camera path - only active when the camera is driving.
     if (!g_useDrone) {
         const float sens = 0.0025f;
         g_cam.yaw   += (float)dx * sens;
@@ -438,7 +438,7 @@ int main() {
     glEnable(GL_MULTISAMPLE);
 
     GLuint program = buildProgramFromFiles(VERTEX_PATH, FRAGMENT_PATH);
-    // (Removed g_meshProgram — Hole16's Mesh class now binds the SAME shader
+    // (Removed g_meshProgram - Hole16's Mesh class now binds the SAME shader
     // as Hole13/14/15 and the Drone. The Mesh::draw method sets uModel +
     // uNormalMat directly, and feeds the per-mesh r/g/b through a constant
     // vertex attribute at slot 2 so the shader's turf/kerb material
@@ -460,7 +460,7 @@ int main() {
     // at draw time via glGetUniformLocation. We just need to keep a pointer.
     Hole16 hole16;  g_h16 = &hole16;
 
-    // Diya's holes — same Mesh-based pattern. Constructors build geometry,
+    // Diya's holes - same Mesh-based pattern. Constructors build geometry,
     // translate() positions the whole hole in world space. No init(program)
     // needed; Mesh::draw picks up uniforms at draw time.
     Hole5 hole5;  g_h5 = &hole5;  hole5.translate(-42.0f, 0.35f, -22.5f);
@@ -468,19 +468,19 @@ int main() {
     Hole7 hole7;  g_h7 = &hole7;  hole7.translate( 14.0f, 0.35f,   7.5f);
     Hole8 hole8;  g_h8 = &hole8;  hole8.translate( 42.0f, 0.35f,  22.5f);
 
-    // Holes 10 / 11 / 12 — same Mesh-based pattern as Diya's holes.
+    // Holes 10 / 11 / 12 - same Mesh-based pattern as Diya's holes.
     // Positioned at the world origin; the camera reframes onto them via R.
     Hole10 hole10;  g_h10 = &hole10;
     Hole11 hole11;  g_h11 = &hole11;
     Hole12 hole12;  g_h12 = &hole12;
 
-    // Holes 1 / 2 / 3 / 4 — built at local origin; camera reframes via F1-F4.
+    // Holes 1 / 2 / 3 / 4 - built at local origin; camera reframes via F1-F4.
     Hole1 hole1;  g_h1 = &hole1;
     Hole2 hole2;  g_h2 = &hole2;
     Hole3 hole3;  g_h3 = &hole3;
     Hole4 hole4;  g_h4 = &hole4;
 
-    // Drone shares the same shader program — it uses the same vertex layout
+    // Drone shares the same shader program - it uses the same vertex layout
     // (pos / normal / colour) as the holes, so all uniforms line up.
     g_drone.init(program);
 
@@ -537,7 +537,7 @@ int main() {
         g_mouseAccumDy = 0.0f;
 
         // Light sky-blue background (so the holes read as outdoor scenes when
-        // the skybox falls back to a gradient — the actual skybox sphere will
+        // the skybox falls back to a gradient - the actual skybox sphere will
         // cover this on every frame the skybox texture/gradient draws).
         glClearColor(0.55f, 0.75f, 0.92f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -576,12 +576,12 @@ int main() {
         // horizon).
         glm::vec3 lightDir;
         if (sun.intensity >= moon.intensity * 4.0f && glm::length(sun.position) > 1e-3f) {
-            // Daytime — sun dominates (moon is 0.25x scaled in Skybox.cpp,
+            // Daytime - sun dominates (moon is 0.25x scaled in Skybox.cpp,
             // so the 4x factor compensates and picks the sun for the full
             // daylight half of the cycle).
             lightDir = glm::normalize(sun.position);
         } else if (glm::length(moon.position) > 1e-3f) {
-            // Night — use the moon's direction so light comes from above.
+            // Night - use the moon's direction so light comes from above.
             lightDir = glm::normalize(moon.position);
         } else {
             lightDir = glm::normalize(glm::vec3(0.45f, 0.80f, 0.35f));
@@ -590,7 +590,7 @@ int main() {
         // Without this clamp, all top-facing surfaces would receive zero
         // diffuse contribution and look pitch-dark whenever both sun and
         // moon are exactly at the horizon. A floor of 0.10 means the
-        // steepest grazing angle is ~6° above horizontal — bright enough
+        // steepest grazing angle is ~6° above horizontal - bright enough
         // to read shape, dim enough to feel like dusk.
         if (lightDir.y < 0.10f) {
             lightDir.y = 0.10f;
@@ -609,7 +609,7 @@ int main() {
 
         // uAmbient is used by the fragment shader as the "ground bounce" tint
         // in the hemisphere ambient model. Slightly brighter during the day,
-        // notably dimmer + cooler at night, but NEVER zero — we want every
+        // notably dimmer + cooler at night, but NEVER zero - we want every
         // surface to remain readable.
         glm::vec3 dayAmbient   (0.32f, 0.30f, 0.26f);
         glm::vec3 nightAmbient (0.08f, 0.10f, 0.16f);
@@ -637,7 +637,7 @@ int main() {
             case 15: hole15.draw(view, proj, lightDir, eyePos); break;
 
             case 16: {
-                // Hole16 uses Shav's Mesh class — now wired up to the SAME
+                // Hole16 uses Shav's Mesh class - now wired up to the SAME
                 // shader as the other holes (Mesh::draw sets uModel +
                 // uNormalMat and feeds the per-mesh colour via constant
                 // attribute slot 2). Just hand it the program and let it
@@ -658,14 +658,14 @@ int main() {
             case 7: hole7.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
             case 8: hole8.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
 
-            // Holes 10 / 11 / 12 — identical Mesh-based pattern.
+            // Holes 10 / 11 / 12 - identical Mesh-based pattern.
             // Program-wide uniforms (view/projection/uLightColor/uAmbient/
             // uLightDir) are already set above; Mesh::draw picks them up.
             case 10: hole10.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
             case 11: hole11.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
             case 12: hole12.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
 
-            // Holes 1 / 2 / 3 / 4 — same Mesh-based pattern; F1-F4 to select.
+            // Holes 1 / 2 / 3 / 4 - same Mesh-based pattern; F1-F4 to select.
             case 1: hole1.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
             case 2: hole2.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
             case 3: hole3.draw(program, g_wireframe, lightDir, lightColor, eyePos); break;
