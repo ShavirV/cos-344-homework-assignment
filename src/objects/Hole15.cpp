@@ -80,7 +80,7 @@ Hole15::Hole15()
     , mProgram(0)
     , mLocMVP(-1), mLocModel(-1), mLocNormalMat(-1)
     , mLocLightDir(-1), mLocLightColor(-1), mLocAmbient(-1), mLocViewPos(-1)
-    , mCenter(0.0f, 0.5f, 0.0f)
+    , mCenter(0.0f, 4.5f, 0.0f)   // 0.5 (original) + 4.0 (LIFT_Y, see init())
     , mRadius(8.0f)
 {}
 
@@ -493,6 +493,11 @@ void Hole15::init(GLuint shaderProgram)
         buildFlag(cupPos + glm::vec3(0, 0.01f, 0),
                   FLAG_POLE_H, FLAG_POLE_R, COL_POLE, COL_FLAG);
     }
+
+    // lift hole 4 units up
+    static constexpr float LIFT_Y = 4.0f;
+    for (auto& v : mVertices)
+        v.pos.y += LIFT_Y;
 
     // =========================================================================
     // 5. UPLOAD TO GPU
